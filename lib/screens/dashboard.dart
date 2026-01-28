@@ -1,0 +1,569 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../project_core.dart';
+import '../models/project_model.dart';
+import 'teklif_screen.dart';
+import 'arsiv_screen.dart';
+import 'new_project_screen.dart';
+import 'project_details_screen.dart';
+import 'project_archive_screen.dart';
+import 'company_finance_dashboard.dart';
+import 'login_screen.dart';
+import '../services/firebase_service.dart';
+
+class DashboardSayfasi extends StatefulWidget {
+  const DashboardSayfasi({super.key});
+
+  @override
+  State<DashboardSayfasi> createState() => _DashboardSayfasiState();
+}
+
+class _DashboardSayfasiState extends State<DashboardSayfasi> {
+  int _navIndex = 0;
+
+  late String _companyId;
+
+  @override
+  void initState() {
+    super.initState();
+    _companyId = SistemYoneticisi().aktifSirket?.id ?? 'default';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sistem = SistemYoneticisi();
+    final canTeklif = sistem.yetkiVarMi('teklif');
+
+    if (!canTeklif) {
+      return Scaffold(
+        backgroundColor: Colors.grey.shade100,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.lock_outline, size: 48, color: Colors.grey),
+                SizedBox(height: 12),
+                Text(
+                  "Bu sayfayı görüntülemek için yetkiniz yok.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      appBar: AppBar(
+        title: const Text('İnşaat Yönetim'),
+        backgroundColor: Colors.blueGrey.shade700,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.folder_outlined),
+            tooltip: 'Proje Arşivi',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (c) => ProjectArchiveScreen(companyId: _companyId),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.archive_outlined),
+            tooltip: 'Teklif Arşivi',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (c) => const ArsivSayfasi()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Çıkış',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginSayfasi()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
+      ),
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: _navIndex,
+            onDestinationSelected: (i) => setState(() => _navIndex = i),
+            backgroundColor: Colors.white,
+            destinations: const [
+              NavigationRailDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: Text('Projeler'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.description_outlined),
+                selectedIcon: Icon(Icons.description),
+                label: Text('Teklifler'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.assessment_outlined),
+                selectedIcon: Icon(Icons.assessment),
+                label: Text('Muhasebe'),
+              ),
+            ],
+          ),
+          Expanded(
+            child: _navIndex == 0
+                ? _ProjectsTab(
+                    companyId: _companyId,
+                    onProjectTap: (projectId) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (c) => ProjectDetailsScreen(projectId: projectId),
+                        ),
+                      );
+                    },
+                  )
+                : _navIndex == 1
+                    ? const _TekliflerListesi()
+                    : CompanyFinanceDashboard(companyId: _companyId),
+          ),
+        ],
+      ),
+      floatingActionButton: _navIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                if (!mounted) return;
+                // ignore: use_build_context_synchronously
+                final projectId = await Navigator.push<String?>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (c) => NewProjectScreen(companyId: _companyId),
+                  ),
+                );
+                if (!mounted || projectId == null) return;
+                // ignore: use_build_context_synchronously
+                await Navigator.push<void>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (c) => ProjectDetailsScreen(projectId: projectId),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Yeni Proje'),
+              backgroundColor: Colors.blueGrey.shade700,
+            )
+          : _navIndex == 1
+              ? FloatingActionButton.extended(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => const TeklifSayfasi(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Yeni Teklif'),
+                  backgroundColor: Colors.blueGrey.shade700,
+                )
+              : null,
+    );
+  }
+}
+
+// -----------------------------------------------------------
+// TEKLİFLER LİSTESİ
+// -----------------------------------------------------------
+class _TekliflerListesi extends StatefulWidget {
+  const _TekliflerListesi();
+
+  @override
+  State<_TekliflerListesi> createState() => _TekliflerListesiState();
+}
+
+class _TekliflerListesiState extends State<_TekliflerListesi> {
+  late TextEditingController _searchCtrl;
+  String _durumFiltre = 'teklif'; // Filtre: 'teklif', 'anlasildi', 'tamamlandi', 'all'
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Arama ve Filtreleme Alanı
+        Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.grey.shade100,
+          child: Column(
+            children: [
+              TextField(
+                controller: _searchCtrl,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: "İlçe, mahalle, ada veya parsel ara...",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                onChanged: (v) => setState(() {}),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  FilterChip(
+                    label: const Text("Teklif"),
+                    selected: _durumFiltre == 'teklif',
+                    onSelected: (v) => setState(() => _durumFiltre = 'teklif'),
+                  ),
+                  FilterChip(
+                    label: const Text("Anlaşıldı"),
+                    selected: _durumFiltre == 'anlasildi',
+                    onSelected: (v) => setState(() => _durumFiltre = 'anlasildi'),
+                  ),
+                  FilterChip(
+                    label: const Text("Tamamlandı"),
+                    selected: _durumFiltre == 'tamamlandi',
+                    onSelected: (v) => setState(() => _durumFiltre = 'tamamlandi'),
+                  ),
+                  FilterChip(
+                    label: const Text("Tümü"),
+                    selected: _durumFiltre == 'all',
+                    onSelected: (v) => setState(() => _durumFiltre = 'all'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Teklifler Listesi
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: _durumFiltre == 'all'
+                ? FirebaseFirestore.instance
+                    .collection('teklifler')
+                    .orderBy('tarih', descending: true)
+                    .limit(50)
+                    .snapshots()
+                : FirebaseFirestore.instance
+                    .collection('teklifler')
+                    .where('durum', isEqualTo: _durumFiltre)
+                    .orderBy('tarih', descending: true)
+                    .limit(50)
+                    .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Text(
+                      "Veriler yüklenemedi.\nLütfen Firebase Console'da INDEX oluşturun.\n\nHata: ${snapshot.error}",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                );
+              }
+
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(child: Text("Teklif bulunamadı."));
+              }
+              final searchTerm = _searchCtrl.text.toLowerCase();
+              final filtered = snapshot.data!.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final ilce = (data['ilce'] ?? '').toString().toLowerCase();
+                final mahalle = (data['mahalle'] ?? '').toString().toLowerCase();
+                final ada = (data['ada'] ?? '').toString().toLowerCase();
+                final parsel = (data['parsel'] ?? '').toString().toLowerCase();
+                return ilce.contains(searchTerm) ||
+                    mahalle.contains(searchTerm) ||
+                    ada.contains(searchTerm) ||
+                    parsel.contains(searchTerm);
+              }).toList();
+
+              if (filtered.isEmpty) {
+                return Center(
+                  child: Text("'$searchTerm' için teklif bulunamadı."),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(10),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) {
+                  var doc = filtered[index];
+                  var data = doc.data() as Map<String, dynamic>;
+                  DateTime tarih;
+                  try {
+                    tarih = (data['tarih'] as Timestamp).toDate();
+                  } catch (e) {
+                    tarih = DateTime.now();
+                  }
+
+                  return Card(
+                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.blue.shade100,
+                        child: const Icon(Icons.description, color: Colors.blue),
+                      ),
+                      title: Text(
+                        "${data['ilce']} / ${data['mahalle']}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        "Ada: ${data['ada']} | Parsel: ${data['parsel']} | Tarih: ${tarih.day}.${tarih.month}.${tarih.year}",
+                      ),
+
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 30),
+                            tooltip: "Teklifi Görüntüle ve Onayla",
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (c) => TeklifSayfasi(mevcutTeklifData: data, mevcutDocId: doc.id),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                        ],
+                      ),
+
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => TeklifSayfasi(mevcutTeklifData: data, mevcutDocId: doc.id),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// -----------------------------------------------------------
+// PROJELER TAB'I
+// -----------------------------------------------------------
+class _ProjectsTab extends StatefulWidget {
+  final String companyId;
+  final Function(String) onProjectTap;
+
+  const _ProjectsTab({
+    required this.companyId,
+    required this.onProjectTap,
+  });
+
+  @override
+  State<_ProjectsTab> createState() => _ProjectsTabState();
+}
+
+class _ProjectsTabState extends State<_ProjectsTab> {
+  final _firebase = FirebaseService();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<Project>>(
+      stream: _firebase.getProjectsStream(widget.companyId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Hata: ${snapshot.error}'),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.folder_open_outlined, size: 48, color: Colors.grey),
+                const SizedBox(height: 12),
+                const Text('Henüz proje yok'),
+              ],
+            ),
+          );
+        }
+
+        final projects = snapshot.data!;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: projects.length,
+          itemBuilder: (context, index) {
+            final project = projects[index];
+
+            return FutureBuilder<ProjectFinance>(
+              future: _firebase.getProjectFinance(project.id),
+              builder: (context, financeSnap) {
+                final finance = financeSnap.data;
+
+                return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: InkWell(
+                    onTap: () => widget.onProjectTap(project.id),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      project.name,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${project.startDate.day}.${project.startDate.month}.${project.startDate.year}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(project.status).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  project.status.name.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: _getStatusColor(project.status),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (finance != null)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Chip(
+                                  label: Text(
+                                    'Gelir: ${formatNumber(finance.totalIncome)} ₺',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  backgroundColor: Colors.green.withValues(alpha: 0.1),
+                                ),
+                                Chip(
+                                  label: Text(
+                                    'Gider: ${formatNumber(finance.totalExpenses)} ₺',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                  backgroundColor: Colors.red.withValues(alpha: 0.1),
+                                ),
+                                Chip(
+                                  label: Text(
+                                    'Kâr: ${formatNumber(finance.profit)} ₺',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Color _getStatusColor(ProjectStatus status) {
+    switch (status) {
+      case ProjectStatus.planning:
+        return Colors.blue;
+      case ProjectStatus.ongoing:
+        return Colors.orange;
+      case ProjectStatus.completed:
+        return Colors.green;
+      case ProjectStatus.cancelled:
+        return Colors.red;
+    }
+  }
+}

@@ -146,6 +146,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         final sira = data['sira'] as int?;
         final url = data['url'] as String?;
         final tarih = data['tarih'] as String?;
+        final aciklama = data['aciklama'] as String?;
         
         if (sira != null && url != null && mounted) {
           if (!_santiyeFotograflar.containsKey(sira)) {
@@ -156,6 +157,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               'url': url,
               'tarih': tarih ?? '',
               'id': doc.id,
+              'aciklama': aciklama ?? '',
             });
           });
         }
@@ -1683,28 +1685,49 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 if (fotograflar.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   SizedBox(
-                    height: 80,
+                    height: 120,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: fotograflar.length,
                       itemBuilder: (context, index) {
                         final foto = fotograflar[index];
+                        final aciklama = foto['aciklama'] ?? '';
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: GestureDetector(
                             onTap: () => _santiyeFotografOnizle(fotograflar, index),
                             child: Stack(
                               children: [
-                                Container(
-                                  width: 80,
-                                  height: 80,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    image: DecorationImage(
-                                      image: NetworkImage(foto['url']!),
-                                      fit: BoxFit.cover,
+                                Column(
+                                  children: [
+                                    Container(
+                                      width: 80,
+                                      height: 80,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        image: DecorationImage(
+                                          image: NetworkImage(foto['url']!),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    if (aciklama.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      SizedBox(
+                                        width: 80,
+                                        child: Text(
+                                          aciklama,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey.shade700,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 Positioned(
                                   top: 2,
@@ -1862,8 +1885,94 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       
       if (result == null || result.files.isEmpty) return;
       
+      // Her fotoğraf için açıklama girme dialogu
+      final fotografBilgileri = <Map<String, dynamic>>[];
+      
       for (final file in result.files) {
         if (file.bytes == null) continue;
+        
+        final aciklamaCtrl = TextEditingController();
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Fotoğraf Açıklaması'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: 150,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(
+                      file.bytes!,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: aciklamaCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Açıklama (isteğe bağlı)',
+                    hintText: 'Örn: Zemin kat kalıp işlemi başlandı',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Atla'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Devam'),
+              ),
+            ],
+          ),
+        );
+        
+        if (confirmed == false) continue;
+        
+        fotografBilgileri.add({
+          'file': file,
+          'aciklama': aciklamaCtrl.text,
+        });
+      }
+      
+      if (fotografBilgileri.isEmpty) return;
+      
+      // Yükleniyor göstergesi
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                Text('${fotografBilgileri.length} fotoğraf yükleniyor...'),
+              ],
+            ),
+            duration: const Duration(seconds: 60),
+            backgroundColor: Colors.blue.shade700,
+          ),
+        );
+      }
+      
+      // Fotoğrafları yükle
+      for (final fotoBilgi in fotografBilgileri) {
+        final file = fotoBilgi['file'] as PlatformFile;
+        final aciklama = fotoBilgi['aciklama'] as String;
         
         // Firebase Storage'a yükle
         final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
@@ -1883,6 +1992,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           'sira': sira,
           'url': downloadUrl,
           'tarih': DateTime.now().toIso8601String(),
+          'aciklama': aciklama,
         });
         
         // State'e ekle
@@ -1895,20 +2005,23 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             'url': downloadUrl,
             'tarih': DateTime.now().toIso8601String(),
             'id': docRef.id,
+            'aciklama': aciklama,
           });
         });
       }
       
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${result.files.length} fotoğraf yüklendi'),
+            content: Text('${fotografBilgileri.length} fotoğraf yüklendi'),
             backgroundColor: Colors.green.shade700,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hata: $e'),
@@ -1995,6 +2108,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               itemCount: fotograflar.length,
               itemBuilder: (context, index) {
                 final foto = fotograflar[index];
+                final aciklama = foto['aciklama'] ?? '';
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -2011,14 +2125,30 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                         ),
                       ),
                     ),
-                    if (foto['tarih']!.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          DateTime.parse(foto['tarih']!).toString().substring(0, 16),
-                          style: const TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          if (aciklama.isNotEmpty) ...[
+                            Text(
+                              aciklama,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          if (foto['tarih']!.isNotEmpty)
+                            Text(
+                              DateTime.parse(foto['tarih']!).toString().substring(0, 16),
+                              style: const TextStyle(color: Colors.white70, fontSize: 14),
+                            ),
+                        ],
                       ),
+                    ),
                   ],
                 );
               },

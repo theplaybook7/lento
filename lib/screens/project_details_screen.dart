@@ -8,8 +8,9 @@ import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
-import '../utils/format_utils.dart';
+import '../utils/format_utils.dart' as format_utils;
 import '../theme/app_theme.dart';
+import '../project_core.dart';
 import 'payment_plans_screen.dart';
 import 'cari_hesap_screen.dart';
 
@@ -306,14 +307,41 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         controller: _tabController,
         children: [
           // Muhasebe Tab
-          _buildMuhasebeTab(),
+          _buildYetkiKontrolluTab('muhasebe', _buildMuhasebeTab()),
           // Ruhsat Tab
-          _buildRuhsatTab(),
+          _buildYetkiKontrolluTab('ruhsat', _buildRuhsatTab()),
           // Şantiye Tab
-          _buildSantiyeTab(),
+          _buildYetkiKontrolluTab('santiye', _buildSantiyeTab()),
         ],
       ),
     );
+  }
+
+  Widget _buildYetkiKontrolluTab(String modul, Widget content) {
+    final sistem = SistemYoneticisi();
+    final yetkiVar = sistem.yetkiVarMi(modul);
+
+    if (!yetkiVar) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                "Bu sekmeyi görüntülemek için yetkiniz yok.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return content;
   }
 
   Widget _buildMuhasebeTab() {
@@ -441,7 +469,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                               children: [
                                 Text('Bütçe', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                                 Text(
-                                  '${formatNumber(project.totalBudget)} ₺',
+                                  '${format_utils.formatNumber(project.totalBudget)} ₺',
                                   style: const TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               ],
@@ -638,7 +666,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                   style: TextStyle(color: renk, fontSize: 12),
                                 ),
                                 trailing: Text(
-                                  formatTL(bakiye.abs()),
+                                  format_utils.formatTL(bakiye.abs()),
                                   style: TextStyle(
                                     color: renk,
                                     fontWeight: FontWeight.bold,
@@ -2407,7 +2435,7 @@ class _FinanceCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${formatNumber(amount)} ₺',
+            '${format_utils.formatNumber(amount)} ₺',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
               color: color,

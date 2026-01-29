@@ -10,6 +10,7 @@ import 'new_project_screen.dart';
 import 'project_details_screen.dart';
 import 'project_archive_screen.dart';
 import 'company_finance_dashboard.dart';
+import 'settings_screen.dart';
 import 'login_screen.dart';
 import '../services/firebase_service.dart';
 
@@ -35,6 +36,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
   Widget build(BuildContext context) {
     final sistem = SistemYoneticisi();
     final canTeklif = sistem.yetkiVarMi('teklif');
+    final canMuhasebe = sistem.yetkiVarMi('muhasebe');
 
     if (!canTeklif) {
       return Scaffold(
@@ -90,6 +92,16 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Ayarlar',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Çıkış',
             onPressed: () async {
@@ -109,22 +121,23 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
             selectedIndex: _navIndex,
             onDestinationSelected: (i) => setState(() => _navIndex = i),
             backgroundColor: Colors.white,
-            destinations: const [
-              NavigationRailDestination(
+            destinations: [
+              const NavigationRailDestination(
                 icon: Icon(Icons.home_outlined),
                 selectedIcon: Icon(Icons.home),
                 label: Text('Projeler'),
               ),
-              NavigationRailDestination(
+              const NavigationRailDestination(
                 icon: Icon(Icons.description_outlined),
                 selectedIcon: Icon(Icons.description),
                 label: Text('Teklifler'),
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.assessment_outlined),
-                selectedIcon: Icon(Icons.assessment),
-                label: Text('Muhasebe'),
-              ),
+              if (canMuhasebe)
+                const NavigationRailDestination(
+                  icon: Icon(Icons.assessment_outlined),
+                  selectedIcon: Icon(Icons.assessment),
+                  label: Text('Muhasebe'),
+                ),
             ],
           ),
           Expanded(
@@ -142,7 +155,9 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                   )
                 : _navIndex == 1
                     ? const _TekliflerListesi()
-                    : CompanyFinanceDashboard(companyId: _companyId),
+                    : canMuhasebe 
+                        ? CompanyFinanceDashboard(companyId: _companyId)
+                        : const Center(child: Text('Yetkiniz yok')),
           ),
         ],
       ),
@@ -536,7 +551,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          if (finance != null)
+                          if (finance != null && SistemYoneticisi().yetkiVarMi('muhasebe'))
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [

@@ -65,10 +65,42 @@ class Sirket {
   String id;
   String ad;
   Uint8List? logo;
+  String? logoUrl;
   String yoneticiEposta;
+  String? telefon;
+  String? adres;
+  bool aktif;
   List<PersonelYetki> personelListesi;
+  
+  // Ödeme & Subscription bilgileri
+  bool odemePaid;
+  DateTime? odemeDate;
+  String? odemeTransactionId;
+  
+  // Subscription
+  String? subscriptionType;       // 'yearly' | 'monthly' | 'trial'
+  DateTime? subscriptionEndDate;  // Abonelik bitiş tarihi
+  bool autoRenew;                 // Otomatik yenileme
+  List<Map<String, dynamic>> paymentHistory; // Ödeme geçmişi
 
-  Sirket({required this.id, required this.ad, this.logo, required this.yoneticiEposta, required this.personelListesi});
+  Sirket({
+    required this.id,
+    required this.ad,
+    this.logo,
+    this.logoUrl,
+    required this.yoneticiEposta,
+    this.telefon,
+    this.adres,
+    this.aktif = true,
+    required this.personelListesi,
+    this.odemePaid = false,
+    this.odemeDate,
+    this.odemeTransactionId,
+    this.subscriptionType,
+    this.subscriptionEndDate,
+    this.autoRenew = true,
+    this.paymentHistory = const [],
+  });
 
   factory Sirket.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> m = doc.data() as Map<String, dynamic>;
@@ -79,8 +111,19 @@ class Sirket {
       id: doc.id,
       ad: m['ad'],
       logo: m['logo'] != null ? base64Decode(m['logo']) : null,
+      logoUrl: m['logoUrl'] as String?,
       yoneticiEposta: m['yoneticiEposta'],
+      telefon: m['telefon'] as String?,
+      adres: m['adres'] as String?,
+      aktif: m['aktif'] as bool? ?? true,
       personelListesi: yetkiler,
+      odemePaid: m['odemePaid'] as bool? ?? false,
+      odemeDate: m['odemeDate'] != null ? (m['odemeDate'] as Timestamp).toDate() : null,
+      odemeTransactionId: m['odemeTransactionId'] as String?,
+      subscriptionType: m['subscriptionType'] as String?,
+      subscriptionEndDate: m['subscriptionEndDate'] != null ? (m['subscriptionEndDate'] as Timestamp).toDate() : null,
+      autoRenew: m['autoRenew'] as bool? ?? true,
+      paymentHistory: List<Map<String, dynamic>>.from(m['paymentHistory'] as List? ?? []),
     );
   }
 }

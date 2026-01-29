@@ -22,6 +22,36 @@ class _CompanyFinanceDashboardState extends State<CompanyFinanceDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final sistem = SistemYoneticisi();
+    final yetkiVar = sistem.yetkiVarMi('muhasebe');
+
+    if (!yetkiVar) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Şirket Muhasebesi'),
+          backgroundColor: Colors.blueGrey.shade700,
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_outline, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+                Text(
+                  "Bu sayfayı görüntülemek için yetkiniz yok.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Şirket Muhasebesi'),

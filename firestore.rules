@@ -14,14 +14,28 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId;
     }
 
-    // Users koleksiyonu
+    function hasActiveSubscription() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionEndDate > now &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionType != null;
+    }
+
+    // Users koleksiyonu - Ödeme bilgileri
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId);
       allow write: if isAuthenticated() && (request.auth.uid == userId);
     }
 
+    // Payments koleksiyonu - Ödeme geçmişi
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if isAuthenticated();
+    }
+
     // Şirketler koleksiyonu
     match /sirketler/{sirketId} {
+      // Şirket oluşturmak için aktif subscription gerekli
+      allow create: if hasActiveSubscription() && request.resource.data.odemePaid == true;
       allow read: if isAuthenticated() && userSirketId() == sirketId;
       allow write: if isAdmin() && userSirketId() == sirketId;
     }

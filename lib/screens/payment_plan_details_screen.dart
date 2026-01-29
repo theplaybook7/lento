@@ -228,9 +228,20 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                             itemCount: paymentRecords.length,
                             itemBuilder: (context, idx) {
                               final record = paymentRecords[idx].data() as Map<String, dynamic>;
-                              final amount = (record['paidAmount'] as num?)?.toDouble() ?? 0;
+                              // tlAmount varsa onu göster (dönüştürülmüş tutar), yoksa paidAmount'ı göster
+                              final amount = ((record['tlAmount'] ?? record['paidAmount']) as num?)?.toDouble() ?? 0;
+                              final originalCurrency = record['currency'] as String? ?? 'TL';
+                              final originalAmount = (record['paidAmount'] as num?)?.toDouble() ?? 0;
                               final date = record['createdAt'] as Timestamp?;
                               final photos = List<String>.from(record['photoUrls'] ?? []);
+                              
+                              // Başlık: eğer orijinal para birimi TL değilse, ikisini de göster
+                              String amountDisplay = '';
+                              if (originalCurrency != 'TL' && originalAmount > 0) {
+                                amountDisplay = '$originalAmount $originalCurrency = ₺${NumberFormat('#,##0.00', 'tr_TR').format(amount)}';
+                              } else {
+                                amountDisplay = '₺${NumberFormat('#,##0.00', 'tr_TR').format(amount)}';
+                              }
 
                               return Column(
                                 children: [
@@ -238,7 +249,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                                     dense: true,
                                     leading: const Icon(Icons.check, color: Colors.green, size: 20),
                                     title: Text(
-                                      '₺${NumberFormat('#,##0.00', 'tr_TR').format(amount)}',
+                                      amountDisplay,
                                       style: const TextStyle(fontWeight: FontWeight.bold),
                                     ),
                                     subtitle: date != null

@@ -3,8 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:html' as html;
-import 'dart:ui_web' as ui;
 import 'dart:developer' as developer;
+import 'dart:typed_data';
+import 'dart:ui_web' as ui_web;
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart';
@@ -1075,86 +1076,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       // Dosya türünü belirle
       final dosyaTipi = dosyaAdi.toLowerCase();
       final isPdf = dosyaTipi.endsWith('.pdf');
-      final isImage = dosyaTipi.endsWith('.jpg') || 
-                      dosyaTipi.endsWith('.jpeg') || 
-                      dosyaTipi.endsWith('.png') || 
-                      dosyaTipi.endsWith('.gif');
-
-      // Benzersiz view type oluştur
-      final viewType = 'preview-${DateTime.now().millisecondsSinceEpoch}';
-      
-      // IFrame oluştur - dosya türüne göre
-      ui.platformViewRegistry.registerViewFactory(
-        viewType,
-        (int viewId) {
-          final iframe = html.IFrameElement();
-          
-          if (isPdf) {
-            // PDF için PDF viewer embed
-            final pdfViewerHtml = '''
-            <html>
-              <head>
-                <style>
-                  body { margin: 0; padding: 0; }
-                  iframe { width: 100%; height: 100%; border: none; }
-                </style>
-              </head>
-              <body>
-                <iframe src="${Uri.encodeComponent(url)}" type="application/pdf"></iframe>
-              </body>
-            </html>
-            ''';
-            iframe.srcdoc = pdfViewerHtml;
-          } else if (isImage) {
-            // Resim için basit HTML
-            final imageHtml = '''
-            <html>
-              <head>
-                <style>
-                  body { margin: 0; padding: 10px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; height: 100vh; }
-                  img { max-width: 100%; max-height: 100%; object-fit: contain; }
-                </style>
-              </head>
-              <body>
-                <img src="$url" />
-              </body>
-            </html>
-            ''';
-            iframe.srcdoc = imageHtml;
-          } else {
-            // Diğer dosyalar için indirme linki göster
-            final downloadHtml = '''
-            <html>
-              <head>
-                <style>
-                  body { margin: 0; padding: 20px; background: #f5f5f5; font-family: Arial; display: flex; align-items: center; justify-content: center; height: 100vh; }
-                  .container { text-align: center; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                  .icon { font-size: 64px; margin-bottom: 20px; }
-                  h2 { color: #333; margin: 0 0 10px 0; }
-                  p { color: #666; margin: 0 0 20px 0; }
-                  a { display: inline-block; background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; cursor: pointer; }
-                  a:hover { background: #1976D2; }
-                </style>
-              </head>
-              <body>
-                <div class="container">
-                  <div class="icon">📄</div>
-                  <h2>Belge Önizlemesi Desteklenmiyor</h2>
-                  <p>Bu dosya türü için önizleme mevcut değildir.</p>
-                  <a href="$url" download="${dosyaAdi}">Dosyayı İndir</a>
-                </div>
-              </body>
-            </html>
-            ''';
-            iframe.srcdoc = downloadHtml;
-          }
-          
-          iframe.style.border = 'none';
-          iframe.style.height = '100%';
-          iframe.style.width = '100%';
-          return iframe;
-        },
-      );
+      final isImage = dosyaTipi.endsWith('.jpg') ||
+          dosyaTipi.endsWith('.jpeg') ||
+          dosyaTipi.endsWith('.png') ||
+          dosyaTipi.endsWith('.gif');
 
       // Dialog ile önizleme göster
       showDialog(
@@ -1210,11 +1135,31 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     ],
                   ),
                 ),
-                // Önizleme alanı - HtmlElementView ile iframe göster
+                // Önizleme alanı
                 Expanded(
                   child: Container(
                     color: Colors.grey.shade100,
-                    child: HtmlElementView(viewType: viewType),
+                    child: (isPdf || isImage)
+                        ? FutureBuilder<Uint8List>(
+                            future: _fetchFileBytes(url),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                              if (snapshot.hasError || !snapshot.hasData) {
+                                return _buildPreviewError(message: snapshot.error?.toString());
+                              }
+                              
+                              final bytes = snapshot.data!;
+                              
+                              if (bytes.isEmpty) {
+                                return _buildPreviewError(message: 'Dosya boş (0 bytes)');
+                              }
+                              
+                              return _buildWebPreview(bytes, isPdf, dosyaAdi);
+                            },
+                          )
+                        : _buildPreviewUnsupported(),
                   ),
                 ),
               ],
@@ -1229,6 +1174,113 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           backgroundColor: Colors.red.shade700,
         ),
       );
+    }
+  }
+
+  Future<Uint8List> _fetchFileBytes(String url) async {
+    try {
+      final ref = FirebaseStorage.instance.refFromURL(url);
+      final metadata = await ref.getMetadata();
+      final maxSize = metadata.size ?? (50 * 1024 * 1024);
+      final bytes = await ref.getData(maxSize);
+      
+      if (bytes == null) {
+        throw Exception('Dosya indirilemedi');
+      }
+      
+      return bytes;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Widget _buildPreviewError({String? message}) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 56, color: Colors.red.shade400),
+            const SizedBox(height: 12),
+            Text(
+              'Önizleme yüklenemedi',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red.shade400),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            if (message != null && message.isNotEmpty)
+              Text(
+                message,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+            const SizedBox(height: 6),
+            Text(
+              'Lütfen indirme butonunu kullanın.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreviewUnsupported() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.file_present, size: 64, color: Colors.blueGrey.shade700),
+            const SizedBox(height: 16),
+            Text(
+              'Bu dosya türü için önizleme yok',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blueGrey.shade700),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'İndirme butonu ile dosyayı açabilirsiniz.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebPreview(Uint8List bytes, bool isPdf, String fileName) {
+    try {
+      // Blob oluştur
+      final mimeType = isPdf ? 'application/pdf' : 'image/png';
+      final blob = html.Blob([bytes], mimeType);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      
+      // Benzersiz bir view ID oluştur
+      final viewId = 'preview-${DateTime.now().millisecondsSinceEpoch}';
+      
+      // HTML iframe elementi oluştur
+      // ignore: undefined_prefixed_name
+      ui_web.platformViewRegistry.registerViewFactory(
+        viewId,
+        (int viewIdInt) {
+          final iframe = html.IFrameElement()
+            ..src = url
+            ..style.border = 'none'
+            ..style.width = '100%'
+            ..style.height = '100%';
+          return iframe;
+        },
+      );
+      
+      return HtmlElementView(viewType: viewId);
+    } catch (e) {
+      print('_buildWebPreview hatası: $e');
+      return _buildPreviewError(message: e.toString());
     }
   }
 

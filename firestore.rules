@@ -79,6 +79,18 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated();
     }
 
+    // Ruhsat Dosyaları
+    match /ruhsat/{projectId} {
+      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/projects/$(projectId));
+      allow write: if isAuthenticated() && exists(/databases/$(database)/documents/projects/$(projectId));
+    }
+
+    // Şantiye Dosyaları
+    match /santiye/{projectId} {
+      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/projects/$(projectId));
+      allow write: if isAuthenticated() && exists(/databases/$(database)/documents/projects/$(projectId));
+    }
+
     // Diğer koleksiyonlar
     match /{document=**} {
       allow read, write: if false;

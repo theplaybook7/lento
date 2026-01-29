@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:html' as html;
+import 'dart:ui_web' as ui;
+import 'dart:developer' as developer;
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart';
@@ -14,13 +19,82 @@ class ProjectDetailsScreen extends StatefulWidget {
   State<ProjectDetailsScreen> createState() => _ProjectDetailsScreenState();
 }
 
-class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
+class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with SingleTickerProviderStateMixin {
   late FirebaseService _firebase;
+  late TabController _tabController;
+  
+  // Ruhsat işlem sırası durum yönetimi
+  final Map<int, int> _ruhsatDurumlari = {}; // sıra -> durum (0: başlamadı, 1: devam ediyor, 2: tamamlandı)
+  
+  // Belgeler
+  final List<Map<String, String>> _yuklenenBelgeler = []; // {başlık, tarih, type}
 
   @override
   void initState() {
     super.initState();
     _firebase = FirebaseService();
+    _tabController = TabController(length: 3, vsync: this);
+    _ruhsatVerileriniYukle();
+    _belgeleriYukle();
+  }
+  
+  void _ruhsatVerileriniYukle() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .collection('islemler')
+          .get();
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final sira = data['sira'] as int?;
+        final durum = data['durum'] as int?;
+        
+        if (sira != null && durum != null && mounted) {
+          setState(() {
+            _ruhsatDurumlari[sira] = durum;
+          });
+        }
+      }
+    } catch (e) {
+      developer.log('Ruhsat verileri yükleme hatası: $e');
+    }
+  }
+  
+  void _belgeleriYukle() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .collection('belgeler')
+          .get();
+      
+      final belgeler = <Map<String, String>>[];
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        belgeler.add({
+          'başlık': data['başlık'] ?? '',
+          'tarih': data['tarih'] ?? '',
+          'firebaseUrl': data['firbaseUrl'] ?? '',
+        });
+      }
+      
+      if (mounted) {
+        setState(() {
+          _yuklenenBelgeler.clear();
+          _yuklenenBelgeler.addAll(belgeler);
+        });
+      }
+    } catch (e) {
+      developer.log('Belgeler yükleme hatası: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -30,6 +104,17 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
         title: const Text('Proje Detayları'),
         backgroundColor: Colors.blueGrey.shade700,
         foregroundColor: Colors.white,
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Muhasebe', icon: Icon(Icons.info_outline, size: 20)),
+            Tab(text: 'Ruhsat', icon: Icon(Icons.description_outlined, size: 20)),
+            Tab(text: 'Şantiye', icon: Icon(Icons.construction_outlined, size: 20)),
+          ],
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+        ),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) async {
@@ -127,20 +212,35 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<Project?>(
-        future: _firebase.getProject(widget.projectId),
-        builder: (context, projectSnap) {
-          if (projectSnap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Muhasebe Tab
+          _buildMuhasebeTab(),
+          // Ruhsat Tab
+          _buildRuhsatTab(),
+          // Şantiye Tab
+          _buildSantiyeTab(),
+        ],
+      ),
+    );
+  }
 
-          if (!projectSnap.hasData || projectSnap.data == null) {
-            return const Center(child: Text('Proje bulunamadı'));
-          }
+  Widget _buildMuhasebeTab() {
+    return FutureBuilder<Project?>(
+      future: _firebase.getProject(widget.projectId),
+      builder: (context, projectSnap) {
+        if (projectSnap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          final project = projectSnap.data!;
+        if (!projectSnap.hasData || projectSnap.data == null) {
+          return const Center(child: Text('Proje bulunamadı'));
+        }
 
-          return SingleChildScrollView(
+        final project = projectSnap.data!;
+
+        return SingleChildScrollView(
             child: Column(
               children: [
                 // Hızlı İşlemler Çubuğu
@@ -467,8 +567,732 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
             ),
           );
         },
-      ),
+      );
+  }
 
+  Widget _buildRuhsatTab() {
+    final ruhsatMaddeleri = [
+      'Aplikasyon Krokisi',
+      'Kentsel dönüşüm ise metrekare ve daire sayısı kontrolü',
+      'İmar durumu',
+      'İstikamet',
+      'Kot Kesit',
+      'Rbt ve Muafiyet Onayı',
+      'Bina Boş Yazısı',
+      'Yıkım Ruhsatı',
+      'Yanan Yıkılan',
+      'Zemine Etütü',
+      'Yola Terk, Hibe, Satın Alma, İfraz, Tevhit varsa Harita Folyosu',
+      'Hibe, Satın alma, İfraz, Tevhit işlemi varsa 3. maddeye geri dön',
+      'Harita folyosu encümen onayı',
+      'Harita folyosu kadastro onayı',
+      'İski müracatı',
+      'İski harcı yatır',
+      'Ruhsat Dilekçesi',
+      'Mimari Proje Ozalit',
+      'Fen işleri harç hesabı ve yatırma',
+      'Yapı Denetim Ataması',
+      'Mimari Proje Belediye Onayı',
+      'Statik Proje Belediye Onayı',
+      'Elektrik Proje Belediye Onayı',
+      'Makine Proje Belediye Onayı',
+      'Akustilk Belediye Onayı',
+      'Zemin Etütü Belediye Onayı',
+      'Harçları Hesaplat Yatır (Otopark Harcı, Proje Kontrol Harcı, Ruhsat Harcı, Tesisat Harcı)',
+      'Asansör Proje',
+      'Teminat Mektubu',
+      'Şantiye Şefi Sözleşmesi, İnşaat Yapım Sözleşmesi',
+      'Müteahhit Taahhütü',
+      'Ruhsat Yazdır',
+    ];
+
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          // Ruhsat ve Belgeler Tab'ları
+          TabBar(
+            tabs: const [
+              Tab(text: 'İşlem Sırası'),
+              Tab(text: 'Belgeler'),
+            ],
+            indicatorColor: Colors.blueGrey.shade700,
+            labelColor: Colors.blueGrey.shade700,
+          ),
+          // Tab Content
+          Expanded(
+            child: TabBarView(
+              children: [
+                // Tab 1: İşlem Sırası (Kanban)
+                _buildRuhsatIslemSirasi(ruhsatMaddeleri),
+                // Tab 2: Belgeler
+                _buildBelgeYuklemeTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRuhsatIslemSirasi(List<String> ruhsatMaddeleri) {
+    return Column(
+      children: [
+        // Başlık ve Legendler
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildLegendItem(Colors.grey.shade300, 'Başlamadı'),
+                  const SizedBox(width: 24),
+                  _buildLegendItem(Colors.amber.shade100, 'Devam Ediyor'),
+                  const SizedBox(width: 24),
+                  _buildLegendItem(Colors.green.shade100, 'Tamamlandı'),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Kanban Kartları
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: ruhsatMaddeleri.length,
+            itemBuilder: (context, index) {
+              final madde = ruhsatMaddeleri[index];
+              return _buildKanbanCard(madde, index + 1);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
+  Widget _buildKanbanCard(String madde, int sira) {
+    // Status: 0 = Başlamadı, 1 = Devam Ediyor, 2 = Tamamlandı
+    final statusValue = _ruhsatDurumlari[sira] ?? 0;
+
+    final colors = [Colors.grey.shade300, Colors.amber.shade100, Colors.green.shade100];
+    final statusLabels = ['Başlamadı', 'Devam Ediyor', 'Tamamlandı'];
+
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Madde $sira - Durum Seç'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (i) => _buildStatusOption(i, statusLabels[i], colors[i], sira, madde)),
+            ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Kapat'),
+                  ),
+                ],
+              ),
+            );
+          },
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: colors[statusValue],
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Colors.blueGrey.shade700,
+                        foregroundColor: Colors.white,
+                        radius: 18,
+                        child: Text(
+                          '$sira',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          madde,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          statusLabels[statusValue],
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.blueGrey.shade900),
+                        ),
+                      ),
+                      const Icon(Icons.touch_app, size: 16, color: Colors.grey),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+  }
+
+  Widget _buildStatusOption(int index, String label, Color color, int sira, String madde) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: ElevatedButton.icon(
+        onPressed: () {
+          // Local state güncelle
+          setState(() {
+            _ruhsatDurumlari[sira] = index;
+          });
+          
+          // Firestore'a kaydet
+          FirebaseFirestore.instance
+              .collection('ruhsat')
+              .doc(widget.projectId)
+              .collection('islemler')
+              .doc('madde_$sira')
+              .set({
+                'sira': sira,
+                'madde': madde,
+                'durum': index,
+                'label': label,
+                'guncellendiTarihi': DateTime.now(),
+              }, SetOptions(merge: true));
+          
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Durum: $label olarak işaretlendi')),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.black87,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        ),
+        icon: const Icon(Icons.check),
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+      ),
+    );
+  }
+
+  Widget _buildBelgeYuklemeTab() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: ElevatedButton.icon(
+            onPressed: () {
+              _tumBelgeleriYukle();
+            },
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Belge Yükle'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueGrey.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+            ),
+          ),
+        ),
+        if (_yuklenenBelgeler.isEmpty)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.file_upload_outlined, size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Henüz belge yüklenmedi',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Belgeler bölümünde görüntülenmek için\nyukarıdaki butona tıklayarak belge yükleyin',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _yuklenenBelgeler.length,
+              itemBuilder: (context, index) {
+                final belge = _yuklenenBelgeler[index];
+                return _buildBelgeKarti(belge, index);
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBelgeKarti(Map<String, String> belge, int index) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.file_present,
+                  size: 32,
+                  color: Colors.blueGrey.shade700,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        belge['başlık'] ?? 'Belge',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        belge['tarih'] ?? '',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildBelgeIslemButonu(Icons.preview, 'Önizle', Colors.blueGrey.shade700, () {
+                  _belgeOnizle(belge);
+                }),
+                _buildBelgeIslemButonu(Icons.download, 'İndir', Colors.green.shade700, () {
+                  _belgeIndir(belge);
+                }),
+                _buildBelgeIslemButonu(Icons.delete, 'Sil', Colors.red.shade700, () {
+                  _belgeySil(index);
+                }),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBelgeIslemButonu(IconData icon, String label, Color color, VoidCallback onPressed) {
+    return InkWell(
+      onTap: onPressed,
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  void _tumBelgeleriYukle() async {
+    try {
+      // Dosya seç
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+      );
+
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dosya seçimi iptal edildi')),
+        );
+        return;
+      }
+
+      final file = result.files.single;
+      
+      // Yükleniyor göstergesi
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Belge yükleniyor...'),
+          duration: const Duration(seconds: 30),
+        ),
+      );
+
+      // Firebase Storage'a yükle
+      final fileName = file.name;
+      final fileExtension = fileName.split('.').last;
+      final uniqueFileName = '${DateTime.now().millisecondsSinceEpoch}_$fileName';
+      
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('ruhsat_belgeler')
+          .child(widget.projectId)
+          .child(uniqueFileName);
+
+      // Dosyayı yükle
+      await storageRef.putData(file.bytes!);
+
+      // Firestore'a kaydet
+      final yeniBelge = {
+        'başlık': fileName,
+        'tarih': DateTime.now().toString().split(' ')[0],
+        'type': fileExtension,
+        'firbaseUrl': await storageRef.getDownloadURL(),
+        'boyut': file.size,
+        'yuklenmeTarihi': DateTime.now(),
+      };
+
+      // Local state'e ekle
+      setState(() {
+        _yuklenenBelgeler.add({
+          'başlık': yeniBelge['başlık'] as String,
+          'tarih': yeniBelge['tarih'] as String,
+          'firebaseUrl': yeniBelge['firbaseUrl'] as String,
+        });
+      });
+
+      // Firestore'a kaydet
+      await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .collection('belgeler')
+          .add(yeniBelge);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Belge "$fileName" başarıyla yüklenmiştir'),
+          backgroundColor: Colors.green.shade700,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hata: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  void _belgeySil(int index) async {
+    try {
+      final belge = _yuklenenBelgeler[index];
+      
+      // Local state'ten sil
+      setState(() {
+        _yuklenenBelgeler.removeAt(index);
+      });
+
+      // Firestore'dan sil (başlık eşleşen ilk belgeyi sil)
+      final ruhsatDoc = await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .collection('belgeler')
+          .where('başlık', isEqualTo: belge['başlık'])
+          .limit(1)
+          .get();
+
+      if (ruhsatDoc.docs.isNotEmpty) {
+        await ruhsatDoc.docs.first.reference.delete();
+      }
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Belge başarıyla silindi'),
+          backgroundColor: Colors.green.shade700,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hata: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  void _belgeOnizle(Map<String, String> belge) async {
+    try {
+      final url = belge['firebaseUrl'];
+      final dosyaAdi = belge['başlık'] ?? '';
+      
+      if (url == null || url.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Belge URL bulunamadı'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Dosya türünü belirle
+      final dosyaTipi = dosyaAdi.toLowerCase();
+      final isPdf = dosyaTipi.endsWith('.pdf');
+      final isImage = dosyaTipi.endsWith('.jpg') || 
+                      dosyaTipi.endsWith('.jpeg') || 
+                      dosyaTipi.endsWith('.png') || 
+                      dosyaTipi.endsWith('.gif');
+
+      // Benzersiz view type oluştur
+      final viewType = 'preview-${DateTime.now().millisecondsSinceEpoch}';
+      
+      // IFrame oluştur - dosya türüne göre
+      ui.platformViewRegistry.registerViewFactory(
+        viewType,
+        (int viewId) {
+          final iframe = html.IFrameElement();
+          
+          if (isPdf) {
+            // PDF için PDF viewer embed
+            final pdfViewerHtml = '''
+            <html>
+              <head>
+                <style>
+                  body { margin: 0; padding: 0; }
+                  iframe { width: 100%; height: 100%; border: none; }
+                </style>
+              </head>
+              <body>
+                <iframe src="${Uri.encodeComponent(url)}" type="application/pdf"></iframe>
+              </body>
+            </html>
+            ''';
+            iframe.srcdoc = pdfViewerHtml;
+          } else if (isImage) {
+            // Resim için basit HTML
+            final imageHtml = '''
+            <html>
+              <head>
+                <style>
+                  body { margin: 0; padding: 10px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                  img { max-width: 100%; max-height: 100%; object-fit: contain; }
+                </style>
+              </head>
+              <body>
+                <img src="$url" />
+              </body>
+            </html>
+            ''';
+            iframe.srcdoc = imageHtml;
+          } else {
+            // Diğer dosyalar için indirme linki göster
+            final downloadHtml = '''
+            <html>
+              <head>
+                <style>
+                  body { margin: 0; padding: 20px; background: #f5f5f5; font-family: Arial; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                  .container { text-align: center; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                  .icon { font-size: 64px; margin-bottom: 20px; }
+                  h2 { color: #333; margin: 0 0 10px 0; }
+                  p { color: #666; margin: 0 0 20px 0; }
+                  a { display: inline-block; background: #2196F3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; cursor: pointer; }
+                  a:hover { background: #1976D2; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="icon">📄</div>
+                  <h2>Belge Önizlemesi Desteklenmiyor</h2>
+                  <p>Bu dosya türü için önizleme mevcut değildir.</p>
+                  <a href="$url" download="${dosyaAdi}">Dosyayı İndir</a>
+                </div>
+              </body>
+            </html>
+            ''';
+            iframe.srcdoc = downloadHtml;
+          }
+          
+          iframe.style.border = 'none';
+          iframe.style.height = '100%';
+          iframe.style.width = '100%';
+          return iframe;
+        },
+      );
+
+      // Dialog ile önizleme göster
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.85,
+            height: MediaQuery.of(context).size.height * 0.85,
+            child: Column(
+              children: [
+                // Başlık ve Kapat butonu
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blueGrey.shade700,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                      topRight: Radius.circular(4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          dosyaAdi,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          maxLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _belgeIndir(belge);
+                        },
+                        icon: const Icon(Icons.download, size: 18),
+                        label: const Text('İndir'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                // Önizleme alanı - HtmlElementView ile iframe göster
+                Expanded(
+                  child: Container(
+                    color: Colors.grey.shade100,
+                    child: HtmlElementView(viewType: viewType),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hata: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  void _belgeIndir(Map<String, String> belge) async {
+    try {
+      final url = belge['firebaseUrl'];
+      if (url == null || url.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Belge URL bulunamadı'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Web için: İndirme bağlantısı oluştur ve tetikle
+      final fileName = belge['başlık'] ?? 'belge';
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..style.display = 'none';
+      
+      html.document.body?.children.add(anchor);
+      anchor.click();
+      
+      // Kısa süre sonra kaldır
+      await Future.delayed(const Duration(milliseconds: 100));
+      html.document.body?.children.remove(anchor);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$fileName indiriliyor...'),
+          backgroundColor: Colors.green.shade700,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hata: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  Widget _buildSantiyeTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.construction_outlined, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            'Şantiye Dosyası',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Yakında burada şantiye fotoğraflarınızı ve belgelerinizi görebileceksiniz',
+            style: TextStyle(color: Colors.grey.shade600),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 

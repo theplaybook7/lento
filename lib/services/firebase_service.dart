@@ -50,6 +50,21 @@ class FirebaseService {
         'budgetedAmount': totalBudget,
       });
 
+      // Ruhsat dosyası oluştur
+      await _db.collection('ruhsat').doc(docRef.id).set({
+        'projectId': docRef.id,
+        'createdAt': DateTime.now(),
+        'documents': [],
+      });
+
+      // Şantiye dosyası oluştur
+      await _db.collection('santiye').doc(docRef.id).set({
+        'projectId': docRef.id,
+        'createdAt': DateTime.now(),
+        'photos': [],
+        'documents': [],
+      });
+
       // Şirket finansmanını güncelle
       await _updateCompanyFinance(companyId);
 

@@ -71,9 +71,14 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                   double totalPaid = 0;
                   for (var record in paymentRecords) {
                     final recordData = record.data() as Map<String, dynamic>;
-                    final tlAmount = recordData['tlAmount'] as double? ?? (recordData['paidAmount'] as double? ?? 0);
-                    totalPaid += tlAmount;
+                    // tlAmount varsa onu, yoksa paidAmount'ı kullan
+                    final tlAmount = (recordData['tlAmount'] ?? recordData['paidAmount']) as num?;
+                    if (tlAmount != null) {
+                      totalPaid += tlAmount.toDouble();
+                    }
                   }
+                  
+                  print('DEBUG: Taksit ${inst.installmentNumber} - Toplam Ödenmiş: $totalPaid / ${inst.amount}');
                   
                   final isPartiallyPaid = totalPaid > 0 && totalPaid < inst.amount && !inst.isPaid;
                   
@@ -295,6 +300,10 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
     final List<XFile> selectedImages = [];
     DateTime selectedDate = DateTime.now();
     final tarihCtrl = TextEditingController(text: DateFormat('dd.MM.yyyy').format(selectedDate));
+    
+    // Dialog içinde kullanılacak değişkenler
+    late String selectedCurrencyForSaving;
+    late double calculatedTlAmount;
     
     String paraBirimi = 'TL';
     final kurUSDCtrl = TextEditingController();
@@ -538,7 +547,45 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                 child: const Text('İptal'),
               ),
               TextButton(
-                onPressed: () => Navigator.pop(c, true),
+                onPressed: () {
+                  // Dialog kapatmadan önce değerleri kaydet
+                  final paidAmount = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+                  
+                  if (paidAmount <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Geçerli bir tutar girin')),
+                    );
+                    return;
+                  }
+                  
+                  // TL karşılığını hesapla
+                  double tlTutar = paidAmount;
+                  if (paraBirimi != 'TL') {
+                    double kur = 0;
+                    if (paraBirimi == 'USD') {
+                      kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
+                    } else if (paraBirimi == 'EUR') {
+                      kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
+                    } else if (paraBirimi == 'GBP') {
+                      kur = double.tryParse(kurGBPCtrl.text.replaceAll(',', '.')) ?? 0;
+                    } else if (paraBirimi == 'ALTIN') {
+                      kur = double.tryParse(altinKurCtrl.text.replaceAll(',', '.')) ?? 0;
+                    }
+                    
+                    if (kur <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('$paraBirimi kuru giriniz')),
+                      );
+                      return;
+                    }
+                    
+                    tlTutar = paidAmount * kur;
+                  }
+                  
+                  selectedCurrencyForSaving = paraBirimi;
+                  calculatedTlAmount = tlTutar;
+                  Navigator.pop(c, true);
+                },
                 child: const Text('Kaydet'),
               ),
             ],
@@ -557,29 +604,11 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
       return;
     }
     
-    // TL karşılığını hesapla
-    double tlTutar = paidAmount;
-    if (paraBirimi != 'TL') {
-      double kur = 0;
-      if (paraBirimi == 'USD') {
-        kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
-      } else if (paraBirimi == 'EUR') {
-        kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
-      } else if (paraBirimi == 'GBP') {
-        kur = double.tryParse(kurGBPCtrl.text.replaceAll(',', '.')) ?? 0;
-      } else if (paraBirimi == 'ALTIN') {
-        kur = double.tryParse(altinKurCtrl.text.replaceAll(',', '.')) ?? 0;
-      }
-      
-      if (kur <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$paraBirimi kuru giriniz')),
-        );
-        return;
-      }
-      
-      tlTutar = paidAmount * kur;
-    }
+    // Daha önceden hesaplanmış TL tutarını kullan
+    final tlTutar = calculatedTlAmount;
+    final finalCurrency = selectedCurrencyForSaving;
+    
+    print('DEBUG SAVE: paidAmount=$paidAmount, currency=$finalCurrency, tlTutar=$tlTutar');
 
     try {
       final List<String> photoUrls = [];
@@ -608,7 +637,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           .collection('payment_records')
           .add({
         'paidAmount': paidAmount,
-        'currency': paraBirimi,
+        'currency': finalCurrency,
         'tlAmount': tlTutar,
         'createdAt': selectedDate,
         'photoUrls': photoUrls,

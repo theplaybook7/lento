@@ -29,6 +29,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   
   // Belgeler
   final List<Map<String, String>> _yuklenenBelgeler = []; // {başlık, tarih, type}
+  
+  // Şantiye durum yönetimi
+  int _santiyeKatSayisi = 0; // Kullanıcının girdiği kat sayısı
+  final Map<int, int> _santiyeDurumlari = {}; // sıra -> durum (0: başlamadı, 1: devam ediyor, 2: tamamlandı)
+  final Map<int, List<Map<String, String>>> _santiyeFotograflar = {}; // sıra -> [{url, tarih}]
 
   @override
   void initState() {
@@ -37,6 +42,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     _tabController = TabController(length: 3, vsync: this);
     _ruhsatVerileriniYukle();
     _belgeleriYukle();
+    _santiyeVerileriniYukle();
   }
   
   void _ruhsatVerileriniYukle() async {
@@ -89,6 +95,73 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       }
     } catch (e) {
       developer.log('Belgeler yükleme hatası: $e');
+    }
+  }
+  
+  void _santiyeVerileriniYukle() async {
+    try {
+      // Kat sayısını yükle
+      final santiyeDoc = await FirebaseFirestore.instance
+          .collection('santiye')
+          .doc(widget.projectId)
+          .get();
+      
+      if (santiyeDoc.exists) {
+        final data = santiyeDoc.data();
+        if (mounted && data != null) {
+          setState(() {
+            _santiyeKatSayisi = data['katSayisi'] ?? 0;
+          });
+        }
+      }
+      
+      // İşlem durumlarını yükle
+      final snapshot = await FirebaseFirestore.instance
+          .collection('santiye')
+          .doc(widget.projectId)
+          .collection('islemler')
+          .get();
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final sira = data['sira'] as int?;
+        final durum = data['durum'] as int?;
+        
+        if (sira != null && durum != null && mounted) {
+          setState(() {
+            _santiyeDurumlari[sira] = durum;
+          });
+        }
+      }
+      
+      // Fotoğrafları yükle
+      final fotografSnapshot = await FirebaseFirestore.instance
+          .collection('santiye')
+          .doc(widget.projectId)
+          .collection('fotograflar')
+          .get();
+      
+      for (var doc in fotografSnapshot.docs) {
+        final data = doc.data();
+        final sira = data['sira'] as int?;
+        final url = data['url'] as String?;
+        final tarih = data['tarih'] as String?;
+        
+        if (sira != null && url != null && mounted) {
+          if (!_santiyeFotograflar.containsKey(sira)) {
+            _santiyeFotograflar[sira] = [];
+          }
+          setState(() {
+            _santiyeFotograflar[sira]!.add({
+              'url': url,
+              'tarih': tarih ?? '',
+              'id': doc.id,
+            });
+          });
+        }
+      }
+    } catch (e) {
+      developer.log('Şantiye verileri yükleme hatası: $e');
     }
   }
 
@@ -1327,23 +1400,642 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Widget _buildSantiyeTab() {
-    return Center(
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Kat sayısı seçimi
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Zemin Üstü Kat Sayısı',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _santiyeKatSayisi > 0
+                                ? '$_santiyeKatSayisi kat'
+                                : 'Henüz belirlenmedi',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _santiyeKatSayisi > 0
+                                  ? Colors.green.shade700
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _katSayisiDialog,
+                      icon: Icon(_santiyeKatSayisi > 0 ? Icons.edit : Icons.add),
+                      label: Text(_santiyeKatSayisi > 0 ? 'Değiştir' : 'Belirle'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // İşlemler listesi
+            if (_santiyeKatSayisi > 0) ...[
+              const Text(
+                'Yapım Aşamaları',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              ..._getSantiyeIslemleri().asMap().entries.map((entry) {
+                final sira = entry.key + 1;
+                final islem = entry.value;
+                return _buildSantiyeKanbanCard(sira, islem);
+              }).toList(),
+            ] else
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      Icon(Icons.construction, size: 64, color: Colors.grey.shade400),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Başlamak için kat sayısını belirleyin',
+                        style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  List<String> _getSantiyeIslemleri() {
+    final islemler = <String>[
+      'Hafriyat yapılacak alanın işaretlenmesi',
+      'Hafriyat',
+      'Hafriyat zeminine düşük dansiteli beton',
+      'Temel atılması için kalıp, demir bağlantıları',
+      'Hazır beton ile temel atılması',
+      'Perde duvarlı bodrum kat (varsa) kalıp, demir ve su basmanı katı döşeme kalıp ve demir işlemleri',
+      'Su basmanı betonu',
+      'Zemin kat kalıp, demir işlemleri',
+      'Hazır betonla Zemin kat betonu',
+    ];
+    
+    // Kat sayısına göre dinamik maddeler ekle
+    for (int i = 1; i <= _santiyeKatSayisi; i++) {
+      islemler.add('${i}. kat kalıp ve demir işleri');
+      islemler.add('${i}. kat beton dökülmesi');
+    }
+    
+    // Kalan maddeler
+    islemler.addAll([
+      'Bodrum katın toprakla örtülecek kısmının su izolasyonunun yapılması',
+      'Çatı katı ve çatının beton yada taşıyıcı tuğla ile taşıyıcı sisteminin yapılması',
+      'Çatının kiremit altı ahşap kurulumundan önce oturacağı yüzeye demir ve betonla hatıl yapılması',
+      'Kaliteli kereste ile 10×10 ve 5×10 kereste ile çatı kurulumu üzerine kiremit altı döşeme tahtalarının çakılması',
+      'Çatıda Su izolasyonu',
+      'Çatıda Isı izolasyonu',
+      'Kiremit çıtalarının ısı izolasyonu levhaları üzerine çakılması',
+      'Kiremit döşenmesi',
+      'Çinko olukların ve yağmur inişlerinin hazırlanması',
+      'Binada dış ve iç duvarların tuğla ile örülmesi',
+      'İskele kurulması',
+      'Dış sıvaya başlanması',
+      'İç sıvaya başlanması',
+      'İçeride su, elektrik, kalorifer, telefon, televizyon, sıhhi tesisata başlanması',
+      'İç duvarlarda ve tavanlarda İnce sıva ve kaba alçıya başlanması',
+      'Dışarıda duvarlara dıştan izolasyona başlanması',
+      'Pencerelere antipas sürülmüş profil demirden kör kasaların takılması',
+      'Dış Kapının ve Pencerelerin takılması',
+      'Dış cephe boyası, yağmur boruları inişleri yapılması ve iskelenin sökülmesi',
+      'İçeride tüm tesisatın kontrolunü takiben şap yapılmaya başlanması',
+      'Seramik kaplanacak banyo, tuvalet ve diğer yerlerin yapılması',
+      'İçeride ince alçı ve boyaya başlanması',
+      'Korkulukların montajı',
+      'Elektrik priz ve anahtarlarının montajı',
+      'Kombi ve radyatörlerin montajı, testi',
+      'Banyo ve tuvaletler vitrifiye ve bataryalar montajı',
+      'Yer döşemesi, merdiven basamakları döşemesi',
+      'İç kapıların montajı',
+      'Balkon yer döşemeleri',
+      'Mutfak kurulumu',
+      'Dolapların montajı',
+      'Çevre düzenlemesi',
+      'İnşaat temizliği',
+    ]);
+    
+    return islemler;
+  }
+  
+  Widget _buildSantiyeKanbanCard(int sira, String islem) {
+    final durum = _santiyeDurumlari[sira] ?? 0;
+    final fotograflar = _santiyeFotograflar[sira] ?? [];
+    
+    Color bgColor;
+    String durumText;
+    IconData icon;
+    
+    switch (durum) {
+      case 0:
+        bgColor = Colors.grey.shade300;
+        durumText = 'Başlamadı';
+        icon = Icons.radio_button_unchecked;
+        break;
+      case 1:
+        bgColor = Colors.yellow.shade300;
+        durumText = 'Devam Ediyor';
+        icon = Icons.access_time;
+        break;
+      case 2:
+        bgColor = Colors.green.shade300;
+        durumText = 'Tamamlandı';
+        icon = Icons.check_circle;
+        break;
+      default:
+        bgColor = Colors.grey.shade300;
+        durumText = 'Başlamadı';
+        icon = Icons.radio_button_unchecked;
+    }
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.construction_outlined, size: 64, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            'Şantiye Dosyası',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade700),
+          InkWell(
+            onTap: () => _santiyeDurumSecDialog(sira, islem),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$sira',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          islem,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(icon, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              durumText,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Yakında burada şantiye fotoğraflarınızı ve belgelerinizi görebileceksiniz',
-            style: TextStyle(color: Colors.grey.shade600),
-            textAlign: TextAlign.center,
+          // Fotoğraf bölümü
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(4),
+                bottomRight: Radius.circular(4),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.photo_library, size: 18, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Fotoğraflar (${fotograflar.length})',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: () => _santiyeFotografYukle(sira),
+                      icon: const Icon(Icons.add_a_photo, size: 16),
+                      label: const Text('Ekle'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
+                if (fotograflar.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 80,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: fotograflar.length,
+                      itemBuilder: (context, index) {
+                        final foto = fotograflar[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: GestureDetector(
+                            onTap: () => _santiyeFotografOnizle(fotograflar, index),
+                            child: Stack(
+                              children: [
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    image: DecorationImage(
+                                      image: NetworkImage(foto['url']!),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 2,
+                                  right: 2,
+                                  child: GestureDetector(
+                                    onTap: () => _santiyeFotografSil(sira, foto['id']!, foto['url']!),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade700,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        size: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+  
+  Future<void> _katSayisiDialog() async {
+    final ctrl = TextEditingController(text: _santiyeKatSayisi > 0 ? '$_santiyeKatSayisi' : '');
+    
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Zemin Üstü Kat Sayısı'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Kat Sayısı',
+            hintText: 'Örn: 2',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final katSayisi = int.tryParse(ctrl.text) ?? 0;
+              if (katSayisi <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Lütfen geçerli bir sayı girin')),
+                );
+                return;
+              }
+              
+              // Firestore'a kaydet
+              await FirebaseFirestore.instance
+                  .collection('santiye')
+                  .doc(widget.projectId)
+                  .set({'katSayisi': katSayisi}, SetOptions(merge: true));
+              
+              setState(() {
+                _santiyeKatSayisi = katSayisi;
+              });
+              
+              Navigator.pop(ctx);
+            },
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _santiyeDurumSecDialog(int sira, String islem) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('$sira. $islem'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildSantiyeStatusOption(ctx, sira, 0, 'Başlamadı', Colors.grey.shade300, Icons.radio_button_unchecked),
+            const SizedBox(height: 8),
+            _buildSantiyeStatusOption(ctx, sira, 1, 'Devam Ediyor', Colors.yellow.shade300, Icons.access_time),
+            const SizedBox(height: 8),
+            _buildSantiyeStatusOption(ctx, sira, 2, 'Tamamlandı', Colors.green.shade300, Icons.check_circle),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildSantiyeStatusOption(BuildContext ctx, int sira, int durum, String label, Color color, IconData icon) {
+    final isSelected = (_santiyeDurumlari[sira] ?? 0) == durum;
+    
+    return InkWell(
+      onTap: () async {
+        // Firestore'a kaydet
+        await FirebaseFirestore.instance
+            .collection('santiye')
+            .doc(widget.projectId)
+            .collection('islemler')
+            .doc('madde_$sira')
+            .set({
+          'sira': sira,
+          'durum': durum,
+        }, SetOptions(merge: true));
+        
+        setState(() {
+          _santiyeDurumlari[sira] = durum;
+        });
+        
+        Navigator.pop(ctx);
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+          border: isSelected ? Border.all(color: Colors.blue, width: 3) : null,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 24),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Future<void> _santiyeFotografYukle(int sira) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: true,
+      );
+      
+      if (result == null || result.files.isEmpty) return;
+      
+      for (final file in result.files) {
+        if (file.bytes == null) continue;
+        
+        // Firebase Storage'a yükle
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('santiye_fotograflar/${widget.projectId}/$fileName');
+        
+        await storageRef.putData(file.bytes!);
+        final downloadUrl = await storageRef.getDownloadURL();
+        
+        // Firestore'a kaydet
+        final docRef = await FirebaseFirestore.instance
+            .collection('santiye')
+            .doc(widget.projectId)
+            .collection('fotograflar')
+            .add({
+          'sira': sira,
+          'url': downloadUrl,
+          'tarih': DateTime.now().toIso8601String(),
+        });
+        
+        // State'e ekle
+        if (!_santiyeFotograflar.containsKey(sira)) {
+          _santiyeFotograflar[sira] = [];
+        }
+        
+        setState(() {
+          _santiyeFotograflar[sira]!.add({
+            'url': downloadUrl,
+            'tarih': DateTime.now().toIso8601String(),
+            'id': docRef.id,
+          });
+        });
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${result.files.length} fotoğraf yüklendi'),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hata: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _santiyeFotografSil(int sira, String docId, String url) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Fotoğraf Sil'),
+        content: const Text('Bu fotoğrafı silmek istediğinize emin misiniz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm != true) return;
+    
+    try {
+      // Firestore'dan sil
+      await FirebaseFirestore.instance
+          .collection('santiye')
+          .doc(widget.projectId)
+          .collection('fotograflar')
+          .doc(docId)
+          .delete();
+      
+      // Firebase Storage'dan sil
+      try {
+        final ref = FirebaseStorage.instance.refFromURL(url);
+        await ref.delete();
+      } catch (e) {
+        developer.log('Storage silme hatası: $e');
+      }
+      
+      // State'den sil
+      setState(() {
+        _santiyeFotograflar[sira]?.removeWhere((f) => f['id'] == docId);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fotoğraf silindi'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hata: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _santiyeFotografOnizle(List<Map<String, String>> fotograflar, int baslangicIndex) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: PageController(initialPage: baslangicIndex),
+              itemCount: fotograflar.length,
+              itemBuilder: (context, index) {
+                final foto = fotograflar[index];
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: InteractiveViewer(
+                        child: Image.network(
+                          foto['url']!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(Icons.error, color: Colors.white, size: 64),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    if (foto['tarih']!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          DateTime.parse(foto['tarih']!).toString().substring(0, 16),
+                          style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IconButton(
+                onPressed: () => Navigator.pop(ctx),
+                icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black54,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -181,6 +181,18 @@ class BolumModel {
     return ana;
   }
   
+  double get toplamMetrekare {
+    double ana = parseFormatted(m2Ctrl.text);
+    if (tip == 'Dubleks') {
+      double ust = parseFormatted(ustKatM2Ctrl.text);
+      return ana + ust;
+    } else if (tip == 'Ters Dubleks' || tip == 'Depolu Dükkan') {
+      double alt = parseFormatted(altKatM2Ctrl.text);
+      return ana + alt;
+    }
+    return ana;
+  }
+  
   double get girilenToprakParasi => parseFormatted(toprakParasiCtrl.text);
   bool get hakKullanildi => (daireHibeSayisi + daireKrediSayisi + dukkanHibeSayisi + dukkanKrediSayisi) > 0;
 }

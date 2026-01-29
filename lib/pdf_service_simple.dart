@@ -238,7 +238,7 @@ Future<Uint8List> generateSimplePdf({
           decoration: pw.BoxDecoration(color: b.sahip == 'Müteahhit' ? PdfColors.red50 : PdfColors.white),
           children: [
             cell('${kat.ad} - ${b.tip}\n(${b.sahip})', align: pw.TextAlign.left, fontSize: 6),
-            cell(_formatNumber(b.girilenM2), fontSize: 6),
+            cell(_formatNumber(b.toplamMetrekare), fontSize: 6),
             cell(_formatNumber(insaatMaliyeti), fontSize: 6),
             cell(_formatNumber(daireBasiOrtakMaliyet), fontSize: 6),
             cell(hibeTL > 0 ? '-${_formatNumber(hibeTL)}' : '-', color: PdfColors.green700, fontSize: 6),

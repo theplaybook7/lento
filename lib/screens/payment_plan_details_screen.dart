@@ -174,7 +174,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                               },
                             ),
                       children: [
-                        if (inst.paidAmount > 0)
+                        if (totalPaid > 0)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             child: Column(
@@ -184,7 +184,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                                   children: [
                                     Text('Toplam Ödenen:', style: TextStyle(color: Colors.grey.shade700)),
                                     Text(
-                                      '₺${NumberFormat('#,##0.00', 'tr_TR').format(inst.paidAmount)}',
+                                      '₺${NumberFormat('#,##0.00', 'tr_TR').format(totalPaid)}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.green,
@@ -192,14 +192,14 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                                     ),
                                   ],
                                 ),
-                                if (inst.paidAmount < inst.amount) ...[
+                                if (totalPaid < inst.amount) ...[
                                   const SizedBox(height: 8),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text('Kalan:', style: TextStyle(color: Colors.grey.shade700)),
                                       Text(
-                                        '₺${NumberFormat('#,##0.00', 'tr_TR').format(inst.amount - inst.paidAmount)}',
+                                        '₺${NumberFormat('#,##0.00', 'tr_TR').format(inst.amount - totalPaid)}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.red,

@@ -11,6 +11,7 @@ import '../services/firebase_service.dart';
 import '../utils/format_utils.dart' as format_utils;
 import '../theme/app_theme.dart';
 import '../project_core.dart';
+import '../notification_service.dart';
 import 'payment_plans_screen.dart';
 import 'cari_hesap_screen.dart';
 
@@ -918,14 +919,14 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: ElevatedButton.icon(
-        onPressed: () {
+        onPressed: () async {
           // Local state güncelle
           setState(() {
             _ruhsatDurumlari[sira] = index;
           });
           
           // Firestore'a kaydet
-          FirebaseFirestore.instance
+          await FirebaseFirestore.instance
               .collection('ruhsat')
               .doc(widget.projectId)
               .collection('islemler')
@@ -937,6 +938,21 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 'label': label,
                 'guncellendiTarihi': DateTime.now(),
               }, SetOptions(merge: true));
+          
+          // Proje adını al ve bildirim gönder
+          final projeDoc = await FirebaseFirestore.instance
+              .collection('projects')
+              .doc(widget.projectId)
+              .get();
+          final projeAdi = projeDoc.data()?['name'] ?? 'Proje';
+          
+          await BildirimServisi.bildirimGonder(
+            baslik: 'Ruhsat Durumu Güncellendi',
+            mesaj: '$projeAdi - $madde: $label',
+            projeId: widget.projectId,
+          );
+          
+          developer.log('✅ Bildirim gönderildi: $projeAdi - $madde: $label');
           
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1230,7 +1246,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       showDialog(
         context: context,
         builder: (context) => Dialog(
-          child: Container(
+          child: SizedBox(
             width: MediaQuery.of(context).size.width * 0.85,
             height: MediaQuery.of(context).size.height * 0.85,
             child: Column(
@@ -1534,7 +1550,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 final sira = entry.key + 1;
                 final islem = entry.value;
                 return _buildSantiyeKanbanCard(sira, islem);
-              }).toList(),
+              }),
             ] else
               Center(
                 child: Padding(
@@ -1572,8 +1588,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     
     // Kat sayısına göre dinamik maddeler ekle
     for (int i = 1; i <= _santiyeKatSayisi; i++) {
-      islemler.add('${i}. kat kalıp ve demir işleri');
-      islemler.add('${i}. kat beton dökülmesi');
+      islemler.add('$i. kat kalıp ve demir işleri');
+      islemler.add('$i. kat beton dökülmesi');
     }
     
     // Kalan maddeler
@@ -1939,6 +1955,25 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         setState(() {
           _santiyeDurumlari[sira] = durum;
         });
+        
+        // Proje adını al ve bildirim gönder
+        final projeDoc = await FirebaseFirestore.instance
+            .collection('projects')
+            .doc(widget.projectId)
+            .get();
+        final projeAdi = projeDoc.data()?['name'] ?? 'Proje';
+        
+        // İşlem adını al
+        final islemler = _getSantiyeIslemleri();
+        final islemAdi = sira <= islemler.length ? islemler[sira - 1] : 'İşlem $sira';
+        
+        await BildirimServisi.bildirimGonder(
+          baslik: 'Şantiye Durumu Güncellendi',
+          mesaj: '$projeAdi - $islemAdi: $label',
+          projeId: widget.projectId,
+        );
+        
+        developer.log('✅ Bildirim gönderildi: $projeAdi - $islemAdi: $label');
         
         Navigator.pop(ctx);
       },

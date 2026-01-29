@@ -69,7 +69,7 @@ class ArsivSayfasi extends StatelessWidget {
                     height: 44,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.primaryColor.withOpacity(0.8), AppTheme.primaryColor],
+                        colors: [AppTheme.primaryColor.withValues(alpha: 0.8), AppTheme.primaryColor],
                       ),
                       borderRadius: BorderRadius.circular(10),
                     ),

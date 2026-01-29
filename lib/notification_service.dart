@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:developer' as developer;
 import 'project_core.dart';
 
 class BildirimServisi {
@@ -8,23 +9,30 @@ class BildirimServisi {
     required String mesaj,
     required String projeId, 
   }) async {
-    if (SistemYoneticisi().aktifSirket == null) return;
+    if (SistemYoneticisi().aktifSirket == null) {
+      developer.log('⚠️ Bildirim gönderilemedi: Aktif şirket yok');
+      return;
+    }
 
     try {
+      final sirketId = SistemYoneticisi().aktifSirket!.id;
+      final gonderenEmail = SistemYoneticisi().girisYapanEmail ?? "Sistem";
       await FirebaseFirestore.instance
           .collection('sirketler')
-          .doc(SistemYoneticisi().aktifSirket!.id)
+          .doc(sirketId)
           .collection('bildirimler')
           .add({
         'baslik': baslik,
         'mesaj': mesaj,
         'projeId': projeId,
-        'gonderen': SistemYoneticisi().girisYapanEmail ?? "Sistem",
+        'gonderen': gonderenEmail,
         'tarih': FieldValue.serverTimestamp(),
-        'okuyanlar': [] 
+        'okuyanlar': gonderenEmail == "Sistem" ? [] : [gonderenEmail]
       });
+      
+      developer.log('✅ Bildirim Firestore\'a kaydedildi: $baslik - $mesaj (Şirket: $sirketId)');
     } catch (e) {
-      // Hata durumunda loglama
+      developer.log('❌ Bildirim gönderme hatası: $e');
     }
   }
 

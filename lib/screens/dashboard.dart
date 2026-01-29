@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../project_core.dart';
+import '../notification_service.dart';
 import '../models/project_model.dart';
 import '../theme/app_theme.dart';
 import 'teklif_screen.dart';
@@ -23,6 +24,7 @@ class DashboardSayfasi extends StatefulWidget {
 
 class _DashboardSayfasiState extends State<DashboardSayfasi> {
   int _navIndex = 0;
+  final GlobalKey _notificationKey = GlobalKey();
 
   late String _companyId;
 
@@ -69,25 +71,44 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
         foregroundColor: Colors.white,
         elevation: 1,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.folder_outlined),
-            tooltip: 'Proje Arşivi',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (c) => ProjectArchiveScreen(companyId: _companyId),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.archive_outlined),
-            tooltip: 'Teklif Arşivi',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (c) => const ArsivSayfasi()),
+          StreamBuilder<QuerySnapshot>(
+            stream: BildirimServisi.bildirimleriDinle(),
+            builder: (context, snapshot) {
+              int okunmayanSayisi = 0;
+              if (snapshot.hasData) {
+                okunmayanSayisi = snapshot.data!.docs.where((doc) {
+                  final b = doc.data() as Map<String, dynamic>;
+                  final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
+                  return !okuyanlar.contains(SistemYoneticisi().girisYapanEmail);
+                }).length;
+              }
+              return Stack(
+                children: [
+                  IconButton(
+                    key: _notificationKey,
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: 'Bildirimler',
+                    onPressed: () => _showNotificationsDropdown(context),
+                  ),
+                  if (okunmayanSayisi > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                        child: Text(
+                          okunmayanSayisi > 99 ? '99+' : okunmayanSayisi.toString(),
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           ),
@@ -139,6 +160,36 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                   label: Text('Muhasebe'),
                 ),
             ],
+            trailing: Column(
+              children: [
+                Tooltip(
+                  message: 'Proje Arşivi',
+                  child: IconButton(
+                    icon: const Icon(Icons.folder_outlined),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (c) => ProjectArchiveScreen(companyId: _companyId),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Tooltip(
+                  message: 'Teklif Arşivi',
+                  child: IconButton(
+                    icon: const Icon(Icons.archive_outlined),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (c) => const ArsivSayfasi()),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
           Expanded(
             child: _navIndex == 0
@@ -200,6 +251,112 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                   backgroundColor: AppTheme.primaryColor,
                 )
               : null,
+    );
+  }
+
+  void _showNotificationsDropdown(BuildContext context) {
+    final keyContext = _notificationKey.currentContext;
+    if (keyContext == null) return;
+
+    final RenderBox button = keyContext.findRenderObject() as RenderBox;
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final Offset offset = button.localToGlobal(Offset.zero, ancestor: overlay);
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromLTWH(offset.dx, offset.dy + button.size.height, button.size.width, 0),
+      Offset.zero & overlay.size,
+    );
+
+    showMenu<int>(
+      context: context,
+      position: position,
+      items: [
+        PopupMenuItem(
+          enabled: false,
+          child: SizedBox(
+            width: 360,
+            child: StreamBuilder<QuerySnapshot>(
+              stream: BildirimServisi.bildirimleriDinle(),
+              builder: (ctx, snap) {
+                if (!snap.hasData || snap.data!.docs.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Bildirim yok'),
+                  );
+                }
+
+                final okunmamis = snap.data!.docs.where((doc) {
+                  final b = doc.data() as Map<String, dynamic>;
+                  final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
+                  return !okuyanlar.contains(SistemYoneticisi().girisYapanEmail);
+                }).toList();
+
+                if (okunmamis.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Bildirim yok'),
+                  );
+                }
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: okunmamis.length,
+                  itemBuilder: (ctx, i) {
+                    final doc = okunmamis[i];
+                    final b = doc.data() as Map<String, dynamic>;
+                    final baslik = b['baslik'] ?? '';
+                    final mesaj = b['mesaj'] ?? '';
+                    final gonderen = b['gonderen'] ?? '';
+                    final projeId = b['projeId'] ?? '';
+
+                    return InkWell(
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await FirebaseFirestore.instance
+                            .collection('sirketler')
+                            .doc(SistemYoneticisi().aktifSirket?.id)
+                            .collection('bildirimler')
+                            .doc(doc.id)
+                            .update({
+                          'okuyanlar': FieldValue.arrayUnion([SistemYoneticisi().girisYapanEmail])
+                        });
+                        if (!mounted) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => ProjectDetailsScreen(projectId: projeId),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(baslik, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(height: 6),
+                            Text(mesaj, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            if (gonderen.toString().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(
+                                  'Yapan: $gonderen',
+                                  style: const TextStyle(fontSize: 11, color: Colors.black54),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

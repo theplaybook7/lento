@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import '../models/payment_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/image_utils.dart';
+import '../theme/app_theme.dart';
 
 class PaymentPlanDetailsScreen extends StatefulWidget {
   final String paymentPlanId;
@@ -29,10 +30,12 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Text(widget.planName),
-        backgroundColor: Colors.blueGrey.shade800,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        elevation: 1,
       ),
       body: FutureBuilder<List<PaymentInstallment>>(
         future: _firebase.getPaymentInstallments(widget.paymentPlanId),
@@ -48,7 +51,21 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           final installments = snapshot.data ?? [];
 
           if (installments.isEmpty) {
-            return const Center(child: Text('Taksit bulunamadı'));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade400),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Taksit bulunamadı',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
 
           return ListView.builder(
@@ -89,7 +106,11 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                   }
                   return Card(
                     elevation: 1,
-                    margin: const EdgeInsets.only(bottom: 10),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
                     color: cardColor,
                     child: StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
@@ -108,8 +129,17 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: inst.isPaid
-                              ? Colors.green
-                              : (isOverdue ? Colors.red : Colors.orange),
+                              ? AppTheme.successColor
+                              : (isOverdue ? Colors.red : AppTheme.warningColor),
+                          boxShadow: [
+                            BoxShadow(
+                              color: inst.isPaid
+                                  ? AppTheme.successColor.withValues(alpha: 0.3)
+                                  : (isOverdue ? Colors.red.withValues(alpha: 0.3) : AppTheme.warningColor.withValues(alpha: 0.3)),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ],
                         ),
                         child: Center(
                           child: Text(

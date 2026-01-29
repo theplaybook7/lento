@@ -12,6 +12,7 @@ import 'dart:html' as html;
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/image_utils.dart';
+import '../theme/app_theme.dart';
 
 class CariHesapScreen extends StatefulWidget {
   const CariHesapScreen({super.key});
@@ -27,8 +28,12 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Cari Hesaplar'),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 1,
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -36,10 +41,10 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
+          preferredSize: const Size.fromHeight(56),
           child: Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            color: AppTheme.primaryColor,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             child: Row(
               children: [
                 Expanded(child: _filtreButomu('tum', 'Tümü', Icons.list)),
@@ -79,9 +84,14 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.account_balance_wallet, size: 80, color: Colors.grey.shade300),
+                  Icon(Icons.account_balance_wallet_outlined, size: 48, color: Colors.grey.shade400),
                   const SizedBox(height: 16),
-                  const Text('Henüz cari hesap kaydı yok', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  Text(
+                    'Henüz cari hesap kaydı yok',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
                 ],
               ),
             );
@@ -98,6 +108,8 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
         onPressed: () => _yeniCariDialog(context),
         icon: const Icon(Icons.add),
         label: const Text('Cari Ekle'),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
       ),
     );
   }
@@ -109,19 +121,23 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: aktif ? Colors.blue : Colors.grey.shade200,
+          color: aktif ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: aktif ? AppTheme.primaryColor : Colors.transparent,
+            width: 2,
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(ikon, size: 18, color: aktif ? Colors.white : Colors.grey.shade700),
+            Icon(ikon, size: 18, color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7)),
             const SizedBox(width: 4),
             Text(
               etiket,
               style: TextStyle(
-                color: aktif ? Colors.white : Colors.grey.shade700,
-                fontWeight: aktif ? FontWeight.bold : FontWeight.normal,
+                color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7),
+                fontWeight: aktif ? FontWeight.w600 : FontWeight.normal,
                 fontSize: 12,
               ),
             ),
@@ -168,13 +184,18 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
     final email = data['email'] ?? '';
 
     final alacak = bakiye > 0;
-    final renk = alacak ? Colors.green : Colors.red;
-    final ikon = tip == 'musteri' ? Icons.person : Icons.business;
+    final renk = alacak ? AppTheme.successColor : Colors.red;
+    final ikon = tip == 'musteri' ? Icons.person_outline : Icons.business_outlined;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: InkWell(
+        borderRadius: BorderRadius.circular(12),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -185,23 +206,36 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              CircleAvatar(
-                backgroundColor: renk.withValues(alpha: (renk.a * 255.0 * 0.1).clamp(0, 255)),
-                child: Icon(ikon, color: renk),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [renk.withValues(alpha: 0.2), renk.withValues(alpha: 0.1)],
+                  ),
+                ),
+                child: Icon(ikon, color: renk, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(ad, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      ad,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
                     if (telefon.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(telefon, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text(telefon, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
                     ],
                     if (email.isNotEmpty) ...[
                       const SizedBox(height: 2),
-                      Text(email, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                      Text(email, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey.shade600)),
                     ],
                   ],
                 ),
@@ -213,8 +247,8 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
                     bakiye == 0 ? 'Dengede' : (alacak ? 'Alacak' : 'Borç'),
                     style: TextStyle(
                       color: bakiye == 0 ? Colors.grey : renk,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),

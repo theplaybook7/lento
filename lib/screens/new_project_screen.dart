@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/firebase_service.dart';
 import '../project_core.dart';
+import '../theme/app_theme.dart';
 
 class NewProjectScreen extends StatefulWidget {
   final String companyId;
@@ -88,10 +89,12 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Yeni Proje Oluştur'),
-        backgroundColor: Colors.blueGrey.shade700,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        elevation: 1,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -105,8 +108,18 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                 controller: _nameCtrl,
                 decoration: InputDecoration(
                   labelText: 'Proje Adı *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  prefixIcon: const Icon(Icons.business),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                  ),
+                  prefixIcon: Icon(Icons.business, color: AppTheme.primaryColor),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 validator: (v) => v?.isEmpty ?? true ? 'Proje adı gerekli' : null,
               ),
@@ -206,18 +219,23 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
               // Oluştur Butonu
               SizedBox(
                 width: double.infinity,
+                height: 52,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _createProject,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueGrey.shade700,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    elevation: 2,
                   ),
                   child: _isLoading
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
+                          height: 22,
+                          width: 22,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2,
+                            strokeWidth: 2.5,
                             valueColor: AlwaysStoppedAnimation(Colors.white),
                           ),
                         )

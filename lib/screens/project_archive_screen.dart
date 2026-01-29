@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../project_core.dart';
+import '../theme/app_theme.dart';
 import 'project_details_screen.dart';
 
 class ProjectArchiveScreen extends StatefulWidget {
@@ -34,10 +35,12 @@ class _ProjectArchiveScreenState extends State<ProjectArchiveScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Proje Arşivi'),
-        backgroundColor: Colors.blueGrey.shade700,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        elevation: 1,
       ),
       body: FutureBuilder<List<Project>>(
         future: _firebase.getArchivedProjects(widget.companyId),
@@ -53,7 +56,9 @@ class _ProjectArchiveScreenState extends State<ProjectArchiveScreen> {
                 child: Text(
                   'Hata: ${snapshot.error}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Colors.red,
+                  ),
                 ),
               ),
             );

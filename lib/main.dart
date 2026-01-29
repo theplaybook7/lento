@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart'; 
 import 'services/payment_notification_service.dart';
+import 'theme/app_theme.dart';
 
 import 'project_core.dart';
 import 'screens/login_screen.dart';
@@ -31,11 +32,7 @@ class InsaatYonetimApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'İnşaat Yönetim',
-      theme: ThemeData(
-        primarySwatch: Colors.blueGrey,
-        scaffoldBackgroundColor: Colors.grey.shade100,
-        useMaterial3: false,
-      ),
+      theme: AppTheme.lightTheme(),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {

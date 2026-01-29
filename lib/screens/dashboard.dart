@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../project_core.dart';
 import '../models/project_model.dart';
+import '../theme/app_theme.dart';
 import 'teklif_screen.dart';
 import 'arsiv_screen.dart';
 import 'new_project_screen.dart';
@@ -59,11 +60,12 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('İnşaat Yönetim'),
-        backgroundColor: Colors.blueGrey.shade700,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        elevation: 1,
         actions: [
           IconButton(
             icon: const Icon(Icons.folder_outlined),
@@ -166,7 +168,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
               },
               icon: const Icon(Icons.add),
               label: const Text('Yeni Proje'),
-              backgroundColor: Colors.blueGrey.shade700,
+              backgroundColor: AppTheme.primaryColor,
             )
           : _navIndex == 1
               ? FloatingActionButton.extended(
@@ -180,7 +182,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                   },
                   icon: const Icon(Icons.add),
                   label: const Text('Yeni Teklif'),
-                  backgroundColor: Colors.blueGrey.shade700,
+                  backgroundColor: AppTheme.primaryColor,
                 )
               : null,
     );
@@ -220,20 +222,33 @@ class _TekliflerListesiState extends State<_TekliflerListesi> {
         // Arama ve Filtreleme Alanı
         Container(
           padding: const EdgeInsets.all(12),
-          color: Colors.grey.shade100,
+          color: Colors.white,
           child: Column(
             children: [
               TextField(
                 controller: _searchCtrl,
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: Icon(Icons.search, color: AppTheme.primaryColor),
                   hintText: "İlçe, mahalle, ada veya parsel ara...",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Colors.transparent),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
                 onChanged: (v) => setState(() {}),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 children: [
@@ -241,11 +256,15 @@ class _TekliflerListesiState extends State<_TekliflerListesi> {
                     label: const Text("Teklif"),
                     selected: _durumFiltre == 'teklif',
                     onSelected: (v) => setState(() => _durumFiltre = 'teklif'),
+                    selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+                    checkmarkColor: AppTheme.primaryColor,
                   ),
                   FilterChip(
-                    label: const Text("Anlaşıldı"),
-                    selected: _durumFiltre == 'anlasildi',
-                    onSelected: (v) => setState(() => _durumFiltre = 'anlasildi'),
+                    label: const Text("Tamamlandı"),
+                    selected: _durumFiltre == 'tamamlandi',
+                    onSelected: (v) => setState(() => _durumFiltre = 'tamamlandi'),
+                    selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+                    checkmarkColor: AppTheme.primaryColor,
                   ),
                   FilterChip(
                     label: const Text("Tamamlandı"),
@@ -331,39 +350,47 @@ class _TekliflerListesiState extends State<_TekliflerListesi> {
                   }
 
                   return Card(
-                    elevation: 2,
-                    margin: const EdgeInsets.only(bottom: 10),
+                    elevation: 1,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
                     child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.blue.shade100,
-                        child: const Icon(Icons.description, color: Colors.blue),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [AppTheme.primaryColor.withValues(alpha: 0.8), AppTheme.primaryColor],
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.description_outlined, color: Colors.white, size: 20),
                       ),
                       title: Text(
                         "${data['ilce']} / ${data['mahalle']}",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryColor,
+                        ),
                       ),
                       subtitle: Text(
-                        "Ada: ${data['ada']} | Parsel: ${data['parsel']} | Tarih: ${tarih.day}.${tarih.month}.${tarih.year}",
+                        "Ada: ${data['ada']} | Parsel: ${data['parsel']} | ${tarih.day}.${tarih.month}.${tarih.year}",
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
 
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 30),
-                            tooltip: "Teklifi Görüntüle ve Onayla",
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (c) => TeklifSayfasi(mevcutTeklifData: data, mevcutDocId: doc.id),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-                        ],
+                      trailing: IconButton(
+                        icon: Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.primaryColor.withValues(alpha: 0.6)),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (c) => TeklifSayfasi(mevcutTeklifData: data, mevcutDocId: doc.id),
+                            ),
+                          );
+                        },
                       ),
 
                       onTap: () {
@@ -447,12 +474,17 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                 final finance = financeSnap.data;
 
                 return Card(
-                  elevation: 2,
+                  elevation: 1,
                   margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
                   child: InkWell(
                     onTap: () => widget.onProjectTap(project.id),
+                    borderRadius: BorderRadius.circular(12),
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -465,16 +497,15 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                   children: [
                                     Text(
                                       project.name,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.primaryColor,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 6),
                                     Text(
                                       '${project.startDate.day}.${project.startDate.month}.${project.startDate.year}',
-                                      style: TextStyle(
-                                        fontSize: 12,
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                         color: Colors.grey.shade600,
                                       ),
                                     ),
@@ -487,8 +518,11 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _getStatusColor(project.status).withValues(alpha: 0.2),
+                                  color: _getStatusColor(project.status).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _getStatusColor(project.status).withValues(alpha: 0.5),
+                                  ),
                                 ),
                                 child: Text(
                                   project.status.name.toUpperCase(),

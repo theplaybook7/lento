@@ -9,6 +9,7 @@ import 'dart:ui_web' as ui_web;
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart';
+import '../theme/app_theme.dart';
 import 'payment_plans_screen.dart';
 import 'cari_hesap_screen.dart';
 
@@ -176,10 +177,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Proje Detayları'),
-        backgroundColor: Colors.blueGrey.shade700,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        elevation: 1,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -188,6 +191,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             Tab(text: 'Şantiye', icon: Icon(Icons.construction_outlined, size: 20)),
           ],
           indicatorColor: Colors.white,
+          indicatorSize: TabBarIndicatorSize.tab,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
         ),
@@ -198,15 +202,25 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Projeyi Arşivle'),
+                    title: Text(
+                      'Projeyi Arşivle',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
                     content: const Text('Bu projeyi arşivlemek istediğinizden emin misiniz?'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
                         child: const Text('İptal'),
                       ),
-                      TextButton(
+                      ElevatedButton(
                         onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
                         child: const Text('Arşivle'),
                       ),
                     ],

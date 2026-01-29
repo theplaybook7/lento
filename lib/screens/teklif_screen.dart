@@ -5,6 +5,7 @@ import '../audit_log_servisi.dart';
 import '../pdf_service.dart';
 import '../pdf_viewer_web.dart';
 import '../project_core.dart';
+import '../theme/app_theme.dart';
 import 'arsiv_screen.dart';
 
 class TeklifSayfasi extends StatefulWidget {
@@ -116,10 +117,21 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
       inputFormatters: isNumber ? [BinlikInputFormatter()] : [],
       decoration: InputDecoration(
         labelText: label,
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Colors.transparent),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+        ),
         isDense: true,
         filled: true,
-        fillColor: Colors.grey.shade50,
+        fillColor: Colors.white,
       ),
     );
   }
@@ -128,10 +140,12 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
   Widget build(BuildContext context) {
     final editMod = widget.mevcutDocId != null;
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: Text(editMod ? 'Teklif Düzenle' : 'Yeni Proje Teklifi'),
-        backgroundColor: Colors.blueGrey.shade800,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        elevation: 1,
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -173,7 +187,11 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
                 onPressed: _olusturVeGec,
                 icon: const Icon(Icons.arrow_forward),
                 label: Text(editMod ? 'Detayları Düzenle' : 'Proje Detaylarına Geç'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey.shade800, foregroundColor: Colors.white),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -187,7 +205,15 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
 
   Widget _bolumBaslik(String t) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(t, style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.blueGrey.shade900)),
+        child: Text(
+          t,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.primaryColor,
+            letterSpacing: 0.3,
+          ),
+        ),
       );
 
   Widget _buildTeklifListesi() {

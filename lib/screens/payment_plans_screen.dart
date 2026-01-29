@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/payment_model.dart';
 import '../services/firebase_service.dart';
 import '../services/payment_notification_service.dart';
+import '../theme/app_theme.dart';
 import 'payment_plan_details_screen.dart';
 import 'create_payment_plan_screen.dart';
 
@@ -27,10 +28,12 @@ class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Ödeme Planları'),
-        backgroundColor: Colors.blueGrey.shade800,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        elevation: 1,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_active),
@@ -64,14 +67,23 @@ class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey),
+                  Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade400),
                   const SizedBox(height: 12),
-                  const Text('Henüz ödeme planı yok'),
+                  Text(
+                    'Henüz ödeme planı yok',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () => _createNewPlan(),
                     icon: const Icon(Icons.add),
                     label: const Text('Yeni Ödeme Planı'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ],
               ),
@@ -87,9 +99,14 @@ class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
               final statusText = _getStatusText(plan.status);
 
               return Card(
-                elevation: 2,
+                elevation: 1,
                 margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade200),
+                ),
                 child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -102,7 +119,7 @@ class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
                     if (refresh == true) setState(() {});
                   }),
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -116,17 +133,16 @@ class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
                                 children: [
                                   Text(
                                     '${plan.firstName} ${plan.lastName}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.primaryColor,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   Text(
                                     '${plan.installmentCount} Taksit',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.grey.shade600,
                                     ),
                                   ),
                                 ],

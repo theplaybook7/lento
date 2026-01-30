@@ -66,7 +66,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('İnşaat Yönetim'),
+        title: const Text('Lento'),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 1,

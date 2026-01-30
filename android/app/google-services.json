@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "478876596230",
+    "project_id": "insaat-yonetim-takip",
+    "storage_bucket": "insaat-yonetim-takip.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:478876596230:android:c02542bd84743821dd6b87",
+        "android_client_info": {
+          "package_name": "com.example.insaat_yonetim"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgplIQ-HZe6wDaeefd0gq_vaJLCbQ5vnM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:478876596230:android:d041940ce577c116dd6b87",
+        "android_client_info": {
+          "package_name": "com.lento.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgplIQ-HZe6wDaeefd0gq_vaJLCbQ5vnM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

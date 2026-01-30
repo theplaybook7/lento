@@ -31,7 +31,7 @@ class InsaatYonetimApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'İnşaat Yönetim',
+      title: 'Lento',
       theme: AppTheme.lightTheme(),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),

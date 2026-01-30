@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:html' as html;
 import 'dart:developer' as developer;
 import 'dart:typed_data';
-import 'dart:ui_web' as ui_web;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart' as format_utils;
 import '../theme/app_theme.dart';
 import '../project_core.dart';
 import '../notification_service.dart';
+import '../web/web_utils.dart' as web_utils;
 import 'payment_plans_screen.dart';
 import 'cari_hesap_screen.dart';
 
@@ -1416,29 +1416,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
   Widget _buildWebPreview(Uint8List bytes, bool isPdf, String fileName) {
     try {
-      // Blob oluştur
-      final mimeType = isPdf ? 'application/pdf' : 'image/png';
-      final blob = html.Blob([bytes], mimeType);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      
-      // Benzersiz bir view ID oluştur
-      final viewId = 'preview-${DateTime.now().millisecondsSinceEpoch}';
-      
-      // HTML iframe elementi oluştur
-      // ignore: undefined_prefixed_name
-      ui_web.platformViewRegistry.registerViewFactory(
-        viewId,
-        (int viewIdInt) {
-          final iframe = html.IFrameElement()
-            ..src = url
-            ..style.border = 'none'
-            ..style.width = '100%'
-            ..style.height = '100%';
-          return iframe;
-        },
+      return web_utils.buildWebPreview(
+        bytes: bytes,
+        isPdf: isPdf,
+        fileName: fileName,
       );
-      
-      return HtmlElementView(viewType: viewId);
     } catch (e) {
       print('_buildWebPreview hatası: $e');
       return _buildPreviewError(message: e.toString());
@@ -1458,18 +1440,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         return;
       }
 
-      // Web için: İndirme bağlantısı oluştur ve tetikle
       final fileName = belge['başlık'] ?? 'belge';
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', fileName)
-        ..style.display = 'none';
-      
-      html.document.body?.children.add(anchor);
-      anchor.click();
-      
-      // Kısa süre sonra kaldır
-      await Future.delayed(const Duration(milliseconds: 100));
-      html.document.body?.children.remove(anchor);
+      if (kIsWeb) {
+        await web_utils.downloadFile(url, fileName);
+      }
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

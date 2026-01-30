@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../audit_log_servisi.dart';
 import '../pdf_service.dart';
-import '../pdf_viewer_web.dart';
+import '../pdf_viewer.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
 import 'arsiv_screen.dart';

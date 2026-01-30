@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDgplIQ-HZe6wDaeefd0gq_vaJLCbQ5vnM',
-    appId: '1:478876596230:android:c02542bd84743821dd6b87',
+    appId: '1:478876596230:android:d041940ce577c116dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',

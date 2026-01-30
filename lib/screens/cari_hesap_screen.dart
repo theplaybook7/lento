@@ -7,12 +7,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/image_utils.dart';
 import '../theme/app_theme.dart';
+import '../web/web_utils.dart' as web_utils;
 
 class CariHesapScreen extends StatefulWidget {
   const CariHesapScreen({super.key});
@@ -2079,10 +2078,10 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
   void _downloadCariImage(String imageUrl) {
     try {
       if (kIsWeb) {
-        (html.document.createElement('a') as html.AnchorElement)
-          ..href = imageUrl
-          ..download = 'cari_${DateTime.now().millisecondsSinceEpoch}.jpg'
-          ..click();
+        web_utils.downloadImage(
+          imageUrl,
+          fileName: 'cari_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

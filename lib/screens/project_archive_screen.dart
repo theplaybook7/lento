@@ -86,7 +86,7 @@ class _ProjectArchiveScreenState extends State<ProjectArchiveScreen> {
               final project = projects[index];
 
               return FutureBuilder<ProjectFinance>(
-                future: _firebase.getProjectFinance(project.id),
+                future: _firebase.getProjectFinanceSummary(project.id),
                 builder: (context, financeSnap) {
                   final finance = financeSnap.data;
 

@@ -39,6 +39,10 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     final sistem = SistemYoneticisi();
     final canTeklif = sistem.yetkiVarMi('teklif');
     final canMuhasebe = sistem.yetkiVarMi('muhasebe');
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 900;
+    final maxIndex = canMuhasebe ? 2 : 1;
+    final navIndex = _navIndex > maxIndex ? 0 : _navIndex;
 
     if (!canTeklif) {
       return Scaffold(
@@ -112,107 +116,271 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Ayarlar',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Çıkış',
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginSayfasi()),
-                (route) => false,
-              );
-            },
-          ),
+          if (!isCompact) ...[
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Ayarlar',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Çıkış',
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (!context.mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginSayfasi()),
+                  (route) => false,
+                );
+              },
+            ),
+          ] else
+            PopupMenuButton<String>(
+              tooltip: 'Menü',
+              onSelected: (value) async {
+                if (value == 'settings') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
+                  );
+                } else if (value == 'logout') {
+                  await FirebaseAuth.instance.signOut();
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginSayfasi()),
+                    (route) => false,
+                  );
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'settings', child: Text('Ayarlar')),
+                PopupMenuItem(value: 'logout', child: Text('Çıkış')),
+              ],
+            ),
         ],
       ),
-      body: Row(
-        children: [
-          NavigationRail(
-            selectedIndex: _navIndex,
-            onDestinationSelected: (i) => setState(() => _navIndex = i),
-            backgroundColor: Colors.white,
-            destinations: [
-              const NavigationRailDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: Text('Projeler'),
-              ),
-              const NavigationRailDestination(
-                icon: Icon(Icons.description_outlined),
-                selectedIcon: Icon(Icons.description),
-                label: Text('Teklifler'),
-              ),
-              if (canMuhasebe)
-                const NavigationRailDestination(
-                  icon: Icon(Icons.assessment_outlined),
-                  selectedIcon: Icon(Icons.assessment),
-                  label: Text('Muhasebe'),
+      drawer: isCompact
+          ? Drawer(
+              child: SafeArea(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                      child: Row(
+                        children: const [
+                          Text('Lento', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.home_outlined),
+                      title: const Text('Projeler'),
+                      selected: navIndex == 0,
+                      onTap: () {
+                        Navigator.pop(context);
+                        setState(() => _navIndex = 0);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.description_outlined),
+                      title: const Text('Teklifler'),
+                      selected: navIndex == 1,
+                      onTap: () {
+                        Navigator.pop(context);
+                        setState(() => _navIndex = 1);
+                      },
+                    ),
+                    if (canMuhasebe)
+                      ListTile(
+                        leading: const Icon(Icons.assessment_outlined),
+                        title: const Text('Muhasebe'),
+                        selected: navIndex == 2,
+                        onTap: () {
+                          Navigator.pop(context);
+                          setState(() => _navIndex = 2);
+                        },
+                      ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.folder_outlined),
+                      title: const Text('Proje Arşivi'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => ProjectArchiveScreen(companyId: _companyId),
+                          ),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.archive_outlined),
+                      title: const Text('Teklif Arşivi'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (c) => const ArsivSayfasi()),
+                        );
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.settings_outlined),
+                      title: const Text('Ayarlar'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.logout),
+                      title: const Text('Çıkış'),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await FirebaseAuth.instance.signOut();
+                        if (!context.mounted) return;
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (context) => const LoginSayfasi()),
+                          (route) => false,
+                        );
+                      },
+                    ),
+                  ],
                 ),
-            ],
-            trailing: Column(
+              ),
+            )
+          : null,
+      body: isCompact
+          ? navIndex == 0
+              ? _ProjectsTab(
+                  companyId: _companyId,
+                  onProjectTap: (projectId) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => ProjectDetailsScreen(projectId: projectId),
+                      ),
+                    );
+                  },
+                )
+                : navIndex == 1
+                  ? const _TekliflerListesi()
+                  : canMuhasebe
+                      ? CompanyFinanceDashboard(companyId: _companyId)
+                      : const Center(child: Text('Yetkiniz yok'))
+          : Row(
               children: [
-                Tooltip(
-                  message: 'Proje Arşivi',
-                  child: IconButton(
-                    icon: const Icon(Icons.folder_outlined),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (c) => ProjectArchiveScreen(companyId: _companyId),
+                NavigationRail(
+                  selectedIndex: navIndex,
+                  onDestinationSelected: (i) => setState(() => _navIndex = i),
+                  backgroundColor: Colors.white,
+                  destinations: [
+                    const NavigationRailDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home),
+                      label: Text('Projeler'),
+                    ),
+                    const NavigationRailDestination(
+                      icon: Icon(Icons.description_outlined),
+                      selectedIcon: Icon(Icons.description),
+                      label: Text('Teklifler'),
+                    ),
+                    if (canMuhasebe)
+                      const NavigationRailDestination(
+                        icon: Icon(Icons.assessment_outlined),
+                        selectedIcon: Icon(Icons.assessment),
+                        label: Text('Muhasebe'),
+                      ),
+                  ],
+                  trailing: Column(
+                    children: [
+                      Tooltip(
+                        message: 'Proje Arşivi',
+                        child: IconButton(
+                          icon: const Icon(Icons.folder_outlined),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (c) => ProjectArchiveScreen(companyId: _companyId),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                      ),
+                      Tooltip(
+                        message: 'Teklif Arşivi',
+                        child: IconButton(
+                          icon: const Icon(Icons.archive_outlined),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (c) => const ArsivSayfasi()),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Tooltip(
-                  message: 'Teklif Arşivi',
-                  child: IconButton(
-                    icon: const Icon(Icons.archive_outlined),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (c) => const ArsivSayfasi()),
-                      );
-                    },
-                  ),
+                Expanded(
+                  child: navIndex == 0
+                      ? _ProjectsTab(
+                          companyId: _companyId,
+                          onProjectTap: (projectId) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (c) => ProjectDetailsScreen(projectId: projectId),
+                              ),
+                            );
+                          },
+                        )
+                        : navIndex == 1
+                          ? const _TekliflerListesi()
+                          : canMuhasebe
+                              ? CompanyFinanceDashboard(companyId: _companyId)
+                              : const Center(child: Text('Yetkiniz yok')),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: _navIndex == 0
-                ? _ProjectsTab(
-                    companyId: _companyId,
-                    onProjectTap: (projectId) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (c) => ProjectDetailsScreen(projectId: projectId),
-                        ),
-                      );
-                    },
-                  )
-                : _navIndex == 1
-                    ? const _TekliflerListesi()
-                    : canMuhasebe 
-                        ? CompanyFinanceDashboard(companyId: _companyId)
-                        : const Center(child: Text('Yetkiniz yok')),
-          ),
-        ],
-      ),
-      floatingActionButton: _navIndex == 0
+      bottomNavigationBar: isCompact
+          ? BottomNavigationBar(
+            currentIndex: navIndex,
+              onTap: (i) => setState(() => _navIndex = i),
+              items: [
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.home_outlined),
+                  activeIcon: Icon(Icons.home),
+                  label: 'Projeler',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.description_outlined),
+                  activeIcon: Icon(Icons.description),
+                  label: 'Teklifler',
+                ),
+                if (canMuhasebe)
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.assessment_outlined),
+                    activeIcon: Icon(Icons.assessment),
+                    label: 'Muhasebe',
+                  ),
+              ],
+              type: BottomNavigationBarType.fixed,
+            )
+          : null,
+      floatingActionButton: navIndex == 0
           ? FloatingActionButton.extended(
               onPressed: () async {
                 if (!mounted) return;
@@ -236,7 +404,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
               label: const Text('Yeni Proje'),
               backgroundColor: AppTheme.primaryColor,
             )
-          : _navIndex == 1
+            : navIndex == 1
               ? FloatingActionButton.extended(
                   onPressed: () {
                     Navigator.push(
@@ -273,7 +441,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
         PopupMenuItem(
           enabled: false,
           child: SizedBox(
-            width: 360,
+            width: (MediaQuery.of(context).size.width - 24).clamp(260, 360).toDouble(),
             child: StreamBuilder<QuerySnapshot>(
               stream: BildirimServisi.bildirimleriDinle(),
               builder: (ctx, snap) {
@@ -641,7 +809,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
             final project = projects[index];
 
             return FutureBuilder<ProjectFinance>(
-              future: _firebase.getProjectFinance(project.id),
+              future: _firebase.getProjectFinanceSummary(project.id),
               builder: (context, financeSnap) {
                 final finance = financeSnap.data;
 

@@ -295,6 +295,27 @@ class FirebaseService {
     }
   }
 
+  /// Proje finansmanı özetini al (işlemleri çekmez)
+  Future<ProjectFinance> getProjectFinanceSummary(String projectId) async {
+    try {
+      final doc = await _db.collection('project_finance').doc(projectId).get();
+      if (!doc.exists) {
+        return ProjectFinance(projectId: projectId);
+      }
+
+      final data = doc.data() as Map<String, dynamic>;
+      return ProjectFinance(
+        projectId: projectId,
+        totalIncome: (data['totalIncome'] ?? 0).toDouble(),
+        totalExpenses: (data['totalExpenses'] ?? 0).toDouble(),
+        budgetedAmount: (data['budgetedAmount'] ?? 0).toDouble(),
+      );
+    } catch (e) {
+      developer.log('Proje finansmanı özet yükleme hatası: $e');
+      rethrow;
+    }
+  }
+
   /// Proje finansmanını güncelle
   Future<void> _updateProjectFinance(String projectId) async {
     try {

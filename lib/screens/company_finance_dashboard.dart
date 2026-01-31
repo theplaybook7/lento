@@ -82,7 +82,7 @@ class _CompanyFinanceDashboardState extends State<CompanyFinanceDashboard> {
 
           return FutureBuilder<List<ProjectFinance>>(
             future: Future.wait(
-              projects.map((p) => _firebase.getProjectFinance(p.id)).toList(),
+              projects.map((p) => _firebase.getProjectFinanceSummary(p.id)).toList(),
             ),
             builder: (context, financeSnap) {
               if (financeSnap.connectionState == ConnectionState.waiting) {

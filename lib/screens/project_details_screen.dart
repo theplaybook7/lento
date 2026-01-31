@@ -484,7 +484,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
                 // Ön Muhasebe Özeti
                 FutureBuilder<ProjectFinance>(
-                  future: _firebase.getProjectFinance(widget.projectId),
+                  future: _firebase.getProjectFinanceSummary(widget.projectId),
                   builder: (context, financeSnap) {
                     if (financeSnap.connectionState == ConnectionState.waiting) {
                       return const Padding(

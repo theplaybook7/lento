@@ -877,8 +877,9 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                           ),
                           const SizedBox(height: 12),
                           if (finance != null && SistemYoneticisi().yetkiVarMi('muhasebe'))
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
                                 Chip(
                                   label: Text(

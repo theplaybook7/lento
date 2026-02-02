@@ -109,50 +109,53 @@ class _CompanyFinanceDashboardState extends State<CompanyFinanceDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Özet Kartları
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SummaryCard(
-                            title: 'Toplam Gelir',
-                            amount: totalIncome,
-                            color: Colors.green,
-                            icon: Icons.trending_up,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _SummaryCard(
-                            title: 'Toplam Gider',
-                            amount: totalExpenses,
-                            color: Colors.red,
-                            icon: Icons.trending_down,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SummaryCard(
-                            title: 'Toplam Kâr',
-                            amount: calculatedProfit,
-                            color: calculatedProfit >= 0 ? Colors.blue : Colors.orange,
-                            icon: Icons.paid,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _SummaryCard(
-                            title: 'Kâr Marjı',
-                            amount: calculatedMargin,
-                            color: Colors.purple,
-                            icon: Icons.pie_chart,
-                            isPercentage: true,
-                          ),
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cardWidth = (constraints.maxWidth - 12) / 2;
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            SizedBox(
+                              width: cardWidth,
+                              child: _SummaryCard(
+                                title: 'Toplam Gelir',
+                                amount: totalIncome,
+                                color: Colors.green,
+                                icon: Icons.trending_up,
+                              ),
+                            ),
+                            SizedBox(
+                              width: cardWidth,
+                              child: _SummaryCard(
+                                title: 'Toplam Gider',
+                                amount: totalExpenses,
+                                color: Colors.red,
+                                icon: Icons.trending_down,
+                              ),
+                            ),
+                            SizedBox(
+                              width: cardWidth,
+                              child: _SummaryCard(
+                                title: 'Toplam Kâr',
+                                amount: calculatedProfit,
+                                color: calculatedProfit >= 0 ? Colors.blue : Colors.orange,
+                                icon: Icons.paid,
+                              ),
+                            ),
+                            SizedBox(
+                              width: cardWidth,
+                              child: _SummaryCard(
+                                title: 'Kâr Marjı',
+                                amount: calculatedMargin,
+                                color: Colors.purple,
+                                icon: Icons.pie_chart,
+                                isPercentage: true,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
 

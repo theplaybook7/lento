@@ -852,27 +852,28 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                   ],
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _getStatusColor(project.status).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _getStatusColor(project.status).withValues(alpha: 0.5),
+                              if (project.status != ProjectStatus.planning)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _getStatusColor(project.status).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _getStatusColor(project.status).withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    project.status.name.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: _getStatusColor(project.status),
+                                    ),
                                   ),
                                 ),
-                                child: Text(
-                                  project.status.name.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: _getStatusColor(project.status),
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 12),

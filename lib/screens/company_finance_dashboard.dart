@@ -209,30 +209,32 @@ class _CompanyFinanceDashboardState extends State<CompanyFinanceDashboard> {
                                         ],
                                       ),
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _getStatusColor(project.status).withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        project.status.name.toUpperCase(),
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: _getStatusColor(project.status),
+                                    if (project.status != ProjectStatus.planning)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _getStatusColor(project.status).withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          project.status.name.toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: _getStatusColor(project.status),
+                                          ),
                                         ),
                                       ),
-                                    ),
                                   ],
                                 ),
                                 if (projectFin != null) ...[
                                   const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
                                     children: [
                                       _InfoChip('Gelir: ${formatNumber(projectFin.totalIncome)} ₺', Colors.green),
                                       _InfoChip('Gider: ${formatNumber(projectFin.totalExpenses)} ₺', Colors.red),

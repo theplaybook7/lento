@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:developer' as developer;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart' as format_utils;
@@ -638,7 +639,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                           final cariData = cariDoc.data() as Map<String, dynamic>;
                           final ad = cariData['ad'] ?? 'İsimsiz';
                           final tip = cariData['tip'] ?? 'musteri';
-                          final bakiye = (cariData['bakiye'] ?? 0.0) as double;
+                          final bakiye = (cariData['bakiye'] as num?)?.toDouble() ?? 0.0;
                           final ikon = tip == 'musteri' ? Icons.person : Icons.business;
                           final renk = bakiye > 0 ? Colors.green : (bakiye < 0 ? Colors.red : Colors.grey);
 
@@ -1416,13 +1417,26 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
   Widget _buildWebPreview(Uint8List bytes, bool isPdf, String fileName) {
     try {
-      return web_utils.buildWebPreview(
-        bytes: bytes,
-        isPdf: isPdf,
-        fileName: fileName,
+      if (kIsWeb) {
+        return web_utils.buildWebPreview(
+          bytes: bytes,
+          isPdf: isPdf,
+          fileName: fileName,
+        );
+      }
+
+      if (isPdf) {
+        return SfPdfViewer.memory(bytes);
+      }
+
+      return InteractiveViewer(
+        child: Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+        ),
       );
     } catch (e) {
-      print('_buildWebPreview hatası: $e');
+      print('_buildWebPreview hatasi: $e');
       return _buildPreviewError(message: e.toString());
     }
   }
@@ -1977,6 +1991,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowMultiple: true,
+        withData: true,
       );
       
       if (result == null || result.files.isEmpty) return;
@@ -1985,7 +2000,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       final fotografBilgileri = <Map<String, dynamic>>[];
       
       for (final file in result.files) {
-        if (file.bytes == null) continue;
+        if (file.bytes == null) {
+          developer.log('Fotograf okunamadi: ${file.name}');
+          continue;
+        }
         
         final aciklamaCtrl = TextEditingController();
         final confirmed = await showDialog<bool>(

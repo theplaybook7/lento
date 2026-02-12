@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Uygulama, santiye fotograflari cekmek ve proje gorselleri eklemek icin kameraya erisim ister.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Uygulama, projelere fotograf yuklemek ve belge eklemek icin fotograf kutuphanesine erisim ister.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

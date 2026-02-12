@@ -991,108 +991,240 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
                                   border: Border.all(color: Colors.grey.shade300),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Row(
-                                  children: [
-                                    if (b.isOrtakAlan)
-                                      Expanded(
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.public, size: 16),
-                                            const SizedBox(width: 6),
-                                            Text(b.tip, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final isTight = constraints.maxWidth < 420;
+
+                                    if (!isTight) {
+                                      return Row(
+                                        children: [
+                                          if (b.isOrtakAlan)
+                                            Expanded(
+                                              child: Row(
+                                                children: [
+                                                  const Icon(Icons.public, size: 16),
+                                                  const SizedBox(width: 6),
+                                                  Text(b.tip, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                            )
+                                          else
+                                            Expanded(
+                                              child: DropdownButtonHideUnderline(
+                                                child: DropdownButton<String>(
+                                                  value: _tiplerForKat(i).contains(b.tip) ? b.tip : 'Daire',
+                                                  isExpanded: true,
+                                                  items: _tiplerForKat(i)
+                                                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                                                      .toList(),
+                                                  onChanged: (v) {
+                                                    setState(() => b.tip = v ?? 'Daire');
+                                                    _hesapla();
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          const SizedBox(width: 6),
+                                          if (!b.isOrtakAlan && b.tip == 'Dubleks') ...[
+                                            _miniInput(b.m2Ctrl, 'Ana'),
+                                            const SizedBox(width: 4),
+                                            _miniInput(b.ustKatM2Ctrl, 'Üst'),
+                                          ] else if (!b.isOrtakAlan && (b.tip == 'Ters Dubleks' || b.tip == 'Depolu Dükkan')) ...[
+                                            _miniInput(b.m2Ctrl, 'Ana'),
+                                            const SizedBox(width: 4),
+                                            _miniInput(b.altKatM2Ctrl, 'Alt'),
+                                          ] else ...[
+                                            _miniInput(b.m2Ctrl, 'm2'),
                                           ],
-                                        ),
-                                      )
-                                    else
-                                      Expanded(
-                                        child: DropdownButtonHideUnderline(
-                                          child: DropdownButton<String>(
-                                            value: _tiplerForKat(i).contains(b.tip) ? b.tip : 'Daire',
-                                            isExpanded: true,
-                                            items: _tiplerForKat(i)
-                                                .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                                                .toList(),
-                                            onChanged: (v) {
-                                              setState(() => b.tip = v ?? 'Daire');
+                                          const SizedBox(width: 6),
+                                          if (!b.isOrtakAlan) ...[
+                                            PopupMenuButton<String>(
+                                              padding: EdgeInsets.zero,
+                                              itemBuilder: (_) => const [
+                                                PopupMenuItem(value: 'Mal Sahibi', child: Text('Mal Sahibi')),
+                                                PopupMenuItem(value: 'Muteahhit', child: Text('Müteahhit')),
+                                              ],
+                                              onSelected: (v) {
+                                                setState(() => b.sahip = v);
+                                                _hesapla();
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                decoration: BoxDecoration(
+                                                  color: b.sahip == 'Muteahhit' ? Colors.red.shade100 : Colors.green.shade100,
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  b.sahip == 'Muteahhit' ? 'Müteahhit' : b.sahip,
+                                                  style: TextStyle(color: b.sahip == 'Muteahhit' ? Colors.red.shade900 : Colors.green.shade900),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            ElevatedButton(
+                                              onPressed: () => _hakDuzenle(b),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: b.hakKullanildi ? Colors.blue : Colors.grey.shade300,
+                                                foregroundColor: b.hakKullanildi ? Colors.white : Colors.black,
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                minimumSize: const Size(90, 40),
+                                              ),
+                                              child: const Text('Hibe/Kredi', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
+                                            ),
+                                          ],
+                                          if (b.sahip == 'Muteahhit' && !b.isOrtakAlan) ...[
+                                            const SizedBox(width: 6),
+                                            SizedBox(
+                                              width: 90,
+                                              child: TextField(
+                                                controller: b.toprakParasiCtrl,
+                                                onChanged: (_) => _hesapla(),
+                                                keyboardType: TextInputType.number,
+                                                inputFormatters: [BinlikInputFormatter()],
+                                                decoration: const InputDecoration(
+                                                  labelText: 'Toprak',
+                                                  isDense: true,
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            icon: const Icon(Icons.cancel, color: Colors.red),
+                                            onPressed: () {
+                                              setState(() => kat.bolumler.remove(b));
                                               _hesapla();
                                             },
-                                          ),
-                                        ),
-                                      ),
-                                    const SizedBox(width: 6),
-                                    if (!b.isOrtakAlan && b.tip == 'Dubleks') ...[
-                                      _miniInput(b.m2Ctrl, 'Ana'),
-                                      const SizedBox(width: 4),
-                                      _miniInput(b.ustKatM2Ctrl, 'Üst'),
-                                    ] else if (!b.isOrtakAlan && (b.tip == 'Ters Dubleks' || b.tip == 'Depolu Dükkan')) ...[
-                                      _miniInput(b.m2Ctrl, 'Ana'),
-                                      const SizedBox(width: 4),
-                                      _miniInput(b.altKatM2Ctrl, 'Alt'),
-                                    ] else ...[
-                                      _miniInput(b.m2Ctrl, 'm2'),
-                                    ],
-                                    const SizedBox(width: 6),
-                                    if (!b.isOrtakAlan) ...[
-                                      PopupMenuButton<String>(
-                                        padding: EdgeInsets.zero,
-                                        itemBuilder: (_) => const [
-                                          PopupMenuItem(value: 'Mal Sahibi', child: Text('Mal Sahibi')),
-                                          PopupMenuItem(value: 'Muteahhit', child: Text('Müteahhit')),
+                                          )
                                         ],
-                                        onSelected: (v) {
-                                          setState(() => b.sahip = v);
-                                          _hesapla();
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: b.sahip == 'Muteahhit' ? Colors.red.shade100 : Colors.green.shade100,
-                                            borderRadius: BorderRadius.circular(6),
+                                      );
+                                    }
+
+                                    final isDubleks = !b.isOrtakAlan && b.tip == 'Dubleks';
+                                    final isTers = !b.isOrtakAlan && (b.tip == 'Ters Dubleks' || b.tip == 'Depolu Dükkan');
+
+                                    Widget inputGroup;
+                                    if (isDubleks) {
+                                      inputGroup = Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _miniInput(b.m2Ctrl, 'Ana'),
+                                          const SizedBox(width: 4),
+                                          _miniInput(b.ustKatM2Ctrl, 'Üst'),
+                                        ],
+                                      );
+                                    } else if (isTers) {
+                                      inputGroup = Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _miniInput(b.m2Ctrl, 'Ana'),
+                                          const SizedBox(width: 4),
+                                          _miniInput(b.altKatM2Ctrl, 'Alt'),
+                                        ],
+                                      );
+                                    } else {
+                                      inputGroup = _miniInput(b.m2Ctrl, 'm2');
+                                    }
+
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (b.isOrtakAlan)
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.public, size: 16),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  b.tip,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        else
+                                          DropdownButtonHideUnderline(
+                                            child: DropdownButton<String>(
+                                              value: _tiplerForKat(i).contains(b.tip) ? b.tip : 'Daire',
+                                              isExpanded: true,
+                                              items: _tiplerForKat(i)
+                                                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                                                  .toList(),
+                                              onChanged: (v) {
+                                                setState(() => b.tip = v ?? 'Daire');
+                                                _hesapla();
+                                              },
+                                            ),
                                           ),
-                                          child: Text(
-                                            b.sahip == 'Muteahhit' ? 'Müteahhit' : b.sahip,
-                                            style: TextStyle(color: b.sahip == 'Muteahhit' ? Colors.red.shade900 : Colors.green.shade900),
-                                          ),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          children: [
+                                            inputGroup,
+                                            if (!b.isOrtakAlan)
+                                              PopupMenuButton<String>(
+                                                padding: EdgeInsets.zero,
+                                                itemBuilder: (_) => const [
+                                                  PopupMenuItem(value: 'Mal Sahibi', child: Text('Mal Sahibi')),
+                                                  PopupMenuItem(value: 'Muteahhit', child: Text('Müteahhit')),
+                                                ],
+                                                onSelected: (v) {
+                                                  setState(() => b.sahip = v);
+                                                  _hesapla();
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                  decoration: BoxDecoration(
+                                                    color: b.sahip == 'Muteahhit' ? Colors.red.shade100 : Colors.green.shade100,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    b.sahip == 'Muteahhit' ? 'Müteahhit' : b.sahip,
+                                                    style: TextStyle(color: b.sahip == 'Muteahhit' ? Colors.red.shade900 : Colors.green.shade900),
+                                                  ),
+                                                ),
+                                              ),
+                                            if (!b.isOrtakAlan)
+                                              ElevatedButton(
+                                                onPressed: () => _hakDuzenle(b),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: b.hakKullanildi ? Colors.blue : Colors.grey.shade300,
+                                                  foregroundColor: b.hakKullanildi ? Colors.white : Colors.black,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                  minimumSize: const Size(90, 40),
+                                                ),
+                                                child: const Text('Hibe/Kredi', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
+                                              ),
+                                            if (b.sahip == 'Muteahhit' && !b.isOrtakAlan)
+                                              SizedBox(
+                                                width: 90,
+                                                child: TextField(
+                                                  controller: b.toprakParasiCtrl,
+                                                  onChanged: (_) => _hesapla(),
+                                                  keyboardType: TextInputType.number,
+                                                  inputFormatters: [BinlikInputFormatter()],
+                                                  decoration: const InputDecoration(
+                                                    labelText: 'Toprak',
+                                                    isDense: true,
+                                                    border: OutlineInputBorder(),
+                                                  ),
+                                                ),
+                                              ),
+                                            IconButton(
+                                              icon: const Icon(Icons.cancel, color: Colors.red),
+                                              onPressed: () {
+                                                setState(() => kat.bolumler.remove(b));
+                                                _hesapla();
+                                              },
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      ElevatedButton(
-                                        onPressed: () => _hakDuzenle(b),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: b.hakKullanildi ? Colors.blue : Colors.grey.shade300,
-                                          foregroundColor: b.hakKullanildi ? Colors.white : Colors.black,
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                          minimumSize: const Size(90, 40),
-                                        ),
-                                        child: const Text('Hibe/Kredi', textAlign: TextAlign.center, style: TextStyle(fontSize: 11)),
-                                      ),
-                                    ],
-                                    if (b.sahip == 'Muteahhit' && !b.isOrtakAlan) ...[
-                                      const SizedBox(width: 6),
-                                      SizedBox(
-                                        width: 90,
-                                        child: TextField(
-                                          controller: b.toprakParasiCtrl,
-                                          onChanged: (_) => _hesapla(),
-                                          keyboardType: TextInputType.number,
-                                          inputFormatters: [BinlikInputFormatter()],
-                                          decoration: const InputDecoration(
-                                            labelText: 'Toprak',
-                                            isDense: true,
-                                            border: OutlineInputBorder(),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      icon: const Icon(Icons.cancel, color: Colors.red),
-                                      onPressed: () {
-                                        setState(() => kat.bolumler.remove(b));
-                                        _hesapla();
-                                      },
-                                    )
-                                  ],
+                                      ],
+                                    );
+                                  },
                                 ),
                               ),
                             ),

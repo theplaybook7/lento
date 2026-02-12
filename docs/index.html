@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Lento - İnşaat projeleriniz için eksiksiz dijital çözüm. Proje yönetimi, teklif hazırlama, görev takibi ve şantiye fotoğrafları.">
+    <title>Lento - İnşaat Proje Yönetimi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 60px 20px;
+            color: white;
+        }
+        
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+        
+        header p {
+            font-size: 1.3em;
+            margin-bottom: 30px;
+            opacity: 0.95;
+        }
+        
+        .app-badge {
+            display: inline-block;
+            margin: 20px 10px;
+        }
+        
+        .app-badge img {
+            height: 50px;
+        }
+        
+        .content {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 40px;
+            margin: 40px 0;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin: 40px 0;
+        }
+        
+        .feature {
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            transition: transform 0.3s ease;
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .feature ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .feature li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .feature li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .support-section {
+            background: #f8f9fa;
+            padding: 40px;
+            border-radius: 15px;
+            margin: 40px 0;
+            text-align: center;
+        }
+        
+        .support-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .support-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: white;
+            opacity: 0.9;
+        }
+        
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+            
+            header p {
+                font-size: 1.1em;
+            }
+            
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏗️ Lento</h1>
+            <p>İnşaat Projeleriniz İçin Eksiksiz Dijital Çözüm</p>
+            <p style="font-size: 1.1em;">Proje yönetimi, teklif hazırlama, görev takibi ve şantiye fotoğrafları - tek bir uygulamada!</p>
+            
+            <div class="app-badge">
+                <a href="https://apps.apple.com/app/lento" target="_blank">
+                    <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" alt="Download on the App Store">
+                </a>
+            </div>
+        </header>
+        
+        <div class="content">
+            <h2 style="text-align: center; color: #667eea; margin-bottom: 40px; font-size: 2em;">Özellikler</h2>
+            
+            <div class="features">
+                <div class="feature">
+                    <h3>📋 Proje Yönetimi</h3>
+                    <ul>
+                        <li>Detaylı proje takibi</li>
+                        <li>Cari hesap yönetimi</li>
+                        <li>Sözleşme ve hakediş takibi</li>
+                        <li>Bütçe ve maliyet kontrolü</li>
+                        <li>Ödeme planlaması</li>
+                    </ul>
+                </div>
+                
+                <div class="feature">
+                    <h3>💰 Teklif Hazırlama</h3>
+                    <ul>
+                        <li>Profesyonel teklif dökümanları</li>
+                        <li>Bölüm bazlı iş kalemleri</li>
+                        <li>Anlık maliyet güncellemeleri</li>
+                        <li>PDF olarak paylaşım</li>
+                        <li>Kalem bazlı açıklamalar</li>
+                    </ul>
+                </div>
+                
+                <div class="feature">
+                    <h3>✅ Görev Takibi</h3>
+                    <ul>
+                        <li>Proje bazlı görevler</li>
+                        <li>Öncelik belirleme</li>
+                        <li>Durum takibi</li>
+                        <li>Organize görev listesi</li>
+                        <li>Tamamlanma kontrolü</li>
+                    </ul>
+                </div>
+                
+                <div class="feature">
+                    <h3>📸 Şantiye Fotoğrafları</h3>
+                    <ul>
+                        <li>Proje bazlı organizasyon</li>
+                        <li>Tarih ve açıklama ekleme</li>
+                        <li>İlerleme görsel kaydı</li>
+                        <li>Mobilde çekip anında yükleme</li>
+                        <li>Raporlara otomatik dahil</li>
+                    </ul>
+                </div>
+                
+                <div class="feature">
+                    <h3>📄 Raporlama</h3>
+                    <ul>
+                        <li>Detaylı PDF raporları</li>
+                        <li>Proje özetleri</li>
+                        <li>Hakediş raporları</li>
+                        <li>Maliyet analizi</li>
+                        <li>Tek tuşla paylaşım</li>
+                    </ul>
+                </div>
+                
+                <div class="feature">
+                    <h3>🔄 Offline Çalışma</h3>
+                    <ul>
+                        <li>İnternet olmadan kullanım</li>
+                        <li>Şantiyede kesintisiz çalışma</li>
+                        <li>Otomatik senkronizasyon</li>
+                        <li>Güvenli bulut yedekleme</li>
+                        <li>Her cihazdan erişim</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin: 60px 0 40px;">
+                <h2 style="color: #667eea; margin-bottom: 20px;">Kimler Kullanabilir?</h2>
+                <p style="font-size: 1.1em; color: #666; line-height: 1.8;">
+                    İnşaat Firmaları • Müteahhitler • Proje Yöneticileri<br>
+                    Şantiye Şefleri • Saha Mühendisleri
+                </p>
+            </div>
+        </div>
+        
+        <div class="content support-section">
+            <h2>💬 Destek ve İletişim</h2>
+            <p style="color: #666; margin: 20px 0; font-size: 1.1em;">
+                Sorularınız mı var? Yardıma mı ihtiyacınız var?<br>
+                Size yardımcı olmaktan mutluluk duyarız!
+            </p>
+            
+            <div class="support-links">
+                <a href="https://github.com/theplaybook7/lento/issues" class="btn" target="_blank">
+                    🐛 Sorun Bildir / Destek Al
+                </a>
+                <a href="https://github.com/theplaybook7/lento" class="btn btn-secondary" target="_blank">
+                    📦 GitHub Repository
+                </a>
+            </div>
+            
+            <div style="margin-top: 40px; padding-top: 40px; border-top: 1px solid #ddd;">
+                <h3 style="color: #667eea; margin-bottom: 15px;">Sık Sorulan Sorular</h3>
+                
+                <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+                    <details style="margin: 15px 0; padding: 15px; background: white; border-radius: 10px;">
+                        <summary style="cursor: pointer; font-weight: 600; color: #667eea;">Offline çalışma nasıl işliyor?</summary>
+                        <p style="margin-top: 10px; color: #666;">Uygulama internet bağlantısı olmadan çalışır. Yaptığınız değişiklikler cihazınızda saklanır ve internet bağlantınız olduğunda otomatik olarak senkronize edilir.</p>
+                    </details>
+                    
+                    <details style="margin: 15px 0; padding: 15px; background: white; border-radius: 10px;">
+                        <summary style="cursor: pointer; font-weight: 600; color: #667eea;">Verilerim güvende mi?</summary>
+                        <p style="margin-top: 10px; color: #666;">Tüm verileriniz Firebase güvenli bulut altyapısında şifrelenerek saklanır. Şirket bazlı kullanıcı yönetimi ile sadece yetkili kişiler verilere erişebilir.</p>
+                    </details>
+                    
+                    <details style="margin: 15px 0; padding: 15px; background: white; border-radius: 10px;">
+                        <summary style="cursor: pointer; font-weight: 600; color: #667eea;">Kaç proje oluşturabilirim?</summary>
+                        <p style="margin-top: 10px; color: #666;">Sınırsız proje oluşturabilir ve yönetebilirsiniz. Her proje için ayrı görevler, fotoğraflar ve teklifler ekleyebilirsiniz.</p>
+                    </details>
+                    
+                    <details style="margin: 15px 0; padding: 15px; background: white; border-radius: 10px;">
+                        <summary style="cursor: pointer; font-weight: 600; color: #667eea;">PDF raporlarını nasıl paylaşabilirim?</summary>
+                        <p style="margin-top: 10px; color: #666;">PDF raporları oluşturulduktan sonra email, WhatsApp veya başka uygulamalar üzerinden kolayca paylaşabilirsiniz.</p>
+                    </details>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2026 Lento. Tüm hakları saklıdır.</p>
+            <p style="margin-top: 10px;">
+                <a href="https://github.com/theplaybook7/lento" style="color: white; text-decoration: none; margin: 0 10px;">GitHub</a> •
+                <a href="https://github.com/theplaybook7/lento/issues" style="color: white; text-decoration: none; margin: 0 10px;">Destek</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

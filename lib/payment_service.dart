@@ -19,8 +19,8 @@ class PaymentService {
   
   
   // Fiyatlandırma
-  static const double yearlyPrice = 999.99;  // ₺999.99/yıl
-  static const double monthlyPrice = 99.99;  // ₺99.99/ay
+  static const double yearlyPrice = 29999.00;  // ₺29.999,00/yıl
+  static const double monthlyPrice = 2999.99;  // ₺2.999,99/ay
 
   factory PaymentService() {
     return _instance;

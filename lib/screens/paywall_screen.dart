@@ -134,7 +134,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
               _buildPlanCard(
                 title: "Aylık",
                 subtitle: "Subscription",
-                price: "₺99.99",
+                price: "₺2999.99",
                 duration: "/ay",
                 features: [
                   "Sınırsız proje yönetimi",
@@ -151,7 +151,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
               _buildPlanCard(
                 title: "Yıllık",
                 subtitle: "En Uygun",
-                price: "₺999.99",
+                price: "₺29999.00",
                 duration: "/yıl",
                 discount: "2 ay tasarruf et",
                 features: [

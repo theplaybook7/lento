@@ -10,17 +10,17 @@ class PaymentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final InAppPurchase _iap = InAppPurchase.instance;
 
-  late StreamSubscription<List<PurchaseDetails>> _subscription;
+  StreamSubscription<List<PurchaseDetails>>? _subscription;
+  bool _initialized = false;
   
   // Ürün ID'leri - Subscription
   static const String yearlySubscriptionId = 'company_yearly_subscription';
   static const String monthlySubscriptionId = 'company_monthly_subscription';
-  static const String trialSubscriptionId = 'company_trial_subscription';
+  
   
   // Fiyatlandırma
-  static const double yearlyPrice = 99.99;  // $99.99/yıl
-  static const double monthlyPrice = 9.99;  // $9.99/ay
-  static const double trialPrice = 0.0;     // 7 gün ücretsiz
+  static const double yearlyPrice = 999.99;  // ₺999.99/yıl
+  static const double monthlyPrice = 99.99;  // ₺99.99/ay
 
   factory PaymentService() {
     return _instance;
@@ -29,6 +29,8 @@ class PaymentService {
   PaymentService._internal();
 
   Future<void> initialize() async {
+    if (_initialized) return;
+
     final iapAvailable = await _iap.isAvailable();
     
     if (iapAvailable) {
@@ -42,28 +44,47 @@ class PaymentService {
           // IAP Error handling
         },
       );
+      _initialized = true;
     }
+  }
+
+  String? _subscriptionTypeFromProductId(String productId) {
+    if (productId == yearlySubscriptionId) return 'yearly';
+    if (productId == monthlySubscriptionId) return 'monthly';
+    return null;
+  }
+
+  DateTime _subscriptionEndDateForType(String type) {
+    if (type == 'yearly') {
+      return DateTime.now().add(const Duration(days: 365));
+    }
+    return DateTime.now().add(const Duration(days: 30));
   }
 
   Future<void> _handlePurchaseUpdate(PurchaseDetails purchase) async {
     if (purchase.status == PurchaseStatus.purchased ||
         purchase.status == PurchaseStatus.restored) {
-      
       final user = _auth.currentUser;
-      if (user != null) {
-        // Ödeme başarılı, Firestore'da kaydet
+      final subscriptionType = _subscriptionTypeFromProductId(purchase.productID);
+
+      if (user != null && subscriptionType != null) {
+        final subscriptionEndDate = _subscriptionEndDateForType(subscriptionType);
+
         await _firestore.collection('users').doc(user.uid).set({
           'companyCreationPaid': true,
           'paidAt': DateTime.now(),
           'productId': purchase.productID,
           'transactionId': purchase.purchaseID,
+          'subscriptionType': subscriptionType,
+          'subscriptionEndDate': Timestamp.fromDate(subscriptionEndDate),
+          'autoRenew': true,
+          'lastPurchaseStatus': purchase.status.name,
         }, SetOptions(merge: true));
       }
+    }
 
-      // Ödemeyi tamamla
-      if (purchase.pendingCompletePurchase) {
-        await _iap.completePurchase(purchase);
-      }
+    if (purchase.pendingCompletePurchase) {
+      await _iap.completePurchase(purchase);
     }
   }
 
@@ -103,7 +124,7 @@ class PaymentService {
   Future<List<ProductDetails>> fetchSubscriptionProducts() async {
     try {
       final ProductDetailsResponse response = await _iap.queryProductDetails(
-        {yearlySubscriptionId, monthlySubscriptionId, trialSubscriptionId},
+        {yearlySubscriptionId, monthlySubscriptionId},
       );
 
       if (response.error != null) {
@@ -119,6 +140,8 @@ class PaymentService {
   /// Subscription satın alma işlemini başlat
   Future<bool> purchaseSubscription(String productId) async {
     try {
+      await initialize();
+
       final products = await fetchSubscriptionProducts();
       
       if (products.isEmpty) {
@@ -144,19 +167,6 @@ class PaymentService {
     }
   }
 
-  /// Stripe ile web ödemesi (Türkiye için iyzico de kullanılabilir)
-  Future<bool> processWebPayment(String email) async {
-    try {
-      // TODO: Stripe Checkout Session oluştur
-      // Firebase Cloud Function çağır: initStripeCheckout
-      // Kullanıcıyı Stripe Checkout'a yönlendir
-      // Webhook ile ödeme doğrulamasını yap
-      return false; // Şimdilik placeholder
-    } catch (e) {
-      return false;
-    }
-  }
-
   /// Restore purchases (kullanıcı uygulamayı yeniden yüklerse)
   Future<void> restorePurchases() async {
     try {
@@ -168,6 +178,8 @@ class PaymentService {
 
   /// Temizle
   void dispose() {
-    _subscription.cancel();
+    _subscription?.cancel();
+    _subscription = null;
+    _initialized = false;
   }
 }

@@ -23,6 +23,14 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
   final _passCtrl = TextEditingController();
   bool _loading = false;
 
+  String _normalizeEmail(String value) => value.trim().toLowerCase();
+
+  @override
+  void initState() {
+    super.initState();
+    PaymentService().initialize();
+  }
+
   Future<void> _girisYap() async {
     if(_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen alanları doldurun.")));
@@ -32,12 +40,14 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     setState(() => _loading = true);
     
     try {
+      final normalizedEmail = _normalizeEmail(_emailCtrl.text);
+
       final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailCtrl.text.trim(),
+        email: normalizedEmail,
         password: _passCtrl.text.trim(),
       );
       
-      String email = cred.user!.email!;
+      String email = _normalizeEmail(cred.user!.email ?? normalizedEmail);
       SistemYoneticisi().girisYapanEmail = email;
 
       var sirketSnap = await FirebaseFirestore.instance.collection('sirketler').get();
@@ -46,7 +56,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
 
       for (var doc in sirketSnap.docs) {
         Sirket s = Sirket.fromFirestore(doc);
-        if (s.yoneticiEposta == email) {
+        if (_normalizeEmail(s.yoneticiEposta) == email) {
           eslesmeler[s.id] = {
             'sirket': s,
             'yetki': PersonelYetki(email: email, adminMi: true),
@@ -54,7 +64,9 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
           };
         } else {
           try {
-            var p = s.personelListesi.firstWhere((element) => element.email == email);
+            var p = s.personelListesi.firstWhere(
+              (element) => _normalizeEmail(element.email) == email,
+            );
             eslesmeler.putIfAbsent(s.id, () => {
               'sirket': s,
               'yetki': p,
@@ -68,8 +80,20 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
 
       if (eslesmeler.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Bu mail adresine bağlı bir şirket bulunamadı.")),
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text("Şirket Bulunamadı"),
+              content: const Text(
+                "Bu hesapla ilişkili bir şirket bulunamadı. Yeni şirket kurabilir veya farklı bir hesapla giriş yapabilirsiniz.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("TAMAM"),
+                ),
+              ],
+            ),
           );
         }
         await FirebaseAuth.instance.signOut();
@@ -451,7 +475,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                             .collection('sirketler')
                             .add({
                           'ad': sirketAdCtrl.text,
-                          'yoneticiEposta': emailCtrl.text.trim(),
+                          'yoneticiEposta': _normalizeEmail(emailCtrl.text),
                           'telefon': telefonCtrl.text,
                           'adres': adresCtrl.text,
                           'logoUrl': logoUrl,
@@ -667,7 +691,9 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                         for (var doc in sirketSnap.docs) {
                           Sirket s = Sirket.fromFirestore(doc);
                           try {
-                            s.personelListesi.firstWhere((p) => p.email == emailCtrl.text.trim());
+                            s.personelListesi.firstWhere(
+                              (p) => _normalizeEmail(p.email) == _normalizeEmail(emailCtrl.text),
+                            );
                             bulundu = true;
                             break;
                           } catch (e) {

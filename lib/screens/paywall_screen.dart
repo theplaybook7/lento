@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../payment_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
@@ -11,11 +9,17 @@ class PaywallScreen extends StatefulWidget {
   State<PaywallScreen> createState() => _PaywallScreenState();
 }
 
-enum PlanType { trial, monthly, yearly }
+enum PlanType { monthly, yearly }
 
 class _PaywallScreenState extends State<PaywallScreen> {
   bool _loading = false;
   String _statusMessage = "";
+
+  @override
+  void initState() {
+    super.initState();
+    PaymentService().initialize();
+  }
 
   Future<void> _buySubscription(PlanType planType) async {
     setState(() {
@@ -36,11 +40,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
         case PlanType.monthly:
           productId = 'company_monthly_subscription';
           break;
-        case PlanType.trial:
-          // Trial için direkt Firestore update
-          await _activateTrial();
-          if (mounted) Navigator.pop(context, true);
-          return;
       }
 
       if (productId.isNotEmpty) {
@@ -70,29 +69,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
           _loading = false;
         });
       }
-    }
-  }
-
-  Future<void> _activateTrial() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final endDate = DateTime.now().add(const Duration(days: 7));
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'subscriptionType': 'trial',
-          'subscriptionEndDate': endDate,
-          'autoRenew': false,
-          'trialStartedAt': DateTime.now(),
-        }, SetOptions(merge: true));
-
-        setState(() {
-          _statusMessage = "✅ 7 günlük trial başladı!";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _statusMessage = "❌ Trial aktivasyonu başarısız: $e";
-      });
     }
   }
 
@@ -155,22 +131,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
               const SizedBox(height: 40),
 
               // Plans
-              _buildPlanCard(
-                title: "7 Gün Ücretsiz",
-                subtitle: "Trial",
-                price: "₺0",
-                duration: "7 gün deneme",
-                features: [
-                  "Sınırsız proje yönetimi",
-                  "Personel ve rol yönetimi",
-                  "Mali raporlama",
-                  "7 gün sonunda otomatik iptal",
-                ],
-                planType: PlanType.trial,
-                isPopular: false,
-              ),
-              const SizedBox(height: 16),
-
               _buildPlanCard(
                 title: "Aylık",
                 subtitle: "Subscription",
@@ -410,7 +370,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     child: Text(
-                      planType == PlanType.trial ? "Şimdi Başla" : "Satın Al",
+                      "Satın Al",
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),

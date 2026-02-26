@@ -471,7 +471,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                         }
 
                         // Firestore'da şirket kaydı
-                        final sirketDocRef = await FirebaseFirestore.instance
+                        await FirebaseFirestore.instance
                             .collection('sirketler')
                             .add({
                           'ad': sirketAdCtrl.text,
@@ -482,26 +482,9 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           'personelListesi': [],
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,
-                          // Ödeme & Subscription bilgileri
-                          'odemePaid': true,
-                          'odemeDate': FieldValue.serverTimestamp(),
-                          'odemeTransactionId': 'company_creation_${DateTime.now().millisecondsSinceEpoch}',
                           'subscriptionType': 'yearly', // Default: yıllık
                           'subscriptionEndDate': DateTime.now().add(Duration(days: 365)),
                           'autoRenew': true,
-                        });
-
-                        // Ödeme kaydı yap (audit için)
-                        await FirebaseFirestore.instance.collection('payments').add({
-                          'userId': FirebaseAuth.instance.currentUser!.uid,
-                          'type': 'company_creation',
-                          'companyId': sirketDocRef.id,
-                          'amount': 9.99,
-                          'currency': 'USD',
-                          'status': 'completed',
-                          'productId': 'create_company_payment',
-                          'createdAt': FieldValue.serverTimestamp(),
-                          'verified': true,
                         });
 
                         if (!ctx.mounted || !mounted) return;

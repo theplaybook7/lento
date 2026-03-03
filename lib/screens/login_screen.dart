@@ -23,6 +23,8 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
   final _passCtrl = TextEditingController();
   bool _loading = false;
 
+  enum _NoCompanyAction { createCompany, signOut }
+
   String _normalizeEmail(String value) => value.trim().toLowerCase();
 
   @override
@@ -80,22 +82,32 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
 
       if (eslesmeler.isEmpty) {
         if (mounted) {
-          await showDialog<void>(
+          final action = await showDialog<_NoCompanyAction>(
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text("Şirket Bulunamadı"),
               content: const Text(
-                "Bu hesapla ilişkili bir şirket bulunamadı. Yeni şirket kurabilir veya farklı bir hesapla giriş yapabilirsiniz.",
+                "Bu hesapla ilişkili bir şirket bulunamadı. Hesabınızla şirket kurulumuna devam edebilir veya çıkış yapabilirsiniz.",
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text("TAMAM"),
+                  onPressed: () => Navigator.pop(ctx, _NoCompanyAction.signOut),
+                  child: const Text("ÇIKIŞ YAP"),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, _NoCompanyAction.createCompany),
+                  child: const Text("ŞİRKET KUR"),
                 ),
               ],
             ),
           );
+
+          if (action == _NoCompanyAction.createCompany) {
+            _sirketKurDialog();
+            return;
+          }
         }
+
         await FirebaseAuth.instance.signOut();
         return;
       }

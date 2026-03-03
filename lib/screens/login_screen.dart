@@ -18,12 +18,12 @@ class LoginSayfasi extends StatefulWidget {
   State<LoginSayfasi> createState() => _LoginSayfasiState();
 }
 
+enum _NoCompanyAction { createCompany, signOut }
+
 class _LoginSayfasiState extends State<LoginSayfasi> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _loading = false;
-
-  enum _NoCompanyAction { createCompany, signOut }
 
   String _normalizeEmail(String value) => value.trim().toLowerCase();
 

@@ -84,6 +84,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
         if (mounted) {
           final action = await showDialog<_NoCompanyAction>(
             context: context,
+            barrierDismissible: false,
             builder: (ctx) => AlertDialog(
               title: const Text("Şirket Bulunamadı"),
               content: const Text(
@@ -103,7 +104,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
           );
 
           if (action == _NoCompanyAction.createCompany) {
-            _sirketKurDialog();
+            await _sirketKurDialog();
             return;
           }
         }
@@ -188,25 +189,27 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     }
   }
 
-  void _sirketKurDialog() async {
+  Future<void> _sirketKurDialog() async {
     // Subscription kontrolü
     final paymentService = PaymentService();
     final subStatus = await paymentService.getSubscriptionStatus();
     
     if (!(subStatus['active'] as bool)) {
       if (mounted) {
-        Navigator.push(
+        final purchased = await Navigator.push<bool>(
           context,
           MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
         );
+
+        if (purchased != true) {
+          return;
+        }
       }
-      return;
     }
 
     // Aktif subscription varsa, şirket kurma dialogunu göster
     final sirketAdCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
     final telefonCtrl = TextEditingController();
     final adresCtrl = TextEditingController();
     bool kurLoading = false;
@@ -344,29 +347,6 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                     labelText: "Yönetici Email *",
                     hintText: "admin@sirket.com",
                     prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryColor),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Şifre
-                TextField(
-                  controller: passCtrl,
-                  enabled: !kurLoading,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: "Şifre *",
-                    hintText: "Güçlü bir şifre girin",
-                    prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryColor),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),

@@ -442,8 +442,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                   ? null
                   : () async {
                       if (sirketAdCtrl.text.isEmpty ||
-                          emailCtrl.text.isEmpty ||
-                          passCtrl.text.isEmpty) {
+                          emailCtrl.text.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text("Lütfen zorunlu alanları doldurun (*)")),
                         );
@@ -453,11 +452,11 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                       setState(() => kurLoading = true);
 
                       try {
-                        // Firebase Auth'ta kullanıcı oluştur
-                        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                          email: emailCtrl.text.trim(),
-                          password: passCtrl.text.trim(),
-                        );
+                        final currentUser = FirebaseAuth.instance.currentUser;
+                        final currentUserEmail = _normalizeEmail(currentUser?.email ?? '');
+                        if (currentUser == null || currentUserEmail.isEmpty) {
+                          throw Exception("Oturum bulunamadı. Lütfen tekrar giriş yapın.");
+                        }
 
                         // Logo URL'sini ekle
                         String? logoUrl;
@@ -487,16 +486,14 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                             .collection('sirketler')
                             .add({
                           'ad': sirketAdCtrl.text,
-                          'yoneticiEposta': _normalizeEmail(emailCtrl.text),
+                          'yoneticiEposta': currentUserEmail,
+                          'yoneticiIletisimEposta': _normalizeEmail(emailCtrl.text),
                           'telefon': telefonCtrl.text,
                           'adres': adresCtrl.text,
                           'logoUrl': logoUrl,
                           'personelListesi': [],
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,
-                          'subscriptionType': 'yearly', // Default: yıllık
-                          'subscriptionEndDate': DateTime.now().add(Duration(days: 365)),
-                          'autoRenew': true,
                         });
 
                         if (!ctx.mounted || !mounted) return;

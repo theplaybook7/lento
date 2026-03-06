@@ -57,6 +57,8 @@ class VeriYuklemeEkrani extends StatefulWidget {
 }
 
 class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
+  String _normalizeEmail(String value) => value.trim().toLowerCase();
+
   @override
   void initState() {
     super.initState();
@@ -66,7 +68,12 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   Future<void> _sirketVerisiniYukle() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      String email = user.email!;
+      final email = _normalizeEmail(user.email ?? '');
+      if (email.isEmpty) {
+        await FirebaseAuth.instance.signOut();
+        return;
+      }
+
       SistemYoneticisi().girisYapanEmail = email;
 
       try {
@@ -76,13 +83,15 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
 
         for (var doc in sirketSnap.docs) {
           Sirket s = Sirket.fromFirestore(doc);
-          if (s.yoneticiEposta == email) {
+          if (_normalizeEmail(s.yoneticiEposta) == email) {
             bulunanSirket = s;
             kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
             break;
           }
           try {
-            var p = s.personelListesi.firstWhere((element) => element.email == email);
+            var p = s.personelListesi.firstWhere(
+              (element) => _normalizeEmail(element.email) == email,
+            );
             bulunanSirket = s;
             kullaniciYetkisi = p;
             break;

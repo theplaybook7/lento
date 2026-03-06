@@ -50,32 +50,72 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
       );
       
       String email = _normalizeEmail(cred.user!.email ?? normalizedEmail);
+      final userUid = cred.user!.uid;
       SistemYoneticisi().girisYapanEmail = email;
-
-      var sirketSnap = await FirebaseFirestore.instance.collection('sirketler').get();
 
       final Map<String, Map<String, dynamic>> eslesmeler = {};
 
-      for (var doc in sirketSnap.docs) {
-        Sirket s = Sirket.fromFirestore(doc);
-        if (_normalizeEmail(s.yoneticiEposta) == email) {
-          eslesmeler[s.id] = {
-            'sirket': s,
-            'yetki': PersonelYetki(email: email, adminMi: true),
-            'rol': 'Yönetici',
-          };
-        } else {
-          try {
-            var p = s.personelListesi.firstWhere(
-              (element) => _normalizeEmail(element.email) == email,
-            );
-            eslesmeler.putIfAbsent(s.id, () => {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userUid)
+          .get();
+
+      final sirketId = userDoc.data()?['sirketId'] as String?;
+      if (sirketId != null && sirketId.isNotEmpty) {
+        final sirketDoc = await FirebaseFirestore.instance
+            .collection('sirketler')
+            .doc(sirketId)
+            .get();
+
+        if (sirketDoc.exists) {
+          final s = Sirket.fromFirestore(sirketDoc);
+          if (_normalizeEmail(s.yoneticiEposta) == email) {
+            eslesmeler[s.id] = {
               'sirket': s,
-              'yetki': p,
-              'rol': 'Personel',
-            });
-          } catch (e) {
-            // Bu şirkette yok
+              'yetki': PersonelYetki(email: email, adminMi: true),
+              'rol': 'Yönetici',
+            };
+          } else {
+            try {
+              final p = s.personelListesi.firstWhere(
+                (element) => _normalizeEmail(element.email) == email,
+              );
+              eslesmeler.putIfAbsent(s.id, () => {
+                'sirket': s,
+                'yetki': p,
+                'rol': 'Personel',
+              });
+            } catch (e) {
+              // Bu şirkette yok
+            }
+          }
+        }
+      }
+
+      if (eslesmeler.isEmpty) {
+        var sirketSnap = await FirebaseFirestore.instance.collection('sirketler').get();
+
+        for (var doc in sirketSnap.docs) {
+          Sirket s = Sirket.fromFirestore(doc);
+          if (_normalizeEmail(s.yoneticiEposta) == email) {
+            eslesmeler[s.id] = {
+              'sirket': s,
+              'yetki': PersonelYetki(email: email, adminMi: true),
+              'rol': 'Yönetici',
+            };
+          } else {
+            try {
+              var p = s.personelListesi.firstWhere(
+                (element) => _normalizeEmail(element.email) == email,
+              );
+              eslesmeler.putIfAbsent(s.id, () => {
+                'sirket': s,
+                'yetki': p,
+                'rol': 'Personel',
+              });
+            } catch (e) {
+              // Bu şirkette yok
+            }
           }
         }
       }

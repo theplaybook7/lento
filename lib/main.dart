@@ -77,26 +77,60 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
       SistemYoneticisi().girisYapanEmail = email;
 
       try {
-        var sirketSnap = await FirebaseFirestore.instance.collection('sirketler').get();
         Sirket? bulunanSirket;
         PersonelYetki? kullaniciYetkisi;
 
-        for (var doc in sirketSnap.docs) {
-          Sirket s = Sirket.fromFirestore(doc);
-          if (_normalizeEmail(s.yoneticiEposta) == email) {
-            bulunanSirket = s;
-            kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
-            break;
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        final sirketId = userDoc.data()?['sirketId'] as String?;
+        if (sirketId != null && sirketId.isNotEmpty) {
+          final sirketDoc = await FirebaseFirestore.instance
+              .collection('sirketler')
+              .doc(sirketId)
+              .get();
+
+          if (sirketDoc.exists) {
+            final s = Sirket.fromFirestore(sirketDoc);
+            if (_normalizeEmail(s.yoneticiEposta) == email) {
+              bulunanSirket = s;
+              kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
+            } else {
+              try {
+                final p = s.personelListesi.firstWhere(
+                  (element) => _normalizeEmail(element.email) == email,
+                );
+                bulunanSirket = s;
+                kullaniciYetkisi = p;
+              } catch (e) {
+                // Bu şirkette yok
+              }
+            }
           }
-          try {
-            var p = s.personelListesi.firstWhere(
-              (element) => _normalizeEmail(element.email) == email,
-            );
-            bulunanSirket = s;
-            kullaniciYetkisi = p;
-            break;
-          } catch (e) {
-            continue;
+        }
+
+        if (bulunanSirket == null) {
+          var sirketSnap = await FirebaseFirestore.instance.collection('sirketler').get();
+
+          for (var doc in sirketSnap.docs) {
+            Sirket s = Sirket.fromFirestore(doc);
+            if (_normalizeEmail(s.yoneticiEposta) == email) {
+              bulunanSirket = s;
+              kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
+              break;
+            }
+            try {
+              var p = s.personelListesi.firstWhere(
+                (element) => _normalizeEmail(element.email) == email,
+              );
+              bulunanSirket = s;
+              kullaniciYetkisi = p;
+              break;
+            } catch (e) {
+              continue;
+            }
           }
         }
 

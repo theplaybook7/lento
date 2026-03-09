@@ -1,1 +1,34 @@
-{"firestore":{"rules":"firestore.rules","indexes":"firestore.indexes.json"},"hosting":{"public":"build/web","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"**","destination":"/index.html"}]},"flutter":{"platforms":{"android":{"default":{"projectId":"insaat-yonetim-takip","appId":"1:478876596230:android:d041940ce577c116dd6b87","fileOutput":"android/app/google-services.json"},"buildConfigurations":{".":{"projectId":"insaat-yonetim-takip","appId":"1:478876596230:android:d041940ce577c116dd6b87","fileOutput":"android/app/google-services.json"}}},"dart":{"lib/firebase_options.dart":{"projectId":"insaat-yonetim-takip","configurations":{"android":"1:478876596230:android:d041940ce577c116dd6b87","ios":"1:478876596230:ios:b9a10331363d2749dd6b87","macos":"1:478876596230:ios:b9a10331363d2749dd6b87","web":"1:478876596230:web:bf478c1b7775f737dd6b87","windows":"1:478876596230:web:9ca8d9470da92a50dd6b87"}}}}}}
+{
+	"firestore": {
+		"rules": "firestore.rules",
+		"indexes": "firestore.indexes.json"
+	},
+	"hosting": {
+		"public": "build/web",
+		"ignore": [
+			"firebase.json",
+			"**/.*",
+			"**/node_modules/**"
+		],
+		"rewrites": [
+			{
+				"source": "**",
+				"destination": "/index.html"
+			}
+		]
+	},
+	"flutter": {
+		"platforms": {
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "insaat-yonetim-takip",
+					"configurations": {
+						"ios": "1:478876596230:ios:b9a10331363d2749dd6b87",
+						"macos": "1:478876596230:ios:b9a10331363d2749dd6b87",
+						"web": "1:478876596230:web:bf478c1b7775f737dd6b87"
+					}
+				}
+			}
+		}
+	}
+}

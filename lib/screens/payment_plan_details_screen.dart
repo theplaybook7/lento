@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data';
 import '../models/payment_model.dart';
 import '../services/firebase_service.dart';
@@ -771,22 +769,12 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
 
   Future<Widget> _buildImageWidget(XFile imageFile) async {
     final bytes = await imageFile.readAsBytes();
-    
-    if (kIsWeb) {
-      return Image.memory(
-        bytes,
-        width: 60,
-        height: 60,
-        fit: BoxFit.cover,
-      );
-    } else {
-      final file = File(imageFile.path);
-      return Image.file(
-        file,
-        width: 60,
-        height: 60,
-        fit: BoxFit.cover,
-      );
-    }
+
+    return Image.memory(
+      bytes,
+      width: 60,
+      height: 60,
+      fit: BoxFit.cover,
+    );
   }
 }

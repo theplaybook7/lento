@@ -17,12 +17,10 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Bildirim servisi başlat
-  final notificationService = PaymentNotificationService();
-  await notificationService.initialize();
-  if (!kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.android)) {
+  // Bildirim ve arka plan görevleri sadece iOS'ta aktiftir.
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+    final notificationService = PaymentNotificationService();
+    await notificationService.initialize();
     await notificationService.initializeBackgroundTasks();
   }
   

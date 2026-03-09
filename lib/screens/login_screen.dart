@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'dart:typed_data';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
 import 'dashboard.dart';
@@ -273,7 +272,6 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     final telefonCtrl = TextEditingController();
     final adresCtrl = TextEditingController();
     bool kurLoading = false;
-    File? logoFile;
     Uint8List? logoBytes;
 
     showDialog(
@@ -304,12 +302,8 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                       );
                       
                       if (image != null) {
-                        if (kIsWeb) {
-                          final bytes = await image.readAsBytes();
-                          setState(() => logoBytes = bytes);
-                        } else {
-                          setState(() => logoFile = File(image.path));
-                        }
+                        final bytes = await image.readAsBytes();
+                        setState(() => logoBytes = bytes);
                       }
                     } catch (e) {
                       if (mounted) {
@@ -330,12 +324,10 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                       borderRadius: BorderRadius.circular(12),
                       color: AppTheme.primaryColor.withValues(alpha: 0.05),
                     ),
-                    child: (logoFile != null || logoBytes != null)
+                    child: logoBytes != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: kIsWeb && logoBytes != null
-                                ? Image.memory(logoBytes!, fit: BoxFit.cover)
-                                : Image.file(logoFile!, fit: BoxFit.cover),
+                        child: Image.memory(logoBytes!, fit: BoxFit.cover),
                           )
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -357,14 +349,13 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                if (logoFile != null || logoBytes != null)
+                if (logoBytes != null)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       TextButton.icon(
                         onPressed: () {
                           setState(() {
-                            logoFile = null;
                             logoBytes = null;
                           });
                         },
@@ -500,16 +491,12 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
 
                         // Logo URL'sini ekle
                         String? logoUrl;
-                        if (logoFile != null || logoBytes != null) {
+                        if (logoBytes != null) {
                           try {
                             final ref = FirebaseStorage.instance.ref(
                               'sirket_logolari/${emailCtrl.text.trim()}_logo_${DateTime.now().millisecondsSinceEpoch}.png',
                             );
-                            if (kIsWeb && logoBytes != null) {
-                              await ref.putData(logoBytes!);
-                            } else if (logoFile != null) {
-                              await ref.putFile(logoFile!);
-                            }
+                            await ref.putData(logoBytes!);
                             logoUrl = await ref.getDownloadURL();
                           } catch (e) {
                             if (mounted) {

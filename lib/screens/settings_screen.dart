@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
@@ -121,12 +119,8 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
           'sirket_logolari/${_sirket.id}_logo_${DateTime.now().millisecondsSinceEpoch}.png',
         );
 
-        if (kIsWeb) {
-          final bytes = await image.readAsBytes();
-          await ref.putData(bytes);
-        } else {
-          await ref.putFile(File(image.path));
-        }
+        final bytes = await image.readAsBytes();
+        await ref.putData(bytes);
 
         final logoUrl = await ref.getDownloadURL();
 

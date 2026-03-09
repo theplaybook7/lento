@@ -18,16 +18,12 @@ class PaymentNotificationService {
   Future<void> initialize() async {
     _notificationsPlugin = FlutterLocalNotificationsPlugin();
 
-    // Android ayarları
-    const androidInitialization = AndroidInitializationSettings('@mipmap/ic_launcher');
-
     // iOS ayarları
     final iosInitialization = DarwinInitializationSettings(
       onDidReceiveLocalNotification: _onDidReceiveLocalNotification,
     );
 
     final initSettings = InitializationSettings(
-      android: androidInitialization,
       iOS: iosInitialization,
     );
 
@@ -55,15 +51,6 @@ class PaymentNotificationService {
     String? payload,
   }) async {
     try {
-      const androidDetails = AndroidNotificationDetails(
-        'payment_channel',
-        'Ödeme Bildirimleri',
-        channelDescription: 'Ödeme planı bildirimleri',
-        importance: Importance.high,
-        priority: Priority.high,
-        showWhen: true,
-      );
-
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
@@ -71,7 +58,6 @@ class PaymentNotificationService {
       );
 
       const notificationDetails = NotificationDetails(
-        android: androidDetails,
         iOS: iosDetails,
       );
 
@@ -129,9 +115,7 @@ class PaymentNotificationService {
         return;
       }
 
-      final isMobile = defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.android;
-      if (!isMobile) {
+      if (defaultTargetPlatform != TargetPlatform.iOS) {
         return;
       }
 

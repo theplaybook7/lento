@@ -20,18 +20,15 @@ class DefaultFirebaseOptions {
       return web;
     }
     switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        return android;
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
         return macos;
+      case TargetPlatform.android:
       case TargetPlatform.windows:
-        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
+          'This app supports only web and Apple platforms (iOS/macOS).',
         );
       default:
         throw UnsupportedError(
@@ -50,14 +47,6 @@ class DefaultFirebaseOptions {
     measurementId: 'G-DVZPKCE7PM',
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDgplIQ-HZe6wDaeefd0gq_vaJLCbQ5vnM',
-    appId: '1:478876596230:android:c02542bd84743821dd6b87',
-    messagingSenderId: '478876596230',
-    projectId: 'insaat-yonetim-takip',
-    storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
-  );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBB7cuL_7TWha6f4FU80Mem6TqpDkMfxf4',
     appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
@@ -74,16 +63,6 @@ class DefaultFirebaseOptions {
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
     iosBundleId: 'com.example.insaatYonetim',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCQgEJnuvmuUJurB_4V6vQUmJdAcMiulvQ',
-    appId: '1:478876596230:web:9ca8d9470da92a50dd6b87',
-    messagingSenderId: '478876596230',
-    projectId: 'insaat-yonetim-takip',
-    authDomain: 'insaat-yonetim-takip.firebaseapp.com',
-    storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
-    measurementId: 'G-F6VS23CSCF',
   );
 
 }

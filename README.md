@@ -2,6 +2,15 @@
 
 A new Flutter project.
 
+## Platform Support
+
+Supported platforms:
+- Web
+- iOS
+- macOS
+
+Android support has been removed from this repository.
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

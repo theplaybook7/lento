@@ -15,6 +15,11 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
+  static const String _webApiKey = String.fromEnvironment(
+    'FIREBASE_WEB_API_KEY',
+    defaultValue: 'REPLACE_WITH_ROTATED_WEB_API_KEY',
+  );
+
   static const String _iosApiKey = String.fromEnvironment(
     'FIREBASE_IOS_API_KEY',
     defaultValue: 'REPLACE_WITH_ROTATED_IOS_API_KEY',
@@ -48,7 +53,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCQgEJnuvmuUJurB_4V6vQUmJdAcMiulvQ',
+    apiKey: _webApiKey,
     appId: '1:478876596230:web:bf478c1b7775f737dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',

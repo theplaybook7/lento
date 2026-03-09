@@ -24,7 +24,7 @@ Use a local file one time, then run with scripts without typing keys again.
 cp firebase_keys.example.json firebase_keys.local.json
 ```
 
-2. Open firebase_keys.local.json and paste your rotated keys.
+2. Open firebase_keys.local.json and paste your rotated keys (optional if example keys are already valid).
 
 3. (macOS) Make scripts executable once:
 
@@ -57,6 +57,8 @@ If you run from Xcode (Runner.xcworkspace), generate local DART_DEFINES first:
 ```bash
 ./scripts/generate_ios_dart_defines.sh
 ```
+
+If firebase_keys.local.json is missing or invalid, scripts fall back to firebase_keys.example.json automatically.
 
 ### macOS Run
 

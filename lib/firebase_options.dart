@@ -15,6 +15,16 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
+  static const String _iosApiKey = String.fromEnvironment(
+    'FIREBASE_IOS_API_KEY',
+    defaultValue: 'REPLACE_WITH_ROTATED_IOS_API_KEY',
+  );
+
+  static const String _macosApiKey = String.fromEnvironment(
+    'FIREBASE_MACOS_API_KEY',
+    defaultValue: 'REPLACE_WITH_ROTATED_MACOS_API_KEY',
+  );
+
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       return web;
@@ -48,7 +58,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBB7cuL_7TWha6f4FU80Mem6TqpDkMfxf4',
+    apiKey: _iosApiKey,
     appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
@@ -57,7 +67,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBB7cuL_7TWha6f4FU80Mem6TqpDkMfxf4',
+    apiKey: _macosApiKey,
     appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',

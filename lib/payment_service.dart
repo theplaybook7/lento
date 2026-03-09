@@ -20,6 +20,10 @@ class PaymentService {
   // Ürün ID'leri - Subscription
   static const String yearlySubscriptionId = 'company_yearly_subscription';
   static const String monthlySubscriptionId = 'company_monthly_subscription';
+  static const Set<String> _subscriptionProductIds = {
+    yearlySubscriptionId,
+    monthlySubscriptionId,
+  };
   
   
   // Fiyatlandırma
@@ -83,6 +87,29 @@ class PaymentService {
       return DateTime.now().add(const Duration(days: 365));
     }
     return DateTime.now().add(const Duration(days: 30));
+  }
+
+  bool _isStoreKitNoResponse(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('storekit') &&
+        (normalized.contains('failed to get response from platform') ||
+            normalized.contains('no response'));
+  }
+
+  String _storeKitNoResponseMessage() {
+    return 'StoreKit platformdan yanit alamadi. iOS Simulator kullaniyorsaniz bu durum gorulebilir. '
+        'Gercek cihaz + Sandbox Apple ID ile tekrar deneyin veya Xcode StoreKit Configuration ayari yapin.';
+  }
+
+  Future<ProductDetailsResponse> _querySubscriptionProductsWithRetry() async {
+    var response = await _iap.queryProductDetails(_subscriptionProductIds);
+
+    if (response.error != null && _isStoreKitNoResponse(response.error!.message)) {
+      await Future.delayed(const Duration(milliseconds: 1200));
+      response = await _iap.queryProductDetails(_subscriptionProductIds);
+    }
+
+    return response;
   }
 
   Future<void> _handlePurchaseUpdate(PurchaseDetails purchase) async {
@@ -181,12 +208,13 @@ class PaymentService {
         return [];
       }
 
-      final ProductDetailsResponse response = await _iap.queryProductDetails(
-        {yearlySubscriptionId, monthlySubscriptionId},
-      );
+      final ProductDetailsResponse response = await _querySubscriptionProductsWithRetry();
 
       if (response.error != null) {
-        _lastError = response.error!.message;
+        final platformMessage = response.error!.message;
+        _lastError = _isStoreKitNoResponse(platformMessage)
+            ? _storeKitNoResponseMessage()
+            : platformMessage;
         return [];
       }
 
@@ -196,7 +224,10 @@ class PaymentService {
 
       return response.productDetails;
     } catch (e) {
-      _lastError = 'Ürünler yüklenemedi: $e';
+      final errorText = e.toString();
+      _lastError = _isStoreKitNoResponse(errorText)
+          ? _storeKitNoResponseMessage()
+          : 'Ürünler yüklenemedi: $e';
       return [];
     }
   }
@@ -278,7 +309,10 @@ class PaymentService {
 
       return completed;
     } catch (e) {
-      _lastError = 'Satın alma hatası: $e';
+      final errorText = e.toString();
+      _lastError = _isStoreKitNoResponse(errorText)
+          ? _storeKitNoResponseMessage()
+          : 'Satın alma hatası: $e';
       _completePurchaseFlow(false, productId: productId);
       return false;
     }
@@ -296,7 +330,10 @@ class PaymentService {
       await _iap.restorePurchases();
       return true;
     } catch (e) {
-      _lastError = 'Geri yükleme hatası: $e';
+      final errorText = e.toString();
+      _lastError = _isStoreKitNoResponse(errorText)
+          ? _storeKitNoResponseMessage()
+          : 'Geri yükleme hatası: $e';
       return false;
     }
   }

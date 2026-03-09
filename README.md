@@ -58,7 +58,8 @@ If you run from Xcode (Runner.xcworkspace), generate local DART_DEFINES first:
 ./scripts/generate_ios_dart_defines.sh
 ```
 
-Scripts require firebase_keys.local.json for local runs and Xcode runs.
+Scripts require firebase_keys.local.json for local runs.
+Xcode iOS builds also include a shared fallback via ios/Flutter/ApiKeys.shared.xcconfig.
 
 ### macOS Run
 

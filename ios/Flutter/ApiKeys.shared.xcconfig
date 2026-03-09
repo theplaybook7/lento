@@ -1,0 +1,3 @@
+// Shared iOS Firebase key fallback for Xcode builds.
+// Local overrides can still be provided via ApiKeys.local.xcconfig.
+DART_DEFINES=RklSRUJBU0VfSU9TX0FQSV9LRVk9QUl6YVN5RDFfX0JFYUQ4RzN2RVR1T2NHZ3ZSNnBjM3pxOGpCbnU4

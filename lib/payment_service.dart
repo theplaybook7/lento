@@ -34,16 +34,19 @@ class PaymentService {
 
   String get lastError => _lastError;
 
-  bool get isIOSPaymentSupported {
+  bool get isApplePaymentSupported {
     if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.iOS;
+    return defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
   }
+
+  bool get isIOSPaymentSupported => isApplePaymentSupported;
 
   Future<void> initialize() async {
     if (_initialized) return;
 
-    if (!isIOSPaymentSupported) {
-      _lastError = 'Bu uygulamada ödeme yalnızca iOS App Store üzerinden desteklenir.';
+    if (!isApplePaymentSupported) {
+      _lastError = 'Bu uygulamada ödeme yalnızca Apple App Store (iOS/macOS) üzerinden desteklenir.';
       return;
     }
 
@@ -173,8 +176,8 @@ class PaymentService {
   /// Subscription ürünlerini yükle
   Future<List<ProductDetails>> fetchSubscriptionProducts() async {
     try {
-      if (!isIOSPaymentSupported) {
-        _lastError = 'Bu uygulamada ödeme yalnızca iOS App Store üzerinden desteklenir.';
+      if (!isApplePaymentSupported) {
+        _lastError = 'Bu uygulamada ödeme yalnızca Apple App Store (iOS/macOS) üzerinden desteklenir.';
         return [];
       }
 
@@ -204,8 +207,8 @@ class PaymentService {
       _lastError = '';
       await initialize();
 
-      if (!isIOSPaymentSupported) {
-        _lastError = 'Bu uygulamada ödeme yalnızca iOS App Store üzerinden desteklenir.';
+      if (!isApplePaymentSupported) {
+        _lastError = 'Bu uygulamada ödeme yalnızca Apple App Store (iOS/macOS) üzerinden desteklenir.';
         return false;
       }
 
@@ -285,8 +288,8 @@ class PaymentService {
   Future<bool> restorePurchases() async {
     try {
       _lastError = '';
-      if (!isIOSPaymentSupported) {
-        _lastError = 'Geri yükleme yalnızca iOS App Store için kullanılabilir.';
+      if (!isApplePaymentSupported) {
+        _lastError = 'Geri yükleme yalnızca Apple App Store (iOS/macOS) için kullanılabilir.';
         return false;
       }
 

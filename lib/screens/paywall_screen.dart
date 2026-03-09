@@ -28,7 +28,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final paymentService = PaymentService();
     await paymentService.initialize();
 
-    if (!paymentService.isIOSPaymentSupported) {
+    if (!paymentService.isApplePaymentSupported) {
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
@@ -69,9 +69,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
     try {
       final paymentService = PaymentService();
 
-      if (!paymentService.isIOSPaymentSupported) {
+      if (!paymentService.isApplePaymentSupported) {
         setState(() {
-          _statusMessage = 'Bu sürümde ödeme yalnızca iOS App Store üzerinden yapılabilir.';
+          _statusMessage = 'Bu sürümde ödeme yalnızca Apple App Store (iOS/macOS) üzerinden yapılabilir.';
         });
         return;
       }

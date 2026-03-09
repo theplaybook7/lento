@@ -232,13 +232,13 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     // Subscription kontrolü
     final paymentService = PaymentService();
 
-    if (!paymentService.isIOSPaymentSupported) {
+    if (!paymentService.isApplePaymentSupported) {
       if (mounted) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('iOS Gerekli'),
-            content: const Text('Şirket oluşturma aboneliği yalnızca iOS App Store üzerinden yapılabilir.'),
+            title: const Text('Apple Platformu Gerekli'),
+            content: const Text('Şirket oluşturma aboneliği yalnızca Apple App Store (iOS/macOS) üzerinden yapılabilir.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),

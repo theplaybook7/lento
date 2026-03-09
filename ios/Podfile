@@ -27,6 +27,7 @@ flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks! :linkage => :static
+  inhibit_all_warnings!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
@@ -38,6 +39,8 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+      config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
     end
 
     if target.name == 'FirebaseCoreExtension'

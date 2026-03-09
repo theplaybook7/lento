@@ -13,22 +13,30 @@ import 'screens/dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  String? startupError;
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    startupError = e.toString();
+  }
   
   // Bildirim ve arka plan görevleri sadece iOS'ta aktiftir.
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+  if (startupError == null && !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
     final notificationService = PaymentNotificationService();
     await notificationService.initialize();
     await notificationService.initializeBackgroundTasks();
   }
   
-  runApp(const InsaatYonetimApp());
+  runApp(InsaatYonetimApp(startupError: startupError));
 }
 
 class InsaatYonetimApp extends StatelessWidget {
-  const InsaatYonetimApp({super.key});
+  const InsaatYonetimApp({super.key, this.startupError});
+
+  final String? startupError;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +44,9 @@ class InsaatYonetimApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Lento',
       theme: AppTheme.lightTheme(),
-      home: StreamBuilder<User?>(
+      home: startupError != null
+          ? StartupErrorScreen(error: startupError!)
+          : StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -47,6 +57,49 @@ class InsaatYonetimApp extends StatelessWidget {
           }
           return const LoginSayfasi();
         },
+      ),
+    );
+  }
+}
+
+class StartupErrorScreen extends StatelessWidget {
+  const StartupErrorScreen({super.key, required this.error});
+
+  final String error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              Text(
+                'Baslangic hatasi',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.red.shade700,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Uygulama Firebase baslatilirken hata aldi. Xcode Scheme > Run > Arguments altinda gerekli --dart-define degerlerinin verildigini kontrol edin.',
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(
+                    error,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

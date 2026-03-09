@@ -1,7 +1,10 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
 import 'firebase_service.dart';
+
+const String _paymentBackgroundTaskName = 'checkPaymentInstallments';
 
 class PaymentNotificationService {
   static final PaymentNotificationService _instance = PaymentNotificationService._internal();
@@ -29,6 +32,17 @@ class PaymentNotificationService {
     );
 
     await _notificationsPlugin.initialize(initSettings);
+
+    // iOS local notifications için kullanıcı izni iste.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      await _notificationsPlugin
+          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+    }
 
     developer.log('Bildirim servisi başlatıldı');
   }
@@ -111,6 +125,16 @@ class PaymentNotificationService {
   /// Background task başlat (her 24 saatte bir taksitleri kontrol et)
   Future<void> initializeBackgroundTasks() async {
     try {
+      if (kIsWeb) {
+        return;
+      }
+
+      final isMobile = defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.android;
+      if (!isMobile) {
+        return;
+      }
+
       await Workmanager().initialize(
         callbackDispatcher,
         isInDebugMode: false,
@@ -118,7 +142,7 @@ class PaymentNotificationService {
 
       await Workmanager().registerPeriodicTask(
         'payment_check',
-        'checkPaymentInstallments',
+        _paymentBackgroundTaskName,
         frequency: const Duration(hours: 24),
         initialDelay: const Duration(minutes: 15),
       );
@@ -141,10 +165,11 @@ class PaymentNotificationService {
 }
 
 /// Callback dispatcher for Workmanager
+@pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
     try {
-      if (taskName == 'checkPaymentInstallments') {
+      if (taskName == _paymentBackgroundTaskName) {
         // Tüm projelerin taksitlerini kontrol et
         // Not: Burada gerçek uygulamada kompanı ID'si ve proje ID'si gerekir
         // Şimdilik örnek olarak gösterilmiştir

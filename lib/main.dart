@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,7 +20,11 @@ void main() async {
   // Bildirim servisi başlat
   final notificationService = PaymentNotificationService();
   await notificationService.initialize();
-  await notificationService.initializeBackgroundTasks();
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.android)) {
+    await notificationService.initializeBackgroundTasks();
+  }
   
   runApp(const InsaatYonetimApp());
 }

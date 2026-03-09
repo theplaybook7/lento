@@ -14,33 +14,46 @@ Android support has been removed from this repository.
 ## Firebase API Key Security
 
 The web, iOS, and macOS Firebase API keys are no longer stored directly in source.
-Provide them at run/build time after rotating keys in Google Cloud Console.
+Use a local file one time, then run with scripts without typing keys again.
+
+### One-time local setup
+
+1. Copy the template file:
+
+```bash
+cp firebase_keys.example.json firebase_keys.local.json
+```
+
+2. Open firebase_keys.local.json and paste your rotated keys.
+
+3. (macOS) Make scripts executable once:
+
+```bash
+chmod +x scripts/run_ios.sh scripts/run_macos.sh scripts/run_web.sh
+```
 
 ### Web Run
 
 ```bash
-flutter run -d chrome \
-	--dart-define=FIREBASE_WEB_API_KEY=YOUR_ROTATED_WEB_KEY \
-	--dart-define=FIREBASE_IOS_API_KEY=YOUR_ROTATED_IOS_KEY \
-	--dart-define=FIREBASE_MACOS_API_KEY=YOUR_ROTATED_MACOS_KEY
+./scripts/run_web.sh
 ```
 
 ### iOS Simulator Run
 
 ```bash
-flutter run -d "iPhone 15 Pro Max" \
-	--dart-define=FIREBASE_WEB_API_KEY=YOUR_ROTATED_WEB_KEY \
-	--dart-define=FIREBASE_IOS_API_KEY=YOUR_ROTATED_IOS_KEY \
-	--dart-define=FIREBASE_MACOS_API_KEY=YOUR_ROTATED_MACOS_KEY
+./scripts/run_ios.sh
 ```
 
 ### macOS Run
 
 ```bash
-flutter run -d macos \
-	--dart-define=FIREBASE_WEB_API_KEY=YOUR_ROTATED_WEB_KEY \
-	--dart-define=FIREBASE_IOS_API_KEY=YOUR_ROTATED_IOS_KEY \
-	--dart-define=FIREBASE_MACOS_API_KEY=YOUR_ROTATED_MACOS_KEY
+./scripts/run_macos.sh
+```
+
+All scripts use:
+
+```bash
+--dart-define-from-file=firebase_keys.local.json
 ```
 
 ### Website restrictions for web API key

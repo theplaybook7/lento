@@ -46,3 +46,6 @@ app.*.map.json
 android/key.properties
 android/keystore/*.jks
 .firebase/
+
+# Local Firebase API keys file (never commit)
+firebase_keys.local.json

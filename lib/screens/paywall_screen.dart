@@ -29,11 +29,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
     await paymentService.initialize();
 
     if (!paymentService.isIOSPaymentSupported) {
-      if (!mounted) return;
-      setState(() {
-        _productsLoading = false;
-        _statusMessage = 'Bu sürümde ödeme yalnızca iOS App Store üzerinden yapılabilir.';
-      });
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.pop(context, false);
+        });
+      }
       return;
     }
 
@@ -148,8 +149,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final iosSupported = PaymentService().isIOSPaymentSupported;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Şirket Oluşturma"),
@@ -276,9 +275,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: _loading || _productsLoading || !iosSupported
-                      ? null
-                      : () => _buySubscription(PlanType.yearly),
+                  onPressed: _loading || _productsLoading ? null : () => _buySubscription(PlanType.yearly),
                   icon: _loading
                       ? SizedBox(
                           width: 20,
@@ -314,17 +311,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 16),
 
-              if (iosSupported)
-                TextButton(
-                  onPressed: _loading ? null : _restorePurchases,
-                  child: const Text('Satın Alımları Geri Yükle'),
-                ),
+              TextButton(
+                onPressed: _loading ? null : _restorePurchases,
+                child: const Text('Satın Alımları Geri Yükle'),
+              ),
 
               // Info Text
               Text(
-                iosSupported
-                    ? "Ödeme App Store üzerinden güvenli şekilde yapılır."
-                    : "Ödeme yalnızca iOS App Store'da desteklenir.",
+                "Ödeme App Store üzerinden güvenli şekilde yapılır.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey.shade500,
                 ),
@@ -448,9 +442,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _loading || _productsLoading || !PaymentService().isIOSPaymentSupported
-                        ? null
-                        : () => _buySubscription(planType),
+                    onPressed: _loading || _productsLoading ? null : () => _buySubscription(planType),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isPopular ? AppTheme.primaryColor : Colors.grey.shade300,
                       foregroundColor: isPopular ? Colors.white : Colors.black87,

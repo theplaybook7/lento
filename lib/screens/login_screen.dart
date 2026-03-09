@@ -232,6 +232,26 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
   Future<void> _sirketKurDialog() async {
     // Subscription kontrolü
     final paymentService = PaymentService();
+
+    if (!paymentService.isIOSPaymentSupported) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('iOS Gerekli'),
+            content: const Text('Şirket oluşturma aboneliği yalnızca iOS App Store üzerinden yapılabilir.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('TAMAM'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
     final subStatus = await paymentService.getSubscriptionStatus();
     
     if (!(subStatus['active'] as bool)) {

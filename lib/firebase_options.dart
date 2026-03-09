@@ -63,7 +63,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
-    iosBundleId: 'com.example.insaatYonetim',
+    iosBundleId: 'com.lento.insaatyonetim',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -72,7 +72,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
-    iosBundleId: 'com.example.insaatYonetim',
+    iosBundleId: 'com.lento.insaatyonetim',
   );
 
 }

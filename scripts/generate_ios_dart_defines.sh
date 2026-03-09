@@ -25,9 +25,7 @@ with open(keys_path, "r", encoding="utf-8") as f:
     data = json.load(f)
 
 required = [
-    "FIREBASE_WEB_API_KEY",
     "FIREBASE_IOS_API_KEY",
-    "FIREBASE_MACOS_API_KEY",
 ]
 
 pairs = []

@@ -18,8 +18,6 @@ import sys
 path = sys.argv[1]
 required = [
   "FIREBASE_WEB_API_KEY",
-  "FIREBASE_IOS_API_KEY",
-  "FIREBASE_MACOS_API_KEY",
 ]
 
 with open(path, "r", encoding="utf-8") as f:

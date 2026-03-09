@@ -17,8 +17,6 @@ import sys
 
 path = sys.argv[1]
 required = [
-  "FIREBASE_WEB_API_KEY",
-  "FIREBASE_IOS_API_KEY",
   "FIREBASE_MACOS_API_KEY",
 ]
 

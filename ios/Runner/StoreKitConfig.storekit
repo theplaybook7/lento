@@ -2,15 +2,10 @@
   "identifier" : "8A7B6C5D-4E3F-2A1B-0C9D-8E7F6A5B4C3D",
   "type" : "com.apple.storekit.testing",
   "version" : 3,
-  "localizations" : [
-    {
-      "locale" : "tr",
-      "displayName" : "Lento",
-      "description" : "Lento abonelik paketleri"
-    }
-  ],
   "settings" : {
     "_failTransactionsEnabled" : false,
+    "_locale" : "tr",
+    "_storefront" : "TUR",
     "_storeKitErrors" : [
       {
         "current" : null,
@@ -21,27 +16,27 @@
   },
   "subscriptionGroups" : [
     {
-      "id" : "company_subscriptions",
+      "id" : "21FA1C45-B174-4F4C-9A1D-E7C3029A1234",
       "localizations" : [
-        {
-          "locale" : "tr",
-          "displayName" : "Sirket Aboneligi",
-          "description" : "Sirket yonetim abonelik planlari"
-        }
+
       ],
       "name" : "Company Subscriptions",
       "subscriptions" : [
         {
-          "adHocOffers" : [],
-          "codeOffers" : [],
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
           "displayPrice" : "2999.99",
           "familyShareable" : false,
           "groupNumber" : 1,
-          "internalID" : "monthly_sub_001",
+          "internalID" : "B1C2D3E4-F5A6-7890-ABCD-EF1234567801",
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Aylik sirket aboneligi",
+              "description" : "Aylik sirket yonetim aboneligi",
               "displayName" : "Aylik Abonelik",
               "locale" : "tr"
             }
@@ -49,20 +44,24 @@
           "productID" : "company_monthly_subscription",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Monthly Subscription",
-          "subscriptionGroupID" : "company_subscriptions",
+          "subscriptionGroupID" : "21FA1C45-B174-4F4C-9A1D-E7C3029A1234",
           "type" : "RecurringSubscription"
         },
         {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "29999.00",
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "29999",
           "familyShareable" : false,
           "groupNumber" : 1,
-          "internalID" : "yearly_sub_001",
+          "internalID" : "B1C2D3E4-F5A6-7890-ABCD-EF1234567802",
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Yillik sirket aboneligi",
+              "description" : "Yillik sirket yonetim aboneligi",
               "displayName" : "Yillik Abonelik",
               "locale" : "tr"
             }
@@ -70,7 +69,7 @@
           "productID" : "company_yearly_subscription",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Yearly Subscription",
-          "subscriptionGroupID" : "company_subscriptions",
+          "subscriptionGroupID" : "21FA1C45-B174-4F4C-9A1D-E7C3029A1234",
           "type" : "RecurringSubscription"
         }
       ]

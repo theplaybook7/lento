@@ -49,3 +49,4 @@ android/keystore/*.jks
 
 # Local Firebase API keys file (never commit)
 firebase_keys.local.json
+ios/Flutter/ApiKeys.local.xcconfig

@@ -29,7 +29,13 @@ cp firebase_keys.example.json firebase_keys.local.json
 3. (macOS) Make scripts executable once:
 
 ```bash
-chmod +x scripts/run_ios.sh scripts/run_macos.sh scripts/run_web.sh
+chmod +x scripts/run_ios.sh scripts/run_macos.sh scripts/run_web.sh scripts/generate_ios_dart_defines.sh
+```
+
+4. (Xcode iOS run) Generate local iOS DART_DEFINES once after updating keys:
+
+```bash
+./scripts/generate_ios_dart_defines.sh
 ```
 
 ### Web Run
@@ -42,6 +48,14 @@ chmod +x scripts/run_ios.sh scripts/run_macos.sh scripts/run_web.sh
 
 ```bash
 ./scripts/run_ios.sh
+```
+
+### iOS Run From Xcode
+
+If you run from Xcode (Runner.xcworkspace), generate local DART_DEFINES first:
+
+```bash
+./scripts/generate_ios_dart_defines.sh
 ```
 
 ### macOS Run

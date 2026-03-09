@@ -203,6 +203,32 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 14),
+
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_outlined, size: 16, color: AppTheme.primaryColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Ödeme sadece iOS ve macOS cihazlarda aktif',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 40),
 
               // Plans

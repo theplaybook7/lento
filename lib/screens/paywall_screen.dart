@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import '../theme/app_theme.dart';
 import '../payment_service.dart';
 
@@ -13,12 +14,49 @@ enum PlanType { monthly, yearly }
 
 class _PaywallScreenState extends State<PaywallScreen> {
   bool _loading = false;
+  bool _productsLoading = true;
   String _statusMessage = "";
+  final Map<String, ProductDetails> _products = {};
 
   @override
   void initState() {
     super.initState();
-    PaymentService().initialize();
+    _prepareStore();
+  }
+
+  Future<void> _prepareStore() async {
+    final paymentService = PaymentService();
+    await paymentService.initialize();
+
+    if (!paymentService.isIOSPaymentSupported) {
+      if (!mounted) return;
+      setState(() {
+        _productsLoading = false;
+        _statusMessage = 'Bu sürümde ödeme yalnızca iOS App Store üzerinden yapılabilir.';
+      });
+      return;
+    }
+
+    await _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    final paymentService = PaymentService();
+    final products = await paymentService.fetchSubscriptionProducts();
+
+    if (!mounted) return;
+
+    setState(() {
+      _products
+        ..clear()
+        ..addEntries(products.map((p) => MapEntry(p.id, p)));
+      _productsLoading = false;
+      if (_products.isEmpty && _statusMessage.isEmpty) {
+        _statusMessage = paymentService.lastError.isNotEmpty
+            ? paymentService.lastError
+            : 'App Store ürünleri yüklenemedi. Lütfen tekrar deneyin.';
+      }
+    });
   }
 
   Future<void> _buySubscription(PlanType planType) async {
@@ -29,6 +67,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
     try {
       final paymentService = PaymentService();
+
+      if (!paymentService.isIOSPaymentSupported) {
+        setState(() {
+          _statusMessage = 'Bu sürümde ödeme yalnızca iOS App Store üzerinden yapılabilir.';
+        });
+        return;
+      }
       
       bool success = false;
       String productId = '';
@@ -55,7 +100,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
           });
         } else {
           setState(() {
-            _statusMessage = "❌ Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin.";
+            _statusMessage = "❌ ${paymentService.lastError.isNotEmpty ? paymentService.lastError : 'Ödeme işlemi başarısız oldu. Lütfen tekrar deneyin.'}";
           });
         }
       }
@@ -72,8 +117,39 @@ class _PaywallScreenState extends State<PaywallScreen> {
     }
   }
 
+  Future<void> _restorePurchases() async {
+    final paymentService = PaymentService();
+    setState(() {
+      _loading = true;
+      _statusMessage = '';
+    });
+
+    final restored = await paymentService.restorePurchases();
+
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _statusMessage = restored
+          ? '✅ Satın alımlar geri yüklendi. Aboneliğiniz aktifse devam edebilirsiniz.'
+          : '❌ ${paymentService.lastError.isNotEmpty ? paymentService.lastError : 'Satın alımlar geri yüklenemedi.'}';
+    });
+  }
+
+  String _priceTextForPlan(PlanType planType) {
+    final id = planType == PlanType.yearly
+        ? PaymentService.yearlySubscriptionId
+        : PaymentService.monthlySubscriptionId;
+    final product = _products[id];
+    if (product != null && product.price.isNotEmpty) {
+      return product.price;
+    }
+    return planType == PlanType.yearly ? '₺29.999,00' : '₺2.999,99';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final iosSupported = PaymentService().isIOSPaymentSupported;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Şirket Oluşturma"),
@@ -134,7 +210,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
               _buildPlanCard(
                 title: "Aylık",
                 subtitle: "Subscription",
-                price: "₺2999.99",
+                price: _priceTextForPlan(PlanType.monthly),
                 duration: "/ay",
                 features: [
                   "Sınırsız proje yönetimi",
@@ -151,7 +227,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
               _buildPlanCard(
                 title: "Yıllık",
                 subtitle: "En Uygun",
-                price: "₺29999.00",
+                price: _priceTextForPlan(PlanType.yearly),
                 duration: "/yıl",
                 discount: "2 ay tasarruf et",
                 features: [
@@ -200,7 +276,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: _loading ? null : () => _buySubscription(PlanType.yearly),
+                  onPressed: _loading || _productsLoading || !iosSupported
+                      ? null
+                      : () => _buySubscription(PlanType.yearly),
                   icon: _loading
                       ? SizedBox(
                           width: 20,
@@ -236,9 +314,17 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 16),
 
+              if (iosSupported)
+                TextButton(
+                  onPressed: _loading ? null : _restorePurchases,
+                  child: const Text('Satın Alımları Geri Yükle'),
+                ),
+
               // Info Text
               Text(
-                "Güvenli ödeme işlemi yapılır. İptal edebilirsiniz.",
+                iosSupported
+                    ? "Ödeme App Store üzerinden güvenli şekilde yapılır."
+                    : "Ödeme yalnızca iOS App Store'da desteklenir.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey.shade500,
                 ),
@@ -362,7 +448,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _loading ? null : () => _buySubscription(planType),
+                    onPressed: _loading || _productsLoading || !PaymentService().isIOSPaymentSupported
+                        ? null
+                        : () => _buySubscription(planType),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isPopular ? AppTheme.primaryColor : Colors.grey.shade300,
                       foregroundColor: isPopular ? Colors.white : Colors.black87,

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'dart:async';
 
@@ -12,6 +13,9 @@ class PaymentService {
 
   StreamSubscription<List<PurchaseDetails>>? _subscription;
   bool _initialized = false;
+  String _lastError = '';
+  Completer<bool>? _purchaseCompleter;
+  String? _pendingProductId;
   
   // Ürün ID'leri - Subscription
   static const String yearlySubscriptionId = 'company_yearly_subscription';
@@ -28,11 +32,27 @@ class PaymentService {
 
   PaymentService._internal();
 
+  String get lastError => _lastError;
+
+  bool get isIOSPaymentSupported {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
   Future<void> initialize() async {
     if (_initialized) return;
 
+    if (!isIOSPaymentSupported) {
+      _lastError = 'Bu uygulamada ödeme yalnızca iOS App Store üzerinden desteklenir.';
+      return;
+    }
+
     final iapAvailable = await _iap.isAvailable();
-    
+    if (!iapAvailable) {
+      _lastError = 'App Store ödeme servisi şu anda kullanılamıyor.';
+      return;
+    }
+
     if (iapAvailable) {
       _subscription = _iap.purchaseStream.listen(
         (List<PurchaseDetails> purchases) async {
@@ -41,7 +61,8 @@ class PaymentService {
           }
         },
         onError: (error) {
-          // IAP Error handling
+          _lastError = 'Ödeme akışı hatası: $error';
+          _completePurchaseFlow(false);
         },
       );
       _initialized = true;
@@ -62,8 +83,7 @@ class PaymentService {
   }
 
   Future<void> _handlePurchaseUpdate(PurchaseDetails purchase) async {
-    if (purchase.status == PurchaseStatus.purchased ||
-        purchase.status == PurchaseStatus.restored) {
+    if (purchase.status == PurchaseStatus.purchased || purchase.status == PurchaseStatus.restored) {
       final user = _auth.currentUser;
       final subscriptionType = _subscriptionTypeFromProductId(purchase.productID);
 
@@ -80,12 +100,42 @@ class PaymentService {
           'autoRenew': true,
           'lastPurchaseStatus': purchase.status.name,
         }, SetOptions(merge: true));
+
+        _lastError = '';
+        _completePurchaseFlow(true, productId: purchase.productID);
+      } else if (_pendingProductId == purchase.productID) {
+        _lastError = 'Satın alma doğrulaması tamamlanamadı.';
+        _completePurchaseFlow(false, productId: purchase.productID);
       }
+    }
+
+    if (purchase.status == PurchaseStatus.error) {
+      _lastError = purchase.error?.message ?? 'Ödeme sırasında beklenmeyen bir hata oluştu.';
+      _completePurchaseFlow(false, productId: purchase.productID);
+    }
+
+    if (purchase.status == PurchaseStatus.canceled) {
+      _lastError = 'Ödeme işlemi iptal edildi.';
+      _completePurchaseFlow(false, productId: purchase.productID);
     }
 
     if (purchase.pendingCompletePurchase) {
       await _iap.completePurchase(purchase);
     }
+  }
+
+  void _completePurchaseFlow(bool value, {String? productId}) {
+    if (_purchaseCompleter == null || _purchaseCompleter!.isCompleted) {
+      return;
+    }
+
+    if (productId != null && _pendingProductId != null && productId != _pendingProductId) {
+      return;
+    }
+
+    _purchaseCompleter!.complete(value);
+    _purchaseCompleter = null;
+    _pendingProductId = null;
   }
 
   /// Subscription durumunu kontrol et
@@ -123,16 +173,27 @@ class PaymentService {
   /// Subscription ürünlerini yükle
   Future<List<ProductDetails>> fetchSubscriptionProducts() async {
     try {
+      if (!isIOSPaymentSupported) {
+        _lastError = 'Bu uygulamada ödeme yalnızca iOS App Store üzerinden desteklenir.';
+        return [];
+      }
+
       final ProductDetailsResponse response = await _iap.queryProductDetails(
         {yearlySubscriptionId, monthlySubscriptionId},
       );
 
       if (response.error != null) {
+        _lastError = response.error!.message;
         return [];
+      }
+
+      if (response.notFoundIDs.isNotEmpty) {
+        _lastError = 'App Store ürünleri bulunamadı: ${response.notFoundIDs.join(', ')}';
       }
 
       return response.productDetails;
     } catch (e) {
+      _lastError = 'Ürünler yüklenemedi: $e';
       return [];
     }
   }
@@ -140,39 +201,100 @@ class PaymentService {
   /// Subscription satın alma işlemini başlat
   Future<bool> purchaseSubscription(String productId) async {
     try {
+      _lastError = '';
       await initialize();
+
+      if (!isIOSPaymentSupported) {
+        _lastError = 'Bu uygulamada ödeme yalnızca iOS App Store üzerinden desteklenir.';
+        return false;
+      }
+
+      if (!_initialized) {
+        if (_lastError.isEmpty) {
+          _lastError = 'App Store ödeme servisi başlatılamadı.';
+        }
+        return false;
+      }
+
+      if (_purchaseCompleter != null && !_purchaseCompleter!.isCompleted) {
+        _lastError = 'Ödeme işlemi zaten devam ediyor. Lütfen bekleyin.';
+        return false;
+      }
 
       final products = await fetchSubscriptionProducts();
       
       if (products.isEmpty) {
+        if (_lastError.isEmpty) {
+          _lastError = 'Satın alınabilir ürün bulunamadı.';
+        }
         return false;
       }
 
       final productDetails = products.firstWhere(
         (p) => p.id == productId,
-        orElse: () => products.first,
+        orElse: () => ProductDetails(
+          id: '',
+          title: '',
+          description: '',
+          price: '',
+          rawPrice: 0,
+          currencyCode: '',
+        ),
       );
+
+      if (productDetails.id.isEmpty) {
+        _lastError = 'Seçilen abonelik ürünü App Store üzerinde bulunamadı.';
+        return false;
+      }
 
       final PurchaseParam purchaseParam = PurchaseParam(
         productDetails: productDetails,
       );
 
-      final success = await _iap.buyNonConsumable(
+      _purchaseCompleter = Completer<bool>();
+      _pendingProductId = productId;
+
+      final started = await _iap.buyNonConsumable(
         purchaseParam: purchaseParam,
       );
 
-      return success;
+      if (!started) {
+        _lastError = 'Ödeme başlatılamadı.';
+        _completePurchaseFlow(false, productId: productId);
+        return false;
+      }
+
+      final completed = await _purchaseCompleter!.future.timeout(
+        const Duration(minutes: 3),
+        onTimeout: () {
+          _lastError = 'Ödeme onayı zaman aşımına uğradı. Lütfen tekrar deneyin.';
+          _completePurchaseFlow(false, productId: productId);
+          return false;
+        },
+      );
+
+      return completed;
     } catch (e) {
+      _lastError = 'Satın alma hatası: $e';
+      _completePurchaseFlow(false, productId: productId);
       return false;
     }
   }
 
   /// Restore purchases (kullanıcı uygulamayı yeniden yüklerse)
-  Future<void> restorePurchases() async {
+  Future<bool> restorePurchases() async {
     try {
+      _lastError = '';
+      if (!isIOSPaymentSupported) {
+        _lastError = 'Geri yükleme yalnızca iOS App Store için kullanılabilir.';
+        return false;
+      }
+
       await _iap.restorePurchases();
+      return true;
     } catch (e) {
-      // Restore hatası
+      _lastError = 'Geri yükleme hatası: $e';
+      return false;
     }
   }
 

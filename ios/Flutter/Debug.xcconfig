@@ -1,6 +1,4 @@
 #include "Generated.xcconfig"
-#include "ApiKeys.shared.xcconfig"
-#include? "ApiKeys.local.xcconfig"
 IPHONEOS_DEPLOYMENT_TARGET=15.0
 GCC_WARN_INHIBIT_ALL_WARNINGS=YES
 SWIFT_SUPPRESS_WARNINGS=YES

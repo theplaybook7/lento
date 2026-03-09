@@ -15,36 +15,11 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
-  static const String _webApiKey = String.fromEnvironment(
-    'FIREBASE_WEB_API_KEY',
-    defaultValue: 'REPLACE_WITH_ROTATED_WEB_API_KEY',
-  );
+  static const String _webApiKey = 'AIzaSyAFPmbGYzuFhropyLDn3iidaRlzgVX_hpo';
 
-  static const String _iosApiKey = String.fromEnvironment(
-    'FIREBASE_IOS_API_KEY',
-    defaultValue: 'REPLACE_WITH_ROTATED_IOS_API_KEY',
-  );
+  static const String _iosApiKey = 'AIzaSyD1__BEaD8G3vETuOcGgvR6pc3zq8jBnu8';
 
-  static const String _macosApiKey = String.fromEnvironment(
-    'FIREBASE_MACOS_API_KEY',
-    defaultValue: 'REPLACE_WITH_ROTATED_MACOS_API_KEY',
-  );
-
-  static String _resolveApiKey(String envName, String value) {
-    if (value.isEmpty || value.startsWith('REPLACE_WITH_ROTATED_')) {
-      throw UnsupportedError(
-        'Missing Firebase API key for $envName. Update firebase_keys.local.json and run with --dart-define-from-file.',
-      );
-    }
-
-    if (!value.startsWith('AIza')) {
-      throw UnsupportedError(
-        'Invalid Firebase API key format for $envName. Check rotated key value in firebase_keys.local.json.',
-      );
-    }
-
-    return value;
-  }
+  static const String _macosApiKey = 'AIzaSyD1__BEaD8G3vETuOcGgvR6pc3zq8jBnu8';
 
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -69,7 +44,7 @@ class DefaultFirebaseOptions {
   }
 
   static FirebaseOptions get web => FirebaseOptions(
-    apiKey: _resolveApiKey('FIREBASE_WEB_API_KEY', _webApiKey),
+    apiKey: _webApiKey,
     appId: '1:478876596230:web:bf478c1b7775f737dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
@@ -79,7 +54,7 @@ class DefaultFirebaseOptions {
   );
 
   static FirebaseOptions get ios => FirebaseOptions(
-    apiKey: _resolveApiKey('FIREBASE_IOS_API_KEY', _iosApiKey),
+    apiKey: _iosApiKey,
     appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
@@ -88,7 +63,7 @@ class DefaultFirebaseOptions {
   );
 
   static FirebaseOptions get macos => FirebaseOptions(
-    apiKey: _resolveApiKey('FIREBASE_MACOS_API_KEY', _macosApiKey),
+    apiKey: _macosApiKey,
     appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',

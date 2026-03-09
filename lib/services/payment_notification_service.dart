@@ -121,7 +121,6 @@ class PaymentNotificationService {
 
       await Workmanager().initialize(
         callbackDispatcher,
-        isInDebugMode: false,
       );
 
       await Workmanager().registerPeriodicTask(

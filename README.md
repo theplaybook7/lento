@@ -56,6 +56,16 @@ All scripts use:
 --dart-define-from-file=firebase_keys.local.json
 ```
 
+### API_KEY_INVALID troubleshooting
+
+If you still get API_KEY_INVALID:
+
+1. Confirm firebase_keys.local.json contains real rotated keys (not placeholders).
+2. Ensure the iOS key restriction is set to iOS apps with bundle id com.lento.app.
+3. Ensure Identity Toolkit API is allowed in API restrictions for the key.
+4. In Firebase Console, verify there is an iOS app registered with bundle id com.lento.app.
+5. If bundle id was changed recently, run flutterfire configure again and refresh firebase_options.dart values.
+
 ### Website restrictions for web API key
 
 In Google Cloud Console for the web key, set Application restrictions to Websites and allow:

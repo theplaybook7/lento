@@ -30,6 +30,22 @@ class DefaultFirebaseOptions {
     defaultValue: 'REPLACE_WITH_ROTATED_MACOS_API_KEY',
   );
 
+  static String _resolveApiKey(String envName, String value) {
+    if (value.isEmpty || value.startsWith('REPLACE_WITH_ROTATED_')) {
+      throw UnsupportedError(
+        'Missing Firebase API key for $envName. Update firebase_keys.local.json and run with --dart-define-from-file.',
+      );
+    }
+
+    if (!value.startsWith('AIza')) {
+      throw UnsupportedError(
+        'Invalid Firebase API key format for $envName. Check rotated key value in firebase_keys.local.json.',
+      );
+    }
+
+    return value;
+  }
+
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       return web;
@@ -52,8 +68,8 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: _webApiKey,
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: _resolveApiKey('FIREBASE_WEB_API_KEY', _webApiKey),
     appId: '1:478876596230:web:bf478c1b7775f737dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
@@ -62,8 +78,8 @@ class DefaultFirebaseOptions {
     measurementId: 'G-DVZPKCE7PM',
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: _iosApiKey,
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: _resolveApiKey('FIREBASE_IOS_API_KEY', _iosApiKey),
     appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
@@ -71,8 +87,8 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.lento.app',
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: _macosApiKey,
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: _resolveApiKey('FIREBASE_MACOS_API_KEY', _macosApiKey),
     appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',

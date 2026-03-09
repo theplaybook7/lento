@@ -64,23 +64,84 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
     dukkanKrediLimitCtrl.text = formatNumber(d['dukkanKrediLim']);
   }
 
+  int _bodrumKatSayisiDegeri() => int.tryParse(bodrumKatSayisiCtrl.text) ?? 0;
+
+  int _normalKatSayisiDegeri() => int.tryParse(normalKatSayisiCtrl.text) ?? 0;
+
+  List<KatModel> _bosKatListesiOlustur({required int bodrum, required int normal}) {
+    final katlar = <KatModel>[];
+    for (int i = bodrum; i >= 1; i--) {
+      katlar.add(KatModel(ad: '$i. Bodrum Kat', katBrutAlanCtrl: TextEditingController(), bolumler: []));
+    }
+    if (normal >= 1) {
+      katlar.add(KatModel(ad: 'Zemin Kat', katBrutAlanCtrl: TextEditingController(), bolumler: []));
+    }
+    for (int i = 1; i < normal; i++) {
+      katlar.add(KatModel(ad: '$i. Normal Kat', katBrutAlanCtrl: TextEditingController(), bolumler: []));
+    }
+    return katlar;
+  }
+
+  List<KatModel> _mevcutKatListesiyleBirlestir(
+    List<KatModel> mevcutKatlar, {
+    required int bodrum,
+    required int normal,
+  }) {
+    final hedef = _bosKatListesiOlustur(bodrum: bodrum, normal: normal);
+    final mevcutByAd = <String, KatModel>{for (final kat in mevcutKatlar) kat.ad: kat};
+    return hedef.map((kat) => mevcutByAd[kat.ad] ?? kat).toList();
+  }
+
+  Future<void> _teklifTemelVerileriniGuncelle() async {
+    if (widget.mevcutDocId == null) return;
+
+    try {
+      final bodrum = _bodrumKatSayisiDegeri();
+      final normal = _normalKatSayisiDegeri();
+
+      List<KatModel>? guncelKatListesi;
+      if (widget.mevcutTeklifData?['katListesi'] != null) {
+        final ham = widget.mevcutTeklifData!['katListesi'] as List<dynamic>;
+        final mevcutKatlar = ham.map((e) => KatModel.fromMap(e as Map<String, dynamic>)).toList();
+        guncelKatListesi = _mevcutKatListesiyleBirlestir(mevcutKatlar, bodrum: bodrum, normal: normal);
+      }
+
+      await FirebaseFirestore.instance.collection('teklifler').doc(widget.mevcutDocId).update({
+        'ilce': ilceCtrl.text,
+        'mahalle': mahalleCtrl.text,
+        'ada': adaCtrl.text,
+        'parsel': parselCtrl.text,
+        'eskiDaireSayisi': parseFormatted(eskiDaireSayisiCtrl.text).toInt(),
+        'eskiDukkanSayisi': parseFormatted(eskiDukkanSayisiCtrl.text).toInt(),
+        'bodrumKatSayisi': bodrum,
+        'normalKatSayisi': normal,
+        'daireBirimMaliyet': parseFormatted(daireMaliyetCtrl.text),
+        'dukkanBirimMaliyet': parseFormatted(dukkanMaliyetCtrl.text),
+        'ortakAlanBirimMaliyet': parseFormatted(ortakAlanMaliyetCtrl.text),
+        'daireHibeLim': parseFormatted(daireHibeLimitCtrl.text),
+        'daireKrediLim': parseFormatted(daireKrediLimitCtrl.text),
+        'dukkanHibeLim': parseFormatted(dukkanHibeLimitCtrl.text),
+        'dukkanKrediLim': parseFormatted(dukkanKrediLimitCtrl.text),
+        if (guncelKatListesi != null) 'katListesi': guncelKatListesi.map((k) => k.toMap()).toList(),
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Teklif güncellendi')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Güncelleme hatası: $e')));
+    }
+  }
+
   void _olusturVeGec() {
-    List<KatModel> katlar = [];
+    final bodrum = _bodrumKatSayisiDegeri();
+    final normal = _normalKatSayisiDegeri();
+
+    List<KatModel> katlar = _bosKatListesiOlustur(bodrum: bodrum, normal: normal);
     if (widget.mevcutTeklifData != null && widget.mevcutTeklifData!['katListesi'] != null) {
       final ham = widget.mevcutTeklifData!['katListesi'] as List<dynamic>;
-      katlar = ham.map((e) => KatModel.fromMap(e as Map<String, dynamic>)).toList();
-    } else {
-      final bodrum = int.tryParse(bodrumKatSayisiCtrl.text) ?? 0;
-      final normal = int.tryParse(normalKatSayisiCtrl.text) ?? 0;
-      for (int i = bodrum; i >= 1; i--) {
-        katlar.add(KatModel(ad: '$i. Bodrum Kat', katBrutAlanCtrl: TextEditingController(), bolumler: []));
-      }
-      if (normal >= 1) {
-        katlar.add(KatModel(ad: 'Zemin Kat', katBrutAlanCtrl: TextEditingController(), bolumler: []));
-      }
-      for (int i = 1; i < normal; i++) {
-        katlar.add(KatModel(ad: '$i. Normal Kat', katBrutAlanCtrl: TextEditingController(), bolumler: []));
-      }
+      final mevcutKatlar = ham.map((e) => KatModel.fromMap(e as Map<String, dynamic>)).toList();
+      katlar = _mevcutKatListesiyleBirlestir(mevcutKatlar, bodrum: bodrum, normal: normal);
     }
 
     Navigator.push(
@@ -101,8 +162,8 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
           daireMaliyet: parseFormatted(daireMaliyetCtrl.text),
           dukkanMaliyet: parseFormatted(dukkanMaliyetCtrl.text),
           ortakMaliyet: parseFormatted(ortakAlanMaliyetCtrl.text),
-          bodrumKatSayisi: int.tryParse(bodrumKatSayisiCtrl.text) ?? 0,
-          normalKatSayisi: int.tryParse(normalKatSayisiCtrl.text) ?? 0,
+          bodrumKatSayisi: bodrum,
+          normalKatSayisi: normal,
           mevcutDocId: widget.mevcutDocId,
           mevcutTeklifData: widget.mevcutTeklifData,
         ),
@@ -180,13 +241,25 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
             _bolumBaslik('Proje Yapısı'),
             Row(children: [Expanded(child: _input(bodrumKatSayisiCtrl, 'Bodrum Kat Sayısı', isNumber: true)), const SizedBox(width: 10), Expanded(child: _input(normalKatSayisiCtrl, 'Zemin Dahil Kat', isNumber: true))]),
             const SizedBox(height: 30),
+            if (editMod) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _teklifTemelVerileriniGuncelle,
+                  icon: const Icon(Icons.system_update_alt),
+                  label: const Text('GÜNCELLE'),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
                 onPressed: _olusturVeGec,
                 icon: const Icon(Icons.arrow_forward),
-                label: Text(editMod ? 'Detayları Düzenle' : 'Proje Detaylarına Geç'),
+                label: Text(editMod ? 'Detaylara Geç' : 'Proje Detaylarına Geç'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryColor,
                   foregroundColor: Colors.white,
@@ -756,10 +829,14 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
         );
       }
     } finally {
-      // Flag'i sakla - başarı durumunda PDF viewer zaten açıldı, tekrar işlem yapılmasın
-      _pdfIslemde = false;
-      // setState YAPMIYORUZ - bu rebuild trigger edip PDF tekrar başlayabilir
-      print('===== PDF işlemi bitti, flag reset edildi (setState YAPILMADI) =====');
+      if (mounted) {
+        setState(() {
+          _pdfIslemde = false;
+        });
+      } else {
+        _pdfIslemde = false;
+      }
+      print('===== PDF işlemi bitti, flag reset edildi =====');
     }
   }
 

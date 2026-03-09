@@ -1,0 +1,79 @@
+{
+  "identifier" : "8A7B6C5D-4E3F-2A1B-0C9D-8E7F6A5B4C3D",
+  "type" : "com.apple.storekit.testing",
+  "version" : 3,
+  "localizations" : [
+    {
+      "locale" : "tr",
+      "displayName" : "Lento",
+      "description" : "Lento abonelik paketleri"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "company_subscriptions",
+      "localizations" : [
+        {
+          "locale" : "tr",
+          "displayName" : "Sirket Aboneligi",
+          "description" : "Sirket yonetim abonelik planlari"
+        }
+      ],
+      "name" : "Company Subscriptions",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "2999.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "monthly_sub_001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Aylik sirket aboneligi",
+              "displayName" : "Aylik Abonelik",
+              "locale" : "tr"
+            }
+          ],
+          "productID" : "company_monthly_subscription",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Monthly Subscription",
+          "subscriptionGroupID" : "company_subscriptions",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "29999.00",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "yearly_sub_001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Yillik sirket aboneligi",
+              "displayName" : "Yillik Abonelik",
+              "locale" : "tr"
+            }
+          ],
+          "productID" : "company_yearly_subscription",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Yearly Subscription",
+          "subscriptionGroupID" : "company_subscriptions",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ]
+}

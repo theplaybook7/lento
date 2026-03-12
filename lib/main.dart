@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart'; 
 import 'services/payment_notification_service.dart';
 import 'theme/app_theme.dart';
+import 'payment_service.dart';
+import 'screens/paywall_screen.dart';
 
 import 'project_core.dart';
 import 'screens/login_screen.dart';
@@ -114,6 +116,8 @@ class VeriYuklemeEkrani extends StatefulWidget {
 
 class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   String _normalizeEmail(String value) => value.trim().toLowerCase();
+  bool _sirketBulunamadi = false;
+  String? _hataMetni;
 
   @override
   void initState() {
@@ -197,16 +201,237 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardSayfasi()));
           }
         } else {
-          await FirebaseAuth.instance.signOut();
+          if (mounted) {
+            setState(() {
+              _sirketBulunamadi = true;
+            });
+          }
         }
       } catch (e) {
-        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() {
+            _hataMetni = 'Veri yükleme hatası: $e';
+          });
+        }
       }
     }
   }
 
+  Future<void> _cikisYap() async {
+    await FirebaseAuth.instance.signOut();
+  }
+
+  Future<void> _sirketKur() async {
+    final paymentService = PaymentService();
+    await paymentService.initialize();
+
+    if (!paymentService.isApplePaymentSupported) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Apple Platformu Gerekli'),
+            content: const Text('Şirket oluşturma aboneliği yalnızca Apple App Store (iOS/macOS) üzerinden yapılabilir.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('TAMAM'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    final subStatus = await paymentService.getSubscriptionStatus();
+
+    if (!(subStatus['active'] as bool)) {
+      if (mounted) {
+        final purchased = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+        );
+        if (purchased != true) return;
+      }
+    }
+
+    if (mounted) {
+      _sirketKurDialog();
+    }
+  }
+
+  void _sirketKurDialog() {
+    final sirketAdCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    bool kurLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Yeni Şirket Kur"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: sirketAdCtrl,
+                  enabled: !kurLoading,
+                  decoration: const InputDecoration(
+                    labelText: "Şirket Adı *",
+                    hintText: "Şirketinizin adını yazın",
+                    prefixIcon: Icon(Icons.business),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailCtrl,
+                  enabled: !kurLoading,
+                  decoration: const InputDecoration(
+                    labelText: "Yönetici Email *",
+                    hintText: "admin@sirket.com",
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: kurLoading ? null : () => Navigator.pop(ctx),
+              child: const Text("İPTAL"),
+            ),
+            ElevatedButton(
+              onPressed: kurLoading
+                  ? null
+                  : () async {
+                      if (sirketAdCtrl.text.isEmpty || emailCtrl.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Lütfen zorunlu alanları doldurun")),
+                        );
+                        return;
+                      }
+                      setDialogState(() => kurLoading = true);
+                      try {
+                        final user = FirebaseAuth.instance.currentUser;
+                        final userEmail = _normalizeEmail(user?.email ?? '');
+                        if (user == null || userEmail.isEmpty) {
+                          throw Exception("Oturum bulunamadı.");
+                        }
+                        await FirebaseFirestore.instance.collection('sirketler').add({
+                          'ad': sirketAdCtrl.text,
+                          'yoneticiEposta': userEmail,
+                          'yoneticiIletisimEposta': _normalizeEmail(emailCtrl.text),
+                          'telefon': '',
+                          'adres': '',
+                          'personelListesi': [],
+                          'olusturmaTarihi': FieldValue.serverTimestamp(),
+                          'aktif': true,
+                        });
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        // Reload company data
+                        setState(() {
+                          _sirketBulunamadi = false;
+                          _hataMetni = null;
+                        });
+                        _sirketVerisiniYukle();
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Hata: $e")),
+                          );
+                        }
+                      } finally {
+                        if (context.mounted) setDialogState(() => kurLoading = false);
+                      }
+                    },
+              child: kurLoading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text("KUR"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_hataMetni != null) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
+                const SizedBox(height: 16),
+                Text(_hataMetni!, textAlign: TextAlign.center),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _hataMetni = null;
+                      _sirketBulunamadi = false;
+                    });
+                    _sirketVerisiniYukle();
+                  },
+                  child: const Text("Tekrar Dene"),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _cikisYap,
+                  child: const Text("Çıkış Yap"),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_sirketBulunamadi) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.business_outlined, size: 64, color: Colors.orange.shade400),
+                const SizedBox(height: 16),
+                const Text(
+                  "Şirket Bulunamadı",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Bu hesapla ilişkili bir şirket bulunamadı. Yeni bir şirket kurabilir veya çıkış yapabilirsiniz.",
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _sirketKur,
+                    icon: const Icon(Icons.add_business),
+                    label: const Text("Şirket Kur"),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _cikisYap,
+                  child: const Text("Çıkış Yap"),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return const Scaffold(
       body: Center(
         child: Column(

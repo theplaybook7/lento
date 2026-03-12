@@ -144,7 +144,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     if (product != null && product.price.isNotEmpty) {
       return product.price;
     }
-    return planType == PlanType.yearly ? '₺29.999,00' : '₺2.999,99';
+    return 'Yükleniyor...';
   }
 
   @override
@@ -342,7 +342,19 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 child: const Text('Satın Alımları Geri Yükle'),
               ),
 
-              // Info Text
+              // Subscription Terms (Apple Required)
+              const SizedBox(height: 8),
+              Text(
+                "Abonelik, iptal edilmedikçe otomatik olarak yenilenir. "
+                "Yenileme ücreti, mevcut dönem sona ermeden 24 saat önce hesabınızdan tahsil edilir. "
+                "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey.shade500,
+                  fontSize: 11,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
               Text(
                 "Ödeme App Store üzerinden güvenli şekilde yapılır.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

@@ -26,9 +26,7 @@ class PaymentService {
   };
   
   
-  // Fiyatlandırma
-  static const double yearlyPrice = 29999.00;  // ₺29.999,00/yıl
-  static const double monthlyPrice = 2999.99;  // ₺2.999,99/ay
+  // Fiyatlar StoreKit'ten dinamik olarak alınır
 
   factory PaymentService() {
     return _instance;

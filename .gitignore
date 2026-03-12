@@ -47,6 +47,10 @@ android/key.properties
 android/keystore/*.jks
 .firebase/
 
+# Cloud Functions
+functions/node_modules/
+functions/.env
+
 # Local Firebase API keys file (never commit)
 firebase_keys.local.json
 ios/Flutter/ApiKeys.local.xcconfig

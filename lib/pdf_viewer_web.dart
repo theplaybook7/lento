@@ -20,10 +20,13 @@ class PdfViewerWeb extends StatefulWidget {
 
 class _PdfViewerWebState extends State<PdfViewerWeb> {
   String? _iframeUrl;
+  late final String _viewType;
+  static int _viewCounter = 0;
 
   @override
   void initState() {
     super.initState();
+    _viewType = 'pdf-viewer-${_viewCounter++}';
     _createPdfBlob();
   }
 
@@ -32,9 +35,9 @@ class _PdfViewerWebState extends State<PdfViewerWeb> {
       final blob = html.Blob([widget.pdfBytes], 'application/pdf');
       _iframeUrl = html.Url.createObjectUrlFromBlob(blob);
       
-      // Register iframe view
+      // Register iframe view with unique name each time
       ui_web.platformViewRegistry.registerViewFactory(
-        'pdf-viewer-${widget.filename}',
+        _viewType,
         (int viewId) {
           final iframe = html.IFrameElement()
             ..src = _iframeUrl!
@@ -88,7 +91,7 @@ class _PdfViewerWebState extends State<PdfViewerWeb> {
       ),
       body: _iframeUrl == null
           ? const Center(child: CircularProgressIndicator())
-          : HtmlElementView(viewType: 'pdf-viewer-${widget.filename}'),
+          : HtmlElementView(viewType: _viewType),
     );
   }
 }

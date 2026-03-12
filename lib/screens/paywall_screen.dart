@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../theme/app_theme.dart';
 import '../payment_service.dart';
 import '../web_payment_service.dart';
 
 class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key});
+  /// [email] verilirse auth olmadan Stripe checkout yapılır (yeni kullanıcı akışı)
+  final String? email;
+  const PaywallScreen({super.key, this.email});
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -134,10 +137,28 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _buySubscriptionWeb(PlanType planType) async {
+    // Email: widget parametresinden veya auth'lu kullanıcıdan al
+    String? email = widget.email;
+    if (email == null || email.isEmpty) {
+      final user = FirebaseAuth.instance.currentUser;
+      email = user?.email;
+    }
+
+    // Hala email yoksa kullanıcıdan iste
+    if (email == null || email.isEmpty) {
+      email = await _askForEmail();
+      if (email == null || email.isEmpty) {
+        setState(() {
+          _loading = false;
+        });
+        return;
+      }
+    }
+
     final webPayment = WebPaymentService();
     final planTypeStr = planType == PlanType.yearly ? 'yearly' : 'monthly';
 
-    final started = await webPayment.startCheckout(planType: planTypeStr);
+    final started = await webPayment.startCheckout(planType: planTypeStr, email: email);
 
     if (!mounted) return;
 
@@ -153,6 +174,41 @@ class _PaywallScreenState extends State<PaywallScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<String?> _askForEmail() async {
+    final emailCtrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('E-Posta Adresi'),
+        content: TextField(
+          controller: emailCtrl,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: 'E-Posta',
+            hintText: 'ornek@email.com',
+            prefixIcon: const Icon(Icons.email_outlined),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İPTAL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final email = emailCtrl.text.trim();
+              if (email.isNotEmpty && email.contains('@')) {
+                Navigator.pop(ctx, email);
+              }
+            },
+            child: const Text('DEVAM'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _restorePurchases() async {

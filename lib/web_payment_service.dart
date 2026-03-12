@@ -1,7 +1,8 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 class WebPaymentService {
@@ -9,7 +10,9 @@ class WebPaymentService {
   factory WebPaymentService() => _instance;
   WebPaymentService._internal();
 
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  static const String _checkoutUrl =
+      'https://us-central1-insaat-yonetim-takip.cloudfunctions.net/initStripeCheckout';
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -32,25 +35,47 @@ class WebPaymentService {
     },
   };
 
-  /// Stripe Checkout Session oluştur ve ödeme sayfasına yönlendir
-  Future<bool> startCheckout({required String planType}) async {
-    _lastError = '';
+  /// Mevcut kullanıcıyı al (web'de currentUser bazen null olabiliyor)
+  Future<User?> _getCurrentUser() async {
     final user = _auth.currentUser;
-    if (user == null) {
-      _lastError = 'Oturum bulunamadı. Lütfen giriş yapın.';
+    if (user != null) return user;
+    // Web'de auth state gecikmeli yüklenebilir, stream'den kontrol et
+    return await _auth.authStateChanges().first;
+  }
+
+  /// Stripe Checkout Session oluştur ve ödeme sayfasına yönlendir
+  /// [email] parametresi verilirse auth gerekmez (yeni kullanıcı akışı)
+  Future<bool> startCheckout({required String planType, String? email}) async {
+    _lastError = '';
+
+    // Auth'lu kullanıcı varsa onun emailini kullan, yoksa parametre olarak gelen emaili
+    final user = _auth.currentUser;
+    final checkoutEmail = email ?? user?.email;
+
+    if (checkoutEmail == null || checkoutEmail.isEmpty) {
+      _lastError = 'E-posta adresi gerekli.';
       return false;
     }
 
     try {
-      final callable = _functions.httpsCallable('initStripeCheckout');
-      final result = await callable.call<Map<String, dynamic>>({
-        'email': user.email,
-        'planType': planType,
-        'successUrl': '${Uri.base.origin}/?payment=success',
-        'cancelUrl': '${Uri.base.origin}/?payment=cancelled',
-      });
+      final response = await http.post(
+        Uri.parse(_checkoutUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': checkoutEmail,
+          'planType': planType,
+          'successUrl': '${Uri.base.origin}/?payment=success&email=${Uri.encodeComponent(checkoutEmail)}',
+          'cancelUrl': '${Uri.base.origin}/?payment=cancelled',
+        }),
+      );
 
-      final data = result.data;
+      if (response.statusCode != 200) {
+        final errorData = jsonDecode(response.body);
+        _lastError = errorData['error'] ?? 'Ödeme servisi hatası.';
+        return false;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
       final url = data['url'] as String?;
 
       if (url != null && url.isNotEmpty) {
@@ -66,9 +91,6 @@ class WebPaymentService {
         _lastError = 'Stripe checkout URL alınamadı.';
         return false;
       }
-    } on FirebaseFunctionsException catch (e) {
-      _lastError = e.message ?? 'Ödeme servisi hatası.';
-      return false;
     } catch (e) {
       _lastError = 'Ödeme başlatma hatası: $e';
       return false;
@@ -78,7 +100,7 @@ class WebPaymentService {
   /// Ödeme durumunu kontrol et
   Future<Map<String, dynamic>> getSubscriptionStatus() async {
     try {
-      final user = _auth.currentUser;
+      final user = await _getCurrentUser();
       if (user == null) return {'active': false, 'type': null};
 
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
@@ -107,6 +129,33 @@ class WebPaymentService {
       return {'active': false, 'type': null};
     } catch (e) {
       return {'active': false, 'type': null};
+    }
+  }
+
+  /// Email bazlı ödeme durumu kontrol et (kayıt olmamış kullanıcılar için)
+  Future<Map<String, dynamic>> checkPaymentByEmail(String email) async {
+    try {
+      final normalizedEmail = email.trim().toLowerCase();
+      final doc = await _firestore
+          .collection('pending_payments')
+          .doc(normalizedEmail)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        final paid = data['paid'] as bool? ?? false;
+        if (paid) {
+          return {
+            'active': true,
+            'planType': data['planType'],
+            'email': normalizedEmail,
+          };
+        }
+      }
+
+      return {'active': false};
+    } catch (e) {
+      return {'active': false};
     }
   }
 }

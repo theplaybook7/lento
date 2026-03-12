@@ -14,6 +14,11 @@ import 'project_core.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard.dart';
 
+/// Şirket kurma akışı sırasında auth state değişikliğini bypass etmek için global flag.
+/// iOS'ta hesap oluşturulduktan sonra ödeme ve şirket kurma tamamlanana kadar
+/// StreamBuilder'ın VeriYuklemeEkrani'na geçmesini engeller.
+final ValueNotifier<bool> companyCreationInProgress = ValueNotifier(false);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   String? startupError;
@@ -49,17 +54,24 @@ class InsaatYonetimApp extends StatelessWidget {
       theme: AppTheme.lightTheme(),
       home: startupError != null
           ? StartupErrorScreen(error: startupError!)
-          : StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-          if (snapshot.hasData) {
-            return const VeriYuklemeEkrani(); 
-          }
-          return const LoginSayfasi();
-        },
+          : ValueListenableBuilder<bool>(
+        valueListenable: companyCreationInProgress,
+        builder: (context, creatingCompany, _) => StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+            // Şirket kurma süreci devam ediyorsa login ekranında kal
+            if (creatingCompany) {
+              return const LoginSayfasi();
+            }
+            if (snapshot.hasData) {
+              return const VeriYuklemeEkrani(); 
+            }
+            return const LoginSayfasi();
+          },
+        ),
       ),
     );
   }
@@ -228,15 +240,25 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
 
     // Web ve Apple platformları için farklı ödeme akışı
     if (kIsWeb) {
-      // Web: Stripe ile ödeme
+      // Web: Zaten auth'lu kullanıcı - pending_payments ve users kontrol et
+      final user = FirebaseAuth.instance.currentUser;
+      final email = user?.email?.trim().toLowerCase() ?? '';
+      
       final webPayment = WebPaymentService();
       final subStatus = await webPayment.getSubscriptionStatus();
+      
+      // Ayrıca pending_payments koleksiyonunu da kontrol et
+      bool hasPendingPayment = false;
+      if (!(subStatus['active'] as bool) && email.isNotEmpty) {
+        final pendingStatus = await webPayment.checkPaymentByEmail(email);
+        hasPendingPayment = pendingStatus['active'] == true;
+      }
 
-      if (!(subStatus['active'] as bool)) {
+      if (!(subStatus['active'] as bool) && !hasPendingPayment) {
         if (mounted) {
           final purchased = await Navigator.push<bool>(
             context,
-            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+            MaterialPageRoute(builder: (ctx) => PaywallScreen(email: email)),
           );
           if (purchased != true) return;
         }

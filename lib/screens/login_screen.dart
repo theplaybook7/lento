@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -8,6 +9,7 @@ import '../project_core.dart';
 import '../theme/app_theme.dart';
 import 'dashboard.dart';
 import '../payment_service.dart';
+import '../web_payment_service.dart';
 import 'paywall_screen.dart';
 
 class LoginSayfasi extends StatefulWidget {
@@ -232,13 +234,44 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     // Subscription kontrolü
     final paymentService = PaymentService();
 
-    if (!paymentService.isApplePaymentSupported) {
+    // Web ve Apple platformları için farklı ödeme akışı
+    if (kIsWeb) {
+      // Web: Stripe ile ödeme
+      final webPayment = WebPaymentService();
+      final subStatus = await webPayment.getSubscriptionStatus();
+
+      if (!(subStatus['active'] as bool)) {
+        if (mounted) {
+          final purchased = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+          );
+
+          if (purchased != true) return;
+        }
+      }
+    } else if (paymentService.isApplePaymentSupported) {
+      // iOS/macOS: Apple IAP ile ödeme
+      final subStatus = await paymentService.getSubscriptionStatus();
+
+      if (!(subStatus['active'] as bool)) {
+        if (mounted) {
+          final purchased = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+          );
+
+          if (purchased != true) return;
+        }
+      }
+    } else {
+      // Desteklenmeyen platform
       if (mounted) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Apple Platformu Gerekli'),
-            content: const Text('Şirket oluşturma aboneliği yalnızca Apple App Store (iOS/macOS) üzerinden yapılabilir.'),
+            title: const Text('Platform Desteklenmiyor'),
+            content: const Text('Şirket oluşturma aboneliği bu platformda desteklenmiyor.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -249,21 +282,6 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
         );
       }
       return;
-    }
-
-    final subStatus = await paymentService.getSubscriptionStatus();
-    
-    if (!(subStatus['active'] as bool)) {
-      if (mounted) {
-        final purchased = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
-        );
-
-        if (purchased != true) {
-          return;
-        }
-      }
     }
 
     // Aktif subscription varsa, şirket kurma dialogunu göster

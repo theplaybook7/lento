@@ -143,7 +143,7 @@ exports.verifyGooglePlayReceipt = functions.https.onCall(async (data, context) =
 
 /**
  * Stripe Checkout Session Oluştur
- * Web ödeme işlemini başlat
+ * Web abonelik ödeme işlemini başlat
  */
 exports.initStripeCheckout = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
@@ -153,7 +153,25 @@ exports.initStripeCheckout = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const { email, successUrl, cancelUrl } = data;
+  const { email, planType, successUrl, cancelUrl } = data;
+
+  // Plan konfigürasyonu
+  const plans = {
+    monthly: {
+      priceAmount: 299999, // ₺2.999,99 kuruş cinsinden
+      interval: "month",
+      intervalCount: 1,
+      name: "Aylık Abonelik",
+    },
+    yearly: {
+      priceAmount: 2999900, // ₺29.999,00 kuruş cinsinden
+      interval: "year",
+      intervalCount: 1,
+      name: "Yıllık Abonelik",
+    },
+  };
+
+  const plan = plans[planType] || plans.monthly;
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -161,30 +179,34 @@ exports.initStripeCheckout = functions.https.onCall(async (data, context) => {
       line_items: [
         {
           price_data: {
-            currency: "usd", // EUR, TRY vs. değiştirebilir
+            currency: "try",
             product_data: {
-              name: "Şirket Oluşturma",
-              description: "İnşaat Yönetim Sistemi - Şirket Oluşturma",
+              name: plan.name,
+              description: "Lento İnşaat Yönetim Sistemi - " + plan.name,
               metadata: {
                 userId: context.auth.uid,
               },
             },
-            unit_amount: 999, // $9.99
+            unit_amount: plan.priceAmount,
+            recurring: {
+              interval: plan.interval,
+              interval_count: plan.intervalCount,
+            },
           },
           quantity: 1,
         },
       ],
-      mode: "payment",
-      customer_email: email,
-      success_url: successUrl || "https://yourapp.com/success",
-      cancel_url: cancelUrl || "https://yourapp.com/cancel",
+      mode: "subscription",
+      customer_email: email || context.auth.token.email,
+      success_url: successUrl || "https://insaat-yonetim-takip.web.app/?payment=success",
+      cancel_url: cancelUrl || "https://insaat-yonetim-takip.web.app/?payment=cancelled",
       metadata: {
         userId: context.auth.uid,
-        productId: "create_company_payment",
+        planType: planType || "monthly",
       },
     });
 
-    return { sessionId: session.id };
+    return { sessionId: session.id, url: session.url };
   } catch (error) {
     console.error("Stripe session oluşturma hatası:", error);
     throw new functions.https.HttpsError(
@@ -211,28 +233,70 @@ exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
       const userId = session.metadata.userId;
+      const planType = session.metadata.planType || "monthly";
+
+      // Abonelik bitiş tarihi hesapla
+      const now = new Date();
+      let endDate;
+      if (planType === "yearly") {
+        endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+      } else {
+        endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
 
       // Ödemeyi kaydet
       await db.collection("payments").add({
         userId,
         type: "stripe",
         sessionId: session.id,
+        subscriptionId: session.subscription,
         amount: session.amount_total / 100,
         currency: session.currency,
+        planType,
         status: "completed",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         verified: true,
       });
 
       // Kullanıcıya izin ver
-      await db.collection("users").doc(userId).update({
-        companyCreationPaid: true,
-        paidAt: admin.firestore.FieldValue.serverTimestamp(),
-        productId: "create_company_payment",
-        transactionId: session.id,
-      });
+      await db.collection("users").doc(userId).set(
+        {
+          companyCreationPaid: true,
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+          productId: planType === "yearly" ? "company_yearly_subscription" : "company_monthly_subscription",
+          transactionId: session.id,
+          subscriptionType: planType,
+          subscriptionEndDate: admin.firestore.Timestamp.fromDate(endDate),
+          stripeSubscriptionId: session.subscription,
+          autoRenew: true,
+          lastPurchaseStatus: "completed",
+        },
+        { merge: true }
+      );
 
-      console.log(`✅ Ödeme doğrulandı: ${userId}`);
+      console.log(`✅ Stripe abonelik ödeme doğrulandı: ${userId} (${planType})`);
+    }
+
+    if (event.type === "customer.subscription.deleted") {
+      // Abonelik iptal edildi
+      const subscription = event.data.object;
+      const payments = await db
+        .collection("payments")
+        .where("stripeSubscriptionId", "==", subscription.id)
+        .limit(1)
+        .get();
+
+      if (!payments.empty) {
+        const userId = payments.docs[0].data().userId;
+        await db.collection("users").doc(userId).set(
+          {
+            autoRenew: false,
+            lastPurchaseStatus: "cancelled",
+          },
+          { merge: true }
+        );
+        console.log(`⚠️ Abonelik iptal edildi: ${userId}`);
+      }
     }
 
     res.json({ received: true });

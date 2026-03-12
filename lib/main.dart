@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'services/payment_notification_service.dart';
 import 'theme/app_theme.dart';
 import 'payment_service.dart';
+import 'web_payment_service.dart';
 import 'screens/paywall_screen.dart';
 
 import 'project_core.dart';
@@ -225,13 +226,41 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
     final paymentService = PaymentService();
     await paymentService.initialize();
 
-    if (!paymentService.isApplePaymentSupported) {
+    // Web ve Apple platformları için farklı ödeme akışı
+    if (kIsWeb) {
+      // Web: Stripe ile ödeme
+      final webPayment = WebPaymentService();
+      final subStatus = await webPayment.getSubscriptionStatus();
+
+      if (!(subStatus['active'] as bool)) {
+        if (mounted) {
+          final purchased = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+          );
+          if (purchased != true) return;
+        }
+      }
+    } else if (paymentService.isApplePaymentSupported) {
+      // iOS/macOS: Apple IAP ile ödeme
+      final subStatus = await paymentService.getSubscriptionStatus();
+
+      if (!(subStatus['active'] as bool)) {
+        if (mounted) {
+          final purchased = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+          );
+          if (purchased != true) return;
+        }
+      }
+    } else {
       if (mounted) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Apple Platformu Gerekli'),
-            content: const Text('Şirket oluşturma aboneliği yalnızca Apple App Store (iOS/macOS) üzerinden yapılabilir.'),
+            title: const Text('Platform Desteklenmiyor'),
+            content: const Text('Şirket oluşturma aboneliği bu platformda desteklenmiyor.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -242,18 +271,6 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
         );
       }
       return;
-    }
-
-    final subStatus = await paymentService.getSubscriptionStatus();
-
-    if (!(subStatus['active'] as bool)) {
-      if (mounted) {
-        final purchased = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
-        );
-        if (purchased != true) return;
-      }
     }
 
     if (mounted) {

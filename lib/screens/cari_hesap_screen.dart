@@ -398,6 +398,22 @@ class CariDetayScreen extends StatefulWidget {
 }
 
 class _CariDetayScreenState extends State<CariDetayScreen> {
+  final Map<String, String> _projeAdlariCache = {};
+
+  Future<void> _projeAdlariniGetir(Set<String> projeIdler) async {
+    bool updated = false;
+    for (var id in projeIdler) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('projects').doc(id).get();
+        if (doc.exists) {
+          _projeAdlariCache[id] = (doc.data()?['name'] ?? 'Proje') as String;
+          updated = true;
+        }
+      } catch (_) {}
+    }
+    if (updated && mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -564,6 +580,22 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                       );
                     }
 
+                    // Fetch missing project names for old hareketler
+                    final yeniProjeIdler = <String>{};
+                    for (var doc in docsWithTarih) {
+                      final d = doc.data() as Map<String, dynamic>;
+                      final pid = d['projeId'] as String? ?? 'manuel';
+                      final pad = d['projeAd'] as String?;
+                      if (pid != 'manuel' && pid.isNotEmpty &&
+                          (pad == null || pad.isEmpty || pad == 'Proje') &&
+                          !_projeAdlariCache.containsKey(pid)) {
+                        yeniProjeIdler.add(pid);
+                      }
+                    }
+                    if (yeniProjeIdler.isNotEmpty) {
+                      _projeAdlariniGetir(yeniProjeIdler);
+                    }
+
                     Map<String, List<Map<String, dynamic>>> projeGruplari = {};
                     for (var doc in docsWithTarih) {
                       final data = doc.data() as Map<String, dynamic>;
@@ -581,7 +613,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           projeAd = tip == "alacak" ? "Tahsilat" : "Ödeme";
                         }
                       } else {
-                        projeAd = data['projeAd'] as String? ?? 'Proje';
+                        projeAd = data['projeAd'] as String? ?? _projeAdlariCache[projeId] ?? 'Proje';
                       }
                       
                       final key = projeId == 'manuel' ? 'manuel_${doc.id}' : projeId;
@@ -712,12 +744,34 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (aciklama.isNotEmpty) Text(aciklama),
-                if (tarih != null)
+                if (data['_projeId'] != null && data['_projeId'] != 'manuel' && data['_projeAd'] != null) ...[
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(Icons.business, size: 14, color: Colors.blue.shade600),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          tarih != null
+                              ? "${data['_projeAd']}'de gerçekleşen ${tarih.day.toString().padLeft(2, '0')}.${tarih.month.toString().padLeft(2, '0')}.${tarih.year} tarihli ${tip == 'alacak' ? 'tahsilat' : 'ödeme'}"
+                              : "${data['_projeAd']}'de gerçekleşen ${tip == 'alacak' ? 'tahsilat' : 'ödeme'}",
+                          style: TextStyle(
+                            color: Colors.blue.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (tarih != null) ...[
                   Text(
-                    '${tarih.day}/${tarih.month}/${tarih.year}',
+                    '${tarih.day.toString().padLeft(2, '0')}.${tarih.month.toString().padLeft(2, '0')}.${tarih.year}',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                   ),
+                ],
+                if (aciklama.isNotEmpty)
+                  Text(aciklama, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
               ],
             ),
             trailing: Row(

@@ -11,9 +11,11 @@ import 'new_project_screen.dart';
 import 'project_details_screen.dart';
 import 'project_archive_screen.dart';
 import 'company_finance_dashboard.dart';
+import 'cari_hesap_screen.dart';
 import 'settings_screen.dart';
 import 'login_screen.dart';
 import '../services/firebase_service.dart';
+import '../utils/format_utils.dart' as format_utils;
 
 class DashboardSayfasi extends StatefulWidget {
   const DashboardSayfasi({super.key});
@@ -41,7 +43,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     final canMuhasebe = sistem.yetkiVarMi('muhasebe');
     final screenWidth = MediaQuery.of(context).size.width;
     final isCompact = screenWidth < 900;
-    final maxIndex = canMuhasebe ? 2 : 1;
+    final maxIndex = canMuhasebe ? 3 : 2;
     final navIndex = _navIndex > maxIndex ? 0 : _navIndex;
 
     if (!canTeklif) {
@@ -196,14 +198,23 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         setState(() => _navIndex = 1);
                       },
                     ),
+                    ListTile(
+                      leading: const Icon(Icons.account_balance_wallet_outlined),
+                      title: const Text('Cariler'),
+                      selected: navIndex == 2,
+                      onTap: () {
+                        Navigator.pop(context);
+                        setState(() => _navIndex = 2);
+                      },
+                    ),
                     if (canMuhasebe)
                       ListTile(
                         leading: const Icon(Icons.assessment_outlined),
                         title: const Text('Muhasebe'),
-                        selected: navIndex == 2,
+                        selected: navIndex == 3,
                         onTap: () {
                           Navigator.pop(context);
-                          setState(() => _navIndex = 2);
+                          setState(() => _navIndex = 3);
                         },
                       ),
                     const Divider(),
@@ -276,9 +287,11 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                 )
                 : navIndex == 1
                   ? const _TekliflerListesi()
-                  : canMuhasebe
-                      ? CompanyFinanceDashboard(companyId: _companyId)
-                      : const Center(child: Text('Yetkiniz yok'))
+                  : navIndex == 2
+                    ? const _CarilerTab()
+                    : canMuhasebe
+                        ? CompanyFinanceDashboard(companyId: _companyId)
+                        : const Center(child: Text('Yetkiniz yok'))
           : Row(
               children: [
                 NavigationRail(
@@ -295,6 +308,11 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                       icon: Icon(Icons.description_outlined),
                       selectedIcon: Icon(Icons.description),
                       label: Text('Teklifler'),
+                    ),
+                    const NavigationRailDestination(
+                      icon: Icon(Icons.account_balance_wallet_outlined),
+                      selectedIcon: Icon(Icons.account_balance_wallet),
+                      label: Text('Cariler'),
                     ),
                     if (canMuhasebe)
                       const NavigationRailDestination(
@@ -349,9 +367,11 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         )
                         : navIndex == 1
                           ? const _TekliflerListesi()
-                          : canMuhasebe
-                              ? CompanyFinanceDashboard(companyId: _companyId)
-                              : const Center(child: Text('Yetkiniz yok')),
+                          : navIndex == 2
+                            ? const _CarilerTab()
+                            : canMuhasebe
+                                ? CompanyFinanceDashboard(companyId: _companyId)
+                                : const Center(child: Text('Yetkiniz yok')),
                 ),
               ],
             ),
@@ -369,6 +389,11 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                   icon: Icon(Icons.description_outlined),
                   activeIcon: Icon(Icons.description),
                   label: 'Teklifler',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.account_balance_wallet_outlined),
+                  activeIcon: Icon(Icons.account_balance_wallet),
+                  label: 'Cariler',
                 ),
                 if (canMuhasebe)
                   const BottomNavigationBarItem(
@@ -418,7 +443,133 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                   label: const Text('Yeni Teklif'),
                   backgroundColor: AppTheme.primaryColor,
                 )
-              : null,
+              : navIndex == 2
+                ? FloatingActionButton.extended(
+                    onPressed: () => _yeniCariDialogGlobal(context),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Cari Ekle'),
+                    backgroundColor: AppTheme.primaryColor,
+                  )
+                : null,
+    );
+  }
+
+  Future<void> _yeniCariDialogGlobal(BuildContext context) async {
+    final adCtrl = TextEditingController();
+    final telefonCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final adresCtrl = TextEditingController();
+    String tip = 'musteri';
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Yeni Cari Hesap'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Müşteri', style: TextStyle(fontSize: 13)),
+                        value: 'musteri',
+                        groupValue: tip,
+                        onChanged: (v) => setState(() => tip = v!),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Tedarikçi', style: TextStyle(fontSize: 13)),
+                        value: 'tedarikci',
+                        groupValue: tip,
+                        onChanged: (v) => setState(() => tip = v!),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: adCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Ad / Firma Adı *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: telefonCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Telefon',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'E-posta',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: adresCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Adres',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (adCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Ad/Firma adı gerekli')),
+                  );
+                  return;
+                }
+
+                await FirebaseFirestore.instance.collection('cari_hesaplar').add({
+                  'ad': adCtrl.text.trim(),
+                  'tip': tip,
+                  'telefon': telefonCtrl.text.trim(),
+                  'email': emailCtrl.text.trim(),
+                  'adres': adresCtrl.text.trim(),
+                  'bakiye': 0.0,
+                  'projectId': '',
+                  'projectIds': <String>[],
+                  'olusturmaTarihi': FieldValue.serverTimestamp(),
+                });
+
+                if (context.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Cari hesap oluşturuldu')),
+                  );
+                }
+              },
+              child: const Text('Kaydet'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -525,6 +676,229 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// -----------------------------------------------------------
+// CARİLER TAB (Dashboard embedded)
+// -----------------------------------------------------------
+class _CarilerTab extends StatefulWidget {
+  const _CarilerTab();
+
+  @override
+  State<_CarilerTab> createState() => _CarilerTabState();
+}
+
+class _CarilerTabState extends State<_CarilerTab> {
+  String _filtre = 'tum';
+  String _arama = '';
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Filtre satırı
+        Container(
+          color: AppTheme.primaryColor,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          child: Row(
+            children: [
+              Expanded(child: _filtreButomu('tum', 'Tümü', Icons.list)),
+              const SizedBox(width: 8),
+              Expanded(child: _filtreButomu('musteri', 'Müşteriler', Icons.people)),
+              const SizedBox(width: 8),
+              Expanded(child: _filtreButomu('tedarikci', 'Tedarikçiler', Icons.business)),
+            ],
+          ),
+        ),
+        // Arama satırı
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TextField(
+            decoration: InputDecoration(
+              hintText: 'Cari ara...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              isDense: true,
+            ),
+            onChanged: (v) => setState(() => _arama = v.trim()),
+          ),
+        ),
+        // Cari listesi
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('cari_hesaplar').snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Hata: ${snapshot.error}'));
+              }
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              var docs = snapshot.data!.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final tip = data['tip'] ?? 'musteri';
+                final ad = (data['ad'] ?? '').toString().toLowerCase();
+                bool tipFiltre = _filtre == 'tum' || tip == _filtre;
+                bool aramaFiltre = _arama.isEmpty || ad.contains(_arama.toLowerCase());
+                return tipFiltre && aramaFiltre;
+              }).toList();
+
+              if (docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.account_balance_wallet_outlined, size: 48, color: Colors.grey.shade400),
+                      const SizedBox(height: 16),
+                      Text(
+                        _arama.isNotEmpty ? 'Sonuç bulunamadı' : 'Henüz cari hesap kaydı yok',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final doc = docs[index];
+                  final data = doc.data() as Map<String, dynamic>;
+                  final ad = data['ad'] ?? 'İsimsiz';
+                  final tip = data['tip'] ?? 'musteri';
+                  final bakiye = (data['bakiye'] as num?)?.toDouble() ?? 0.0;
+                  final telefon = data['telefon'] ?? '';
+                  final email = data['email'] ?? '';
+                  final alacak = bakiye > 0;
+                  final renk = alacak ? AppTheme.successColor : Colors.red;
+                  final ikon = tip == 'musteri' ? Icons.person_outline : Icons.business_outlined;
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (c) => CariDetayScreen(cariId: doc.id, cariAd: ad),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [renk.withValues(alpha: 0.2), renk.withValues(alpha: 0.1)],
+                                ),
+                              ),
+                              child: Icon(ikon, color: renk, size: 24),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    ad,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                  if (telefon.toString().isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(telefon, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
+                                  ],
+                                  if (email.toString().isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(email, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey.shade600)),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  bakiye == 0 ? 'Dengede' : (alacak ? 'Alacak' : 'Borç'),
+                                  style: TextStyle(
+                                    color: bakiye == 0 ? Colors.grey : renk,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  format_utils.formatTL(bakiye.abs()),
+                                  style: TextStyle(
+                                    color: bakiye == 0 ? Colors.grey : renk,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _filtreButomu(String deger, String etiket, IconData ikon) {
+    final aktif = _filtre == deger;
+    return InkWell(
+      onTap: () => setState(() => _filtre = deger),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: aktif ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: aktif ? AppTheme.primaryColor : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(ikon, size: 18, color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7)),
+            const SizedBox(width: 4),
+            Text(
+              etiket,
+              style: TextStyle(
+                color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7),
+                fontWeight: aktif ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

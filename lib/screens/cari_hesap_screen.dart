@@ -367,6 +367,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
                   'adres': adresCtrl.text.trim(),
                   'bakiye': 0.0,
                   'projectId': '',
+                  'projectIds': <String>[],
                   'olusturmaTarihi': FieldValue.serverTimestamp(),
                 });
 
@@ -1165,6 +1166,8 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                   }
 
                   String? giderId;
+                  String projeId = '';
+                  String projeAd = '';
                   
                   // Eğer ödeme veya tahsilat ise giderlere kaydetto
                   if (tip == 'borc' || tip == 'alacak') {
@@ -1172,12 +1175,23 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                     final cariDoc = await FirebaseFirestore.instance.collection('cari_hesaplar').doc(widget.cariId).get();
                     var projectId = cariDoc.data()?['projectId'] ?? '';
                     
+                    // Zaten atanmış proje varsa adını al
+                    if (projectId.isNotEmpty) {
+                      projeId = projectId;
+                      try {
+                        final projeDoc = await FirebaseFirestore.instance.collection('projects').doc(projectId).get();
+                        projeAd = projeDoc.data()?['name'] ?? 'Proje';
+                      } catch (_) {
+                        projeAd = 'Proje';
+                      }
+                    }
+                    
                     // ProjectId boş ise proje seç
                     if (projectId.isEmpty) {
                       if (!mounted) return;
                       final projects = await FirebaseFirestore.instance.collection('projects').get();
                       if (projects.docs.isNotEmpty && mounted) {
-                        final selected = await showDialog<String>(
+                        final selected = await showDialog<Map<String, String>>(
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text('Proje Seç'),
@@ -1185,9 +1199,10 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: projects.docs.map((doc) {
+                                  final pAd = doc.data()['name'] ?? 'İsimsiz';
                                   return ListTile(
-                                    title: Text(doc.data()['name'] ?? 'İsimsiz'),
-                                    onTap: () => Navigator.pop(ctx, doc.id),
+                                    title: Text(pAd),
+                                    onTap: () => Navigator.pop(ctx, {'id': doc.id, 'ad': pAd}),
                                   );
                                 }).toList(),
                               ),
@@ -1196,12 +1211,17 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                         );
                         
                         if (selected != null) {
-                          projectId = selected;
+                          projectId = selected['id']!;
+                          projeId = projectId;
+                          projeAd = selected['ad']!;
                           // Cari'ye proje atama yap
                           await FirebaseFirestore.instance
                               .collection('cari_hesaplar')
                               .doc(widget.cariId)
-                              .update({'projectId': projectId});
+                              .update({
+                                'projectId': projectId,
+                                'projectIds': FieldValue.arrayUnion([projectId]),
+                              });
                         }
                       }
                     }
@@ -1344,6 +1364,8 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                     'tarih': selectedDate,
                     'fotoUrls': photoUrls,
                     'giderId': giderId,
+                    'projeId': projeId.isNotEmpty ? projeId : 'manuel',
+                    'projeAd': projeAd,
                   });
                   
                   final bakiyeUpdate = FirebaseFirestore.instance
@@ -2127,7 +2149,10 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
       await FirebaseFirestore.instance
           .collection('cari_hesaplar')
           .doc(widget.cariId)
-          .update({'projectId': selected});
+          .update({
+            'projectId': selected,
+            'projectIds': FieldValue.arrayUnion([selected]),
+          });
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Proje atandı')),

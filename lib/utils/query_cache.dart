@@ -47,7 +47,7 @@ extension OptimizedQueries on FirebaseFirestore {
   /// Cariler sorgusu - projectId'ye göre filtrelenmiş
   Query carilerByProject(String projectId) {
     return collection('cari_hesaplar')
-        .where('projectId', isEqualTo: projectId)
+        .where('projectIds', arrayContains: projectId)
         .orderBy('ad');
   }
   

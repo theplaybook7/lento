@@ -607,14 +607,20 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('cari_hesaplar')
-                      .where('projectId', isEqualTo: widget.projectId)
                       .snapshots(),
                   builder: (context, cariSnap) {
                     if (!cariSnap.hasData) {
                       return const SizedBox();
                     }
 
-                    final cariler = cariSnap.data!.docs;
+                    // Hem eski projectId hem yeni projectIds formatını destekle
+                    final cariler = cariSnap.data!.docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final pids = List<String>.from(data['projectIds'] ?? []);
+                      final pid = data['projectId'] ?? '';
+                      return pids.contains(widget.projectId) || pid == widget.projectId;
+                    }).toList();
+
                     if (cariler.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2285,6 +2291,154 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Future<void> _yeniCariDialog(BuildContext context) async {
+    if (!mounted) return;
+
+    // İlk dialog: Var olan cari seç veya yeni oluştur
+    final secim = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cari Hesap Ekle'),
+        content: const Text('Var olan bir cari hesabı bu projeye atayabilir veya yeni bir cari hesap oluşturabilirsiniz.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(ctx, 'mevcut'),
+            icon: const Icon(Icons.search),
+            label: const Text('Var Olandan Seç'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, 'yeni'),
+            icon: const Icon(Icons.add),
+            label: const Text('Yeni Oluştur'),
+          ),
+        ],
+      ),
+    );
+
+    if (secim == null || !mounted) return;
+
+    if (secim == 'mevcut') {
+      await _mevcutCariSec(context);
+    } else {
+      await _yeniCariOlustur(context);
+    }
+  }
+
+  Future<void> _mevcutCariSec(BuildContext context) async {
+    String arama = '';
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Cari Seç'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: Column(
+              children: [
+                TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Cari ara...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    isDense: true,
+                  ),
+                  onChanged: (v) => setState(() => arama = v.trim().toLowerCase()),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance.collection('cari_hesaplar').snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      // Projede zaten olan carileri filtrele
+                      var docs = snapshot.data!.docs.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final pids = List<String>.from(data['projectIds'] ?? []);
+                        // Eski format desteği
+                        final pid = data['projectId'] ?? '';
+                        // Bu projede zaten olan carileri gösterme
+                        if (pids.contains(widget.projectId) || pid == widget.projectId) return false;
+                        final ad = (data['ad'] ?? '').toString().toLowerCase();
+                        return arama.isEmpty || ad.contains(arama);
+                      }).toList();
+
+                      if (docs.isEmpty) {
+                        return Center(
+                          child: Text(
+                            arama.isNotEmpty ? 'Sonuç bulunamadı' : 'Mevcut cari hesap yok',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final doc = docs[index];
+                          final data = doc.data() as Map<String, dynamic>;
+                          final ad = data['ad'] ?? 'İsimsiz';
+                          final tip = data['tip'] ?? 'musteri';
+                          final telefon = data['telefon'] ?? '';
+                          final ikon = tip == 'musteri' ? Icons.person_outline : Icons.business_outlined;
+
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                              child: Icon(ikon, color: AppTheme.primaryColor, size: 20),
+                            ),
+                            title: Text(ad, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: telefon.toString().isNotEmpty ? Text(telefon) : null,
+                            trailing: Text(
+                              tip == 'musteri' ? 'Müşteri' : 'Tedarikçi',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            ),
+                            onTap: () async {
+                              // Cari'nin projectIds listesine bu projeyi ekle
+                              await FirebaseFirestore.instance
+                                  .collection('cari_hesaplar')
+                                  .doc(doc.id)
+                                  .update({
+                                    'projectIds': FieldValue.arrayUnion([widget.projectId]),
+                                  });
+
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('$ad bu projeye eklendi')),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('İptal'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _yeniCariOlustur(BuildContext context) async {
     final adCtrl = TextEditingController();
     final telefonCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
@@ -2384,6 +2538,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   'adres': adresCtrl.text.trim(),
                   'bakiye': 0.0,
                   'projectId': widget.projectId,
+                  'projectIds': [widget.projectId],
                   'olusturmaTarihi': FieldValue.serverTimestamp(),
                 });
 

@@ -30,6 +30,13 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     PaymentService().initialize();
   }
 
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _girisYap() async {
     if(_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen alanları doldurun.")));

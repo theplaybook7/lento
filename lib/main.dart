@@ -130,11 +130,18 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   String _normalizeEmail(String value) => value.trim().toLowerCase();
   bool _sirketBulunamadi = false;
   String? _hataMetni;
+  bool _yuklemeUzunSuruyor = false;
 
   @override
   void initState() {
     super.initState();
     _sirketVerisiniYukle();
+    // 12 saniye sonra hâlâ yükleniyorsa kullanıcıya çıkış seçeneği sun
+    Future.delayed(const Duration(seconds: 12), () {
+      if (mounted && !_sirketBulunamadi && _hataMetni == null) {
+        setState(() => _yuklemeUzunSuruyor = true);
+      }
+    });
   }
 
   Future<void> _sirketVerisiniYukle() async {
@@ -500,15 +507,47 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
       );
     }
 
-    return const Scaffold(
+    return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 20),
-            Text("Veriler yükleniyor...", style: TextStyle(color: Colors.grey))
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              const Text("Veriler yükleniyor...", style: TextStyle(color: Colors.grey)),
+              if (_yuklemeUzunSuruyor) ...[
+                const SizedBox(height: 24),
+                const Text(
+                  "Bağlantı yavaş olabilir.",
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _yuklemeUzunSuruyor = false;
+                      _sirketBulunamadi = false;
+                      _hataMetni = null;
+                    });
+                    _sirketVerisiniYukle();
+                    Future.delayed(const Duration(seconds: 12), () {
+                      if (mounted && !_sirketBulunamadi && _hataMetni == null) {
+                        setState(() => _yuklemeUzunSuruyor = true);
+                      }
+                    });
+                  },
+                  child: const Text("Tekrar Dene"),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _cikisYap,
+                  child: const Text("Çıkış Yap"),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

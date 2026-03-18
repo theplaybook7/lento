@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../payment_service.dart';
 
@@ -342,11 +343,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 child: const Text('Satın Alımları Geri Yükle'),
               ),
 
-              // Subscription Terms
+              // Subscription Terms (Apple Guideline 3.1.2)
               const SizedBox(height: 8),
               Text(
-                "Abonelik, iptal edilmedikçe otomatik olarak yenilenir. "
-                "Yenileme ücreti, mevcut dönem sona ermeden 24 saat önce hesabınızdan tahsil edilir. "
+                "Ödeme, Apple Kimliğiniz hesabına tahsil edilecektir. "
+                "Abonelik, mevcut dönem sona ermeden en az 24 saat önce iptal edilmedikçe otomatik olarak yenilenir. "
+                "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
                 "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey.shade500,
@@ -354,13 +356,37 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
-              Text(
-                "Ödeme App Store üzerinden güvenli şekilde yapılır.",
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade500,
-                ),
-                textAlign: TextAlign.center,
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GestureDetector(
+                    onTap: () => launchUrl(Uri.parse('https://insaat-yonetim-takip.web.app/privacy.html'), mode: LaunchMode.externalApplication),
+                    child: Text(
+                      'Gizlilik Politikası',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.primaryColor,
+                        decoration: TextDecoration.underline,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text('|', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                  ),
+                  GestureDetector(
+                    onTap: () => launchUrl(Uri.parse('https://insaat-yonetim-takip.web.app/terms.html'), mode: LaunchMode.externalApplication),
+                    child: Text(
+                      'Kullanım Koşulları',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.primaryColor,
+                        decoration: TextDecoration.underline,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

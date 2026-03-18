@@ -7,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
-import 'dashboard.dart';
 import '../payment_service.dart';
 import '../web_payment_service.dart';
 import '../main.dart' show companyCreationInProgress;
@@ -19,8 +18,6 @@ class LoginSayfasi extends StatefulWidget {
   @override
   State<LoginSayfasi> createState() => _LoginSayfasiState();
 }
-
-enum _NoCompanyAction { createCompany, signOut }
 
 class _LoginSayfasiState extends State<LoginSayfasi> {
   final _emailCtrl = TextEditingController();
@@ -65,184 +62,31 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     try {
       final normalizedEmail = _normalizeEmail(_emailCtrl.text);
 
-      final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: normalizedEmail,
         password: _passCtrl.text.trim(),
       );
-      
-      String email = _normalizeEmail(cred.user!.email ?? normalizedEmail);
-      final userUid = cred.user!.uid;
-      SistemYoneticisi().girisYapanEmail = email;
-
-      final Map<String, Map<String, dynamic>> eslesmeler = {};
-
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userUid)
-          .get();
-
-      final sirketId = userDoc.data()?['sirketId'] as String?;
-      if (sirketId != null && sirketId.isNotEmpty) {
-        final sirketDoc = await FirebaseFirestore.instance
-            .collection('sirketler')
-            .doc(sirketId)
-            .get();
-
-        if (sirketDoc.exists) {
-          final s = Sirket.fromFirestore(sirketDoc);
-          if (_normalizeEmail(s.yoneticiEposta) == email) {
-            eslesmeler[s.id] = {
-              'sirket': s,
-              'yetki': PersonelYetki(email: email, adminMi: true),
-              'rol': 'Yönetici',
-            };
-          } else {
-            try {
-              final p = s.personelListesi.firstWhere(
-                (element) => _normalizeEmail(element.email) == email,
-              );
-              eslesmeler.putIfAbsent(s.id, () => {
-                'sirket': s,
-                'yetki': p,
-                'rol': 'Personel',
-              });
-            } catch (e) {
-              // Bu şirkette yok
-            }
-          }
-        }
+      // Auth state change triggers StreamBuilder → VeriYuklemeEkrani handles company lookup
+    } on FirebaseAuthException catch (e) {
+      String msg;
+      switch (e.code) {
+        case 'user-not-found':
+          msg = 'Bu e-posta ile kayıtlı kullanıcı bulunamadı.';
+          break;
+        case 'wrong-password':
+        case 'invalid-credential':
+          msg = 'E-posta veya şifre hatalı.';
+          break;
+        case 'invalid-email':
+          msg = 'Geçersiz e-posta adresi.';
+          break;
+        case 'user-disabled':
+          msg = 'Bu hesap devre dışı bırakılmış.';
+          break;
+        default:
+          msg = 'Giriş hatası: ${e.message}';
       }
-
-      if (eslesmeler.isEmpty) {
-        var sirketSnap = await FirebaseFirestore.instance.collection('sirketler').get();
-
-        for (var doc in sirketSnap.docs) {
-          Sirket s = Sirket.fromFirestore(doc);
-          if (_normalizeEmail(s.yoneticiEposta) == email) {
-            eslesmeler[s.id] = {
-              'sirket': s,
-              'yetki': PersonelYetki(email: email, adminMi: true),
-              'rol': 'Yönetici',
-            };
-          } else {
-            try {
-              var p = s.personelListesi.firstWhere(
-                (element) => _normalizeEmail(element.email) == email,
-              );
-              eslesmeler.putIfAbsent(s.id, () => {
-                'sirket': s,
-                'yetki': p,
-                'rol': 'Personel',
-              });
-            } catch (e) {
-              // Bu şirkette yok
-            }
-          }
-        }
-      }
-
-      if (eslesmeler.isEmpty) {
-        if (mounted) {
-          final action = await showDialog<_NoCompanyAction>(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => AlertDialog(
-              title: const Text("Şirket Bulunamadı"),
-              content: const Text(
-                "Bu hesapla ilişkili bir şirket bulunamadı. Hesabınızla şirket kurulumuna devam edebilir veya çıkış yapabilirsiniz.",
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, _NoCompanyAction.signOut),
-                  child: const Text("ÇIKIŞ YAP"),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, _NoCompanyAction.createCompany),
-                  child: const Text("ŞİRKET KUR"),
-                ),
-              ],
-            ),
-          );
-
-          if (action == _NoCompanyAction.createCompany) {
-            await _sirketKurDialog();
-            return;
-          }
-        }
-
-        await FirebaseAuth.instance.signOut();
-        return;
-      }
-
-      Map<String, dynamic> secim;
-
-      if (eslesmeler.length == 1) {
-        secim = eslesmeler.values.first;
-      } else {
-        final result = await showDialog<Map<String, dynamic>>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(
-              "Şirket Seçin",
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.primaryColor,
-              ),
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: eslesmeler.values.length,
-                separatorBuilder: (context, index) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final item = eslesmeler.values.elementAt(index);
-                  final Sirket s = item['sirket'] as Sirket;
-                  final String rol = item['rol'] as String;
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                      child: Icon(Icons.business, color: AppTheme.primaryColor),
-                    ),
-                    title: Text(s.ad),
-                    subtitle: Text(rol),
-                    onTap: () => Navigator.pop(ctx, item),
-                  );
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("İPTAL"),
-              ),
-            ],
-          ),
-        );
-
-        if (!mounted) return;
-
-        if (result == null) {
-          await FirebaseAuth.instance.signOut();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Şirket seçimi iptal edildi.")),
-          );
-          return;
-        }
-
-        secim = result;
-      }
-
-      SistemYoneticisi().aktifSirket = secim['sirket'] as Sirket;
-      SistemYoneticisi().aktifKullaniciYetkileri = secim['yetki'] as PersonelYetki;
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (c) => const DashboardSayfasi()),
-        );
-      }
-
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Giriş Hatası: $e")));
     } finally {

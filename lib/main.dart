@@ -186,23 +186,78 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
 
         if (bulunanSirket == null) {
           var sirketSnap = await FirebaseFirestore.instance.collection('sirketler').get();
+          final Map<String, Map<String, dynamic>> eslesmeler = {};
 
           for (var doc in sirketSnap.docs) {
             Sirket s = Sirket.fromFirestore(doc);
             if (_normalizeEmail(s.yoneticiEposta) == email) {
-              bulunanSirket = s;
-              kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
-              break;
+              eslesmeler[s.id] = {
+                'sirket': s,
+                'yetki': PersonelYetki(email: email, adminMi: true),
+                'rol': 'Yönetici',
+              };
+            } else {
+              try {
+                var p = s.personelListesi.firstWhere(
+                  (element) => _normalizeEmail(element.email) == email,
+                );
+                eslesmeler.putIfAbsent(s.id, () => {
+                  'sirket': s,
+                  'yetki': p,
+                  'rol': 'Personel',
+                });
+              } catch (e) {
+                continue;
+              }
             }
-            try {
-              var p = s.personelListesi.firstWhere(
-                (element) => _normalizeEmail(element.email) == email,
-              );
-              bulunanSirket = s;
-              kullaniciYetkisi = p;
-              break;
-            } catch (e) {
-              continue;
+          }
+
+          if (eslesmeler.length == 1) {
+            final secim = eslesmeler.values.first;
+            bulunanSirket = secim['sirket'] as Sirket;
+            kullaniciYetkisi = secim['yetki'] as PersonelYetki;
+          } else if (eslesmeler.length > 1 && mounted) {
+            final result = await showDialog<Map<String, dynamic>>(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Şirket Seçin'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: eslesmeler.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final item = eslesmeler.values.elementAt(index);
+                      final Sirket s = item['sirket'] as Sirket;
+                      final String rol = item['rol'] as String;
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                          child: const Icon(Icons.business, color: Colors.blue),
+                        ),
+                        title: Text(s.ad),
+                        subtitle: Text(rol),
+                        onTap: () => Navigator.pop(ctx, item),
+                      );
+                    },
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('ÇIKIŞ YAP'),
+                  ),
+                ],
+              ),
+            );
+            if (result != null) {
+              bulunanSirket = result['sirket'] as Sirket;
+              kullaniciYetkisi = result['yetki'] as PersonelYetki;
+            } else {
+              await FirebaseAuth.instance.signOut();
+              return;
             }
           }
         }

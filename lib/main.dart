@@ -7,7 +7,6 @@ import 'firebase_options.dart';
 import 'services/payment_notification_service.dart';
 import 'theme/app_theme.dart';
 import 'payment_service.dart';
-import 'web_payment_service.dart';
 import 'screens/paywall_screen.dart';
 
 import 'project_core.dart';
@@ -293,51 +292,13 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
     final paymentService = PaymentService();
     await paymentService.initialize();
 
-    // Web ve Apple platformları için farklı ödeme akışı
-    if (kIsWeb) {
-      // Web: Zaten auth'lu kullanıcı - pending_payments ve users kontrol et
-      final user = FirebaseAuth.instance.currentUser;
-      final email = user?.email?.trim().toLowerCase() ?? '';
-      
-      final webPayment = WebPaymentService();
-      final subStatus = await webPayment.getSubscriptionStatus();
-      
-      // Ayrıca pending_payments koleksiyonunu da kontrol et
-      bool hasPendingPayment = false;
-      if (!(subStatus['active'] as bool) && email.isNotEmpty) {
-        final pendingStatus = await webPayment.checkPaymentByEmail(email);
-        hasPendingPayment = pendingStatus['active'] == true;
-      }
-
-      if (!(subStatus['active'] as bool) && !hasPendingPayment) {
-        if (mounted) {
-          final purchased = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (ctx) => PaywallScreen(email: email)),
-          );
-          if (purchased != true) return;
-        }
-      }
-    } else if (paymentService.isApplePaymentSupported) {
-      // iOS/macOS: Apple IAP ile ödeme
-      final subStatus = await paymentService.getSubscriptionStatus();
-
-      if (!(subStatus['active'] as bool)) {
-        if (mounted) {
-          final purchased = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
-          );
-          if (purchased != true) return;
-        }
-      }
-    } else {
+    if (!paymentService.isApplePaymentSupported) {
       if (mounted) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Platform Desteklenmiyor'),
-            content: const Text('Şirket oluşturma aboneliği bu platformda desteklenmiyor.'),
+            content: const Text('Şirket oluşturma aboneliği bu platformda desteklenmiyor. Lütfen iOS uygulamasını kullanın.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -348,6 +309,19 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
         );
       }
       return;
+    }
+
+    // Apple IAP ile ödeme
+    final subStatus = await paymentService.getSubscriptionStatus();
+
+    if (!(subStatus['active'] as bool)) {
+      if (mounted) {
+        final purchased = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+        );
+        if (purchased != true) return;
+      }
     }
 
     if (mounted) {

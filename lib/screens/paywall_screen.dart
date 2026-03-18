@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../theme/app_theme.dart';
 import '../payment_service.dart';
-import '../web_payment_service.dart';
 
 class PaywallScreen extends StatefulWidget {
-  /// [email] verilirse auth olmadan Stripe checkout yapılır (yeni kullanıcı akışı)
-  final String? email;
-  const PaywallScreen({super.key, this.email});
+  const PaywallScreen({super.key});
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -23,8 +18,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
   String _statusMessage = "";
   final Map<String, ProductDetails> _products = {};
 
-  bool get _isWeb => kIsWeb;
-
   @override
   void initState() {
     super.initState();
@@ -32,12 +25,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _prepareStore() async {
-    if (_isWeb) {
-      // Web: Stripe fiyatları statik, yükleme gerekmez
-      setState(() => _productsLoading = false);
-      return;
-    }
-
     final paymentService = PaymentService();
     await paymentService.initialize();
 
@@ -80,16 +67,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
     });
 
     try {
-      if (_isWeb) {
-        await _buySubscriptionWeb(planType);
-        return;
-      }
-
       final paymentService = PaymentService();
 
       if (!paymentService.isApplePaymentSupported) {
         setState(() {
-          _statusMessage = 'Bu sürümde ödeme yalnızca Apple App Store (iOS/macOS) üzerinden yapılabilir.';
+          _statusMessage = 'Bu sürümde ödeme yalnızca Apple App Store (İOS/macOS) üzerinden yapılabilir.';
         });
         return;
       }
@@ -136,108 +118,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     }
   }
 
-  Future<void> _buySubscriptionWeb(PlanType planType) async {
-    // Email: widget parametresinden veya auth'lu kullanıcıdan al
-    String? email = widget.email;
-    if (email == null || email.isEmpty) {
-      final user = FirebaseAuth.instance.currentUser;
-      email = user?.email;
-    }
-
-    // Hala email yoksa kullanıcıdan iste
-    if (email == null || email.isEmpty) {
-      email = await _askForEmail();
-      if (email == null || email.isEmpty) {
-        setState(() {
-          _loading = false;
-        });
-        return;
-      }
-    }
-
-    final webPayment = WebPaymentService();
-    final planTypeStr = planType == PlanType.yearly ? 'yearly' : 'monthly';
-
-    final started = await webPayment.startCheckout(planType: planTypeStr, email: email);
-
-    if (!mounted) return;
-
-    if (started) {
-      setState(() {
-        _statusMessage = "✅ Stripe ödeme sayfasına yönlendiriliyorsunuz... "
-            "Ödeme tamamlandıktan sonra bu sayfaya geri dönün.";
-        _loading = false;
-      });
-    } else {
-      setState(() {
-        _statusMessage = "❌ ${webPayment.lastError}";
-        _loading = false;
-      });
-    }
-  }
-
-  Future<String?> _askForEmail() async {
-    final emailCtrl = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('E-Posta Adresi'),
-        content: TextField(
-          controller: emailCtrl,
-          keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(
-            labelText: 'E-Posta',
-            hintText: 'ornek@email.com',
-            prefixIcon: const Icon(Icons.email_outlined),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('İPTAL'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final email = emailCtrl.text.trim();
-              if (email.isNotEmpty && email.contains('@')) {
-                Navigator.pop(ctx, email);
-              }
-            },
-            child: const Text('DEVAM'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _restorePurchases() async {
-    if (_isWeb) {
-      // Web: Firestore'dan ödeme durumunu kontrol et
-      setState(() {
-        _loading = true;
-        _statusMessage = '';
-      });
-      final webPayment = WebPaymentService();
-      final status = await webPayment.getSubscriptionStatus();
-      if (!mounted) return;
-      if (status['active'] == true) {
-        setState(() {
-          _loading = false;
-          _statusMessage = '✅ Aktif aboneliğiniz bulundu! Devam edebilirsiniz.';
-        });
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) Navigator.pop(context, true);
-        });
-      } else {
-        setState(() {
-          _loading = false;
-          _statusMessage = '❌ Aktif abonelik bulunamadı.';
-        });
-      }
-      return;
-    }
-
     final paymentService = PaymentService();
     setState(() {
       _loading = true;
@@ -256,10 +137,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   String _priceTextForPlan(PlanType planType) {
-    if (_isWeb) {
-      final key = planType == PlanType.yearly ? 'yearly' : 'monthly';
-      return WebPaymentService.webPlans[key]?['price'] as String? ?? '';
-    }
     final id = planType == PlanType.yearly
         ? PaymentService.yearlySubscriptionId
         : PaymentService.monthlySubscriptionId;
@@ -343,9 +220,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     Icon(Icons.verified_outlined, size: 16, color: AppTheme.primaryColor),
                     const SizedBox(width: 6),
                     Text(
-                      _isWeb
-                          ? 'Güvenli ödeme Stripe altyapısı ile yapılır'
-                          : 'Ödeme App Store üzerinden güvenli şekilde yapılır',
+                      'Ödeme App Store üzerinden güvenli şekilde yapılır',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppTheme.primaryColor,
                         fontWeight: FontWeight.w600,
@@ -464,18 +339,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
               TextButton(
                 onPressed: _loading ? null : _restorePurchases,
-                child: Text(_isWeb ? 'Ödeme Durumunu Kontrol Et' : 'Satın Alımları Geri Yükle'),
+                child: const Text('Satın Alımları Geri Yükle'),
               ),
 
               // Subscription Terms
               const SizedBox(height: 8),
               Text(
-                _isWeb
-                    ? "Abonelik, iptal edilmedikçe otomatik olarak yenilenir. "
-                      "Aboneliğinizi Stripe müşteri portalı üzerinden yönetebilir veya iptal edebilirsiniz."
-                    : "Abonelik, iptal edilmedikçe otomatik olarak yenilenir. "
-                      "Yenileme ücreti, mevcut dönem sona ermeden 24 saat önce hesabınızdan tahsil edilir. "
-                      "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
+                "Abonelik, iptal edilmedikçe otomatik olarak yenilenir. "
+                "Yenileme ücreti, mevcut dönem sona ermeden 24 saat önce hesabınızdan tahsil edilir. "
+                "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey.shade500,
                   fontSize: 11,
@@ -484,9 +356,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _isWeb
-                    ? "Ödeme Stripe üzerinden güvenli şekilde yapılır."
-                    : "Ödeme App Store üzerinden güvenli şekilde yapılır.",
+                "Ödeme App Store üzerinden güvenli şekilde yapılır.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey.shade500,
                 ),

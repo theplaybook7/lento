@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../project_core.dart'; 
 import '../notification_service.dart'; 
+import '../theme/app_theme.dart';
 
 // --------------------------------------------------------------------------
 // 1. ANA LİSTE EKRANI (FİLTRELEMELİ)
@@ -41,7 +42,7 @@ class IsTakipSayfasi extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(baslik), 
-        backgroundColor: Colors.blueGrey.shade900, 
+        backgroundColor: AppTheme.primaryColor, 
         foregroundColor: Colors.white,
         centerTitle: true,
       ),
@@ -333,7 +334,7 @@ class _ProjeDetayYonetimSayfasiState extends State<ProjeDetayYonetimSayfasi> wit
     return Scaffold(
       appBar: AppBar(
         title: Text("${widget.projeData['ilce']} / ${widget.projeData['ada']} / ${widget.projeData['parsel']}"),
-        backgroundColor: Colors.blueGrey.shade900, 
+        backgroundColor: AppTheme.primaryColor, 
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white, 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../project_core.dart';
+import '../theme/app_theme.dart';
 
 class CompanyFinanceDashboard extends StatefulWidget {
   final String companyId;
@@ -29,7 +30,7 @@ class _CompanyFinanceDashboardState extends State<CompanyFinanceDashboard> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Şirket Muhasebesi'),
-          backgroundColor: Colors.blueGrey.shade700,
+          backgroundColor: AppTheme.primaryColor,
           foregroundColor: Colors.white,
         ),
         body: Center(
@@ -55,7 +56,7 @@ class _CompanyFinanceDashboardState extends State<CompanyFinanceDashboard> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Şirket Muhasebesi'),
-        backgroundColor: Colors.blueGrey.shade700,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<Project>>(

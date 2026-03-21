@@ -360,29 +360,34 @@ class _PaywallScreenState extends State<PaywallScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  GestureDetector(
+                  InkWell(
                     onTap: () => launchUrl(Uri.parse('https://insaat-yonetim-takip.web.app/privacy.html'), mode: LaunchMode.externalApplication),
-                    child: Text(
-                      'Gizlilik Politikası',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primaryColor,
-                        decoration: TextDecoration.underline,
-                        fontSize: 12,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                      child: Text(
+                        'Gizlilik Politikası',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.primaryColor,
+                          decoration: TextDecoration.underline,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('|', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                  ),
-                  GestureDetector(
+                  Text('|', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                  InkWell(
                     onTap: () => launchUrl(Uri.parse('https://insaat-yonetim-takip.web.app/terms.html'), mode: LaunchMode.externalApplication),
-                    child: Text(
-                      'Kullanım Koşulları',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primaryColor,
-                        decoration: TextDecoration.underline,
-                        fontSize: 12,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                      child: Text(
+                        'Kullanım Koşulları',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.primaryColor,
+                          decoration: TextDecoration.underline,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ),

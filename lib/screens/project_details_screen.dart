@@ -366,7 +366,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 // Hızlı İşlemler Çubuğu
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  color: Colors.blueGrey.shade50,
+                  color: AppTheme.primaryColor.withValues(alpha: 0.05),
                   child: Row(
                     children: [
                       Expanded(
@@ -398,7 +398,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 // Proje Bilgileri
                 Container(
                   padding: const EdgeInsets.all(16),
-                  color: Colors.blueGrey.shade50,
+                  color: AppTheme.primaryColor.withValues(alpha: 0.05),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -594,7 +594,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Cari Ekle'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueGrey.shade700,
+                          backgroundColor: AppTheme.primaryColor,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -742,8 +742,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               Tab(text: 'İşlem Sırası'),
               Tab(text: 'Belgeler'),
             ],
-            indicatorColor: Colors.blueGrey.shade700,
-            labelColor: Colors.blueGrey.shade700,
+            indicatorColor: AppTheme.primaryColor,
+            labelColor: AppTheme.primaryColor,
           ),
           // Tab Content
           Expanded(
@@ -989,7 +989,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             icon: const Icon(Icons.upload_file),
             label: const Text('Belge Yükle'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueGrey.shade700,
+              backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
             ),
@@ -1046,7 +1046,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 Icon(
                   Icons.file_present,
                   size: 32,
-                  color: Colors.blueGrey.shade700,
+                  color: AppTheme.primaryColor,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1071,7 +1071,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildBelgeIslemButonu(Icons.preview, 'Önizle', Colors.blueGrey.shade700, () {
+                _buildBelgeIslemButonu(Icons.preview, 'Önizle', AppTheme.primaryColor, () {
                   _belgeOnizle(belge);
                 }),
                 _buildBelgeIslemButonu(Icons.download, 'İndir', Colors.green.shade700, () {
@@ -1262,7 +1262,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.blueGrey.shade700,
+                    color: AppTheme.primaryColor,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(4),
                       topRight: Radius.circular(4),
@@ -1402,11 +1402,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.file_present, size: 64, color: Colors.blueGrey.shade700),
+            Icon(Icons.file_present, size: 64, color: AppTheme.primaryColor),
             const SizedBox(height: 16),
             Text(
               'Bu dosya türü için önizleme yok',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.blueGrey.shade700),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryColor),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),

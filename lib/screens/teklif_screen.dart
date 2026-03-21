@@ -994,7 +994,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Planlama ve Dağıtım'),
-        backgroundColor: Colors.blueGrey.shade800,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         actions: [
           IconButton(onPressed: () => _kaydet('teklif'), icon: const Icon(Icons.save, color: Colors.white), tooltip: 'Taslak Kaydet'),
@@ -1356,7 +1356,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
                       child: ElevatedButton.icon(
                         onPressed: () => _kaydet('teklif'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueGrey.shade700,
+                          backgroundColor: AppTheme.primaryColor,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 15),
                         ),

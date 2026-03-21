@@ -129,14 +129,17 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(ikon, size: 18, color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7)),
+            Icon(ikon, size: 16, color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7)),
             const SizedBox(width: 4),
-            Text(
-              etiket,
-              style: TextStyle(
-                color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7),
-                fontWeight: aktif ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 12,
+            Flexible(
+              child: Text(
+                etiket,
+                style: TextStyle(
+                  color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7),
+                  fontWeight: aktif ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 12,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

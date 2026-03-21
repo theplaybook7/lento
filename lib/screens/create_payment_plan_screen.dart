@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
+import '../theme/app_theme.dart';
 
 class CreatePaymentPlanScreen extends StatefulWidget {
   final String projectId;
@@ -203,7 +204,7 @@ class _CreatePaymentPlanScreenState extends State<CreatePaymentPlanScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Yeni Ödeme Planı'),
-        backgroundColor: Colors.blueGrey.shade800,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
       ),
       body: Form(

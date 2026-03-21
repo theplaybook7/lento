@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart'; 
 import '../project_core.dart';
+import '../theme/app_theme.dart';
 import 'login_screen.dart';
 
 class AyarlarSayfasi extends StatefulWidget {
@@ -155,7 +156,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Ayarlar"), 
-        backgroundColor: Colors.blueGrey.shade900,
+        backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
       ),
       body: ListView(

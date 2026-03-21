@@ -681,20 +681,21 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.primaryColor.withValues(alpha: 0.1),
-              AppTheme.secondaryColor.withValues(alpha: 0.1),
-            ],
+      body: SafeArea(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primaryColor.withValues(alpha: 0.1),
+                AppTheme.secondaryColor.withValues(alpha: 0.1),
+              ],
+            ),
           ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(isMobile ? 20.0 : 40.0),
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(isMobile ? 20.0 : 40.0),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
@@ -868,6 +869,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

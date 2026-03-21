@@ -266,7 +266,7 @@ class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
         onPressed: () => _createNewPlan(),
         icon: const Icon(Icons.add),
         label: const Text('Yeni Ödeme Planı'),
-        backgroundColor: Colors.blueGrey.shade700,
+        backgroundColor: AppTheme.primaryColor,
       ),
     );
   }

@@ -53,24 +53,34 @@ class InsaatYonetimApp extends StatelessWidget {
       theme: AppTheme.lightTheme(),
       home: startupError != null
           ? StartupErrorScreen(error: startupError!)
-          : ValueListenableBuilder<bool>(
-        valueListenable: companyCreationInProgress,
-        builder: (context, creatingCompany, _) => StreamBuilder<User?>(
-          stream: FirebaseAuth.instance.authStateChanges(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(body: Center(child: CircularProgressIndicator()));
-            }
-            // Şirket kurma süreci devam ediyorsa login ekranında kal
-            if (creatingCompany) {
-              return const LoginSayfasi();
-            }
-            if (snapshot.hasData) {
-              return const VeriYuklemeEkrani(); 
-            }
+          : const AuthGate(),
+    );
+  }
+}
+
+/// Auth state'e göre LoginSayfasi veya VeriYuklemeEkrani gösteren wrapper.
+/// Hem MaterialApp home'da hem logout sonrası navigasyonda kullanılır.
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: companyCreationInProgress,
+      builder: (context, creatingCompany, _) => StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+          if (creatingCompany) {
             return const LoginSayfasi();
-          },
-        ),
+          }
+          if (snapshot.hasData) {
+            return const VeriYuklemeEkrani();
+          }
+          return const LoginSayfasi();
+        },
       ),
     );
   }

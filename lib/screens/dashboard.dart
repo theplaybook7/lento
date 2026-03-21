@@ -14,8 +14,8 @@ import 'project_archive_screen.dart';
 import 'company_finance_dashboard.dart';
 import 'cari_hesap_screen.dart';
 import 'settings_screen.dart';
-import 'login_screen.dart';
 import '../services/firebase_service.dart';
+import '../main.dart' show AuthGate;
 import '../utils/format_utils.dart' as format_utils;
 
 class DashboardSayfasi extends StatefulWidget {
@@ -39,7 +39,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user == null && mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginSayfasi()),
+          MaterialPageRoute(builder: (_) => const AuthGate()),
           (route) => false,
         );
       }

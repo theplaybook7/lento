@@ -38,6 +38,23 @@ service cloud.firestore {
       allow create: if hasActiveSubscription() && request.resource.data.odemePaid == true;
       allow read: if isAuthenticated() && userSirketId() == sirketId;
       allow write: if isAdmin() && userSirketId() == sirketId;
+
+      // Bildirimler alt koleksiyonu
+      match /bildirimler/{bildirimId} {
+        allow read, write: if isAuthenticated() && userSirketId() == sirketId;
+      }
+    }
+
+    // Cari Hesaplar
+    match /cari_hesaplar/{cariId} {
+      allow read: if isAuthenticated() && resource.data.sirketId == userSirketId();
+      allow create: if isAuthenticated() && request.resource.data.sirketId == userSirketId();
+      allow update, delete: if isAuthenticated() && resource.data.sirketId == userSirketId();
+
+      // Hareketler alt koleksiyonu
+      match /hareketler/{hareketId} {
+        allow read, write: if isAuthenticated();
+      }
     }
 
     // Projeler koleksiyonu

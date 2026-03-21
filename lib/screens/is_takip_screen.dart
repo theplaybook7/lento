@@ -21,7 +21,8 @@ class IsTakipSayfasi extends StatelessWidget {
   Widget build(BuildContext context) {
     String baslik = "Proje ve İş Takip";
     // FİLTRELEME SORGUSU
-    Query sorgu = FirebaseFirestore.instance.collection('teklifler');
+    final sirketId = SistemYoneticisi().aktifSirket?.id ?? '';
+    Query sorgu = FirebaseFirestore.instance.collection('teklifler').where('sirketId', isEqualTo: sirketId);
 
     if (acilisIndex == 0) {
       baslik = "Ruhsat Aşamasındaki İşler";
@@ -262,7 +263,9 @@ class IsTakipSayfasi extends StatelessWidget {
                   'katListesi': [], 
                   'moduller': ['ruhsat', 'santiye', 'muhasebe'], 
                   'yuzde': 0.0, 
-                  'sonIslem': 'Dosya Oluşturuldu'
+                  'sonIslem': 'Dosya Oluşturuldu',
+                  'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
+                  'sirket': SistemYoneticisi().aktifSirket?.ad ?? '',
                 });
                 
                 if(context.mounted) {

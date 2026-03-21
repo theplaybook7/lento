@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme/app_theme.dart';
+import '../project_core.dart';
 import 'teklif_screen.dart';
 
 class ArsivSayfasi extends StatelessWidget {
@@ -18,6 +19,7 @@ class ArsivSayfasi extends StatelessWidget {
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('teklifler')
+            .where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
             .orderBy('tarih', descending: true)
             .snapshots(),
         builder: (context, snapshot) {

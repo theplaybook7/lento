@@ -10,6 +10,7 @@ import '../services/firebase_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/image_utils.dart';
 import '../theme/app_theme.dart';
+import '../project_core.dart' show SistemYoneticisi;
 import '../web/web_utils.dart' as web_utils;
 
 class CariHesapScreen extends StatefulWidget {
@@ -56,7 +57,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
         ),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('cari_hesaplar').snapshots(),
+        stream: FirebaseFirestore.instance.collection('cari_hesaplar').where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text('Hata: ${snapshot.error}'));
@@ -372,6 +373,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
                   'projectId': '',
                   'projectIds': <String>[],
                   'olusturmaTarihi': FieldValue.serverTimestamp(),
+                  'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
                 });
 
                 if (context.mounted) {

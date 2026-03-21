@@ -290,12 +290,12 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
       );
 
   Widget _buildTeklifListesi() {
-    final sirketAdi = SistemYoneticisi().aktifSirket?.ad ?? '';
+    final sirketId = SistemYoneticisi().aktifSirket?.id ?? '';
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('teklifler')
-          .where('sirket', isEqualTo: sirketAdi)
+          .where('sirketId', isEqualTo: sirketId)
           .orderBy('tarih', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
@@ -601,6 +601,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
         'dukkanKrediLim': widget.dukkanKrediLim,
         'katListesi': widget.katListesi.map((k) => k.toMap()).toList(),
         'sirket': SistemYoneticisi().aktifSirket?.ad ?? '',
+        'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
         'durum': hedefDurum,
         'kaynak': 'teklif',
         'ruhsatAsama': '',

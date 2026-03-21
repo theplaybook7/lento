@@ -37,7 +37,39 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "sirket",
+          "fieldPath": "sirketId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tarih",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "teklifler",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sirketId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mevcutAsama",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "teklifler",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sirketId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "durum",
           "order": "ASCENDING"
         },
         {

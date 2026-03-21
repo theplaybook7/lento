@@ -556,6 +556,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                   'projectId': '',
                   'projectIds': <String>[],
                   'olusturmaTarihi': FieldValue.serverTimestamp(),
+                  'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
                 });
 
                 if (context.mounted) {
@@ -731,7 +732,7 @@ class _CarilerTabState extends State<_CarilerTab> {
         // Cari listesi
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('cari_hesaplar').snapshots(),
+            stream: FirebaseFirestore.instance.collection('cari_hesaplar').where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return Center(child: Text('Hata: ${snapshot.error}'));
@@ -1002,11 +1003,13 @@ class _TekliflerListesiState extends State<_TekliflerListesi> {
             stream: _durumFiltre == 'all'
                 ? FirebaseFirestore.instance
                     .collection('teklifler')
+                    .where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
                     .orderBy('tarih', descending: true)
                     .limit(50)
                     .snapshots()
                 : FirebaseFirestore.instance
                     .collection('teklifler')
+                    .where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
                     .where('durum', isEqualTo: _durumFiltre)
                     .orderBy('tarih', descending: true)
                     .limit(50)

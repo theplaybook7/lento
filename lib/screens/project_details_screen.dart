@@ -607,6 +607,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('cari_hesaplar')
+                      .where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
                       .snapshots(),
                   builder: (context, cariSnap) {
                     if (!cariSnap.hasData) {
@@ -2354,7 +2355,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 const SizedBox(height: 12),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('cari_hesaplar').snapshots(),
+                    stream: FirebaseFirestore.instance.collection('cari_hesaplar').where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
                         return const Center(child: CircularProgressIndicator());
@@ -2540,6 +2541,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   'projectId': widget.projectId,
                   'projectIds': [widget.projectId],
                   'olusturmaTarihi': FieldValue.serverTimestamp(),
+                  'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
                 });
 
                 if (context.mounted) {

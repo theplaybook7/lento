@@ -195,26 +195,30 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
           final Map<String, Map<String, dynamic>> eslesmeler = {};
 
           for (var doc in sirketSnap.docs) {
-            Sirket s = Sirket.fromFirestore(doc);
-            if (_normalizeEmail(s.yoneticiEposta) == email) {
-              eslesmeler[s.id] = {
-                'sirket': s,
-                'yetki': PersonelYetki(email: email, adminMi: true),
-                'rol': 'Yönetici',
-              };
-            } else {
-              try {
-                var p = s.personelListesi.firstWhere(
-                  (element) => _normalizeEmail(element.email) == email,
-                );
-                eslesmeler.putIfAbsent(s.id, () => {
+            try {
+              Sirket s = Sirket.fromFirestore(doc);
+              if (_normalizeEmail(s.yoneticiEposta) == email) {
+                eslesmeler[s.id] = {
                   'sirket': s,
-                  'yetki': p,
-                  'rol': 'Personel',
-                });
-              } catch (e) {
-                continue;
+                  'yetki': PersonelYetki(email: email, adminMi: true),
+                  'rol': 'Yönetici',
+                };
+              } else {
+                try {
+                  var p = s.personelListesi.firstWhere(
+                    (element) => _normalizeEmail(element.email) == email,
+                  );
+                  eslesmeler.putIfAbsent(s.id, () => {
+                    'sirket': s,
+                    'yetki': p,
+                    'rol': 'Personel',
+                  });
+                } catch (_) {
+                  continue;
+                }
               }
+            } catch (_) {
+              continue;
             }
           }
 

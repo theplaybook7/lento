@@ -166,27 +166,31 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
 
         final sirketId = userDoc.data()?['sirketId'] as String?;
         if (sirketId != null && sirketId.isNotEmpty) {
-          final sirketDoc = await FirebaseFirestore.instance
-              .collection('sirketler')
-              .doc(sirketId)
-              .get();
+          try {
+            final sirketDoc = await FirebaseFirestore.instance
+                .collection('sirketler')
+                .doc(sirketId)
+                .get();
 
-          if (sirketDoc.exists) {
-            final s = Sirket.fromFirestore(sirketDoc);
-            if (_normalizeEmail(s.yoneticiEposta) == email) {
-              bulunanSirket = s;
-              kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
-            } else {
-              try {
-                final p = s.personelListesi.firstWhere(
-                  (element) => _normalizeEmail(element.email) == email,
-                );
+            if (sirketDoc.exists) {
+              final s = Sirket.fromFirestore(sirketDoc);
+              if (_normalizeEmail(s.yoneticiEposta) == email) {
                 bulunanSirket = s;
-                kullaniciYetkisi = p;
-              } catch (e) {
-                // Bu şirkette yok
+                kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
+              } else {
+                try {
+                  final p = s.personelListesi.firstWhere(
+                    (element) => _normalizeEmail(element.email) == email,
+                  );
+                  bulunanSirket = s;
+                  kullaniciYetkisi = p;
+                } catch (_) {
+                  // Bu şirkette yok
+                }
               }
             }
+          } catch (_) {
+            // Bozuk şirket verisi, fallback taramaya devam et
           }
         }
 

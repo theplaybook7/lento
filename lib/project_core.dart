@@ -105,7 +105,12 @@ class Sirket {
   factory Sirket.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> m = doc.data() as Map<String, dynamic>;
     var pList = m['personelListesi'] as List<dynamic>? ?? [];
-    List<PersonelYetki> yetkiler = pList.map((e) => PersonelYetki.fromMap(e)).toList();
+    List<PersonelYetki> yetkiler = [];
+    for (var e in pList) {
+      if (e is Map<String, dynamic>) {
+        yetkiler.add(PersonelYetki.fromMap(e));
+      }
+    }
 
     return Sirket(
       id: doc.id,

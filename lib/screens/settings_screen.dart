@@ -5,7 +5,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
-import 'login_screen.dart';
 
 class SettingsSayfasi extends StatefulWidget {
   const SettingsSayfasi({super.key});
@@ -286,12 +285,10 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
     );
 
     if (confirm == true) {
+      SistemYoneticisi().temizle();
       await FirebaseAuth.instance.signOut();
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (c) => const LoginSayfasi()),
-        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     }
   }

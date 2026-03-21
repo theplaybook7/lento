@@ -142,6 +142,12 @@ class SistemYoneticisi {
   PersonelYetki? aktifKullaniciYetkileri;
   String? girisYapanEmail;
 
+  void temizle() {
+    aktifSirket = null;
+    aktifKullaniciYetkileri = null;
+    girisYapanEmail = null;
+  }
+
   bool yetkiVarMi(String modul) {
     if (aktifSirket != null && aktifSirket!.yoneticiEposta == girisYapanEmail) return true;
     if (aktifKullaniciYetkileri == null) return false;

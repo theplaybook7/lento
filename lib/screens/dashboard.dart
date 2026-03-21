@@ -133,12 +133,10 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
               icon: const Icon(Icons.logout),
               tooltip: 'Çıkış',
               onPressed: () async {
+                SistemYoneticisi().temizle();
                 await FirebaseAuth.instance.signOut();
                 if (!context.mounted) return;
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginSayfasi()),
-                  (route) => false,
-                );
+                Navigator.of(context).popUntil((route) => route.isFirst);
               },
             ),
           ] else
@@ -151,12 +149,10 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
                   );
                 } else if (value == 'logout') {
+                  SistemYoneticisi().temizle();
                   await FirebaseAuth.instance.signOut();
                   if (!context.mounted) return;
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const LoginSayfasi()),
-                    (route) => false,
-                  );
+                  Navigator.of(context).popUntil((route) => route.isFirst);
                 }
               },
               itemBuilder: (context) => const [
@@ -259,12 +255,10 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                       title: const Text('Çıkış'),
                       onTap: () async {
                         Navigator.pop(context);
+                        SistemYoneticisi().temizle();
                         await FirebaseAuth.instance.signOut();
                         if (!context.mounted) return;
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (context) => const LoginSayfasi()),
-                          (route) => false,
-                        );
+                        Navigator.of(context).popUntil((route) => route.isFirst);
                       },
                     ),
                   ],

@@ -149,6 +149,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
     if (user != null) {
       final email = _normalizeEmail(user.email ?? '');
       if (email.isEmpty) {
+        SistemYoneticisi().temizle();
         await FirebaseAuth.instance.signOut();
         return;
       }
@@ -270,6 +271,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
               bulunanSirket = result['sirket'] as Sirket;
               kullaniciYetkisi = result['yetki'] as PersonelYetki;
             } else {
+              SistemYoneticisi().temizle();
               await FirebaseAuth.instance.signOut();
               return;
             }
@@ -300,6 +302,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   }
 
   Future<void> _cikisYap() async {
+    SistemYoneticisi().temizle();
     await FirebaseAuth.instance.signOut();
   }
 

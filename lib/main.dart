@@ -155,11 +155,11 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   }
 
   Future<void> _sirketVerisiniYukle() async {
+    // Yeni giriş yapıldı, flag'i sıfırla
+    SistemYoneticisi().cikisYapiliyor = false;
+    
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      // Çıkış yapılıyorsa tekrar yükleme yapma
-      if (SistemYoneticisi().cikisYapiliyor) return;
-      
       final email = _normalizeEmail(user.email ?? '');
       if (email.isEmpty) {
         SistemYoneticisi().temizle();
@@ -168,7 +168,6 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
       }
 
       SistemYoneticisi().girisYapanEmail = email;
-      SistemYoneticisi().cikisYapiliyor = false;
 
       try {
         Sirket? bulunanSirket;

@@ -54,6 +54,9 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
 
   @override
   Widget build(BuildContext context) {
+    if (SistemYoneticisi().cikisYapiliyor) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final sistem = SistemYoneticisi();
     final canTeklif = sistem.yetkiVarMi('teklif');
     final canMuhasebe = sistem.yetkiVarMi('muhasebe');

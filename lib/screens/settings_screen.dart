@@ -285,11 +285,9 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
     );
 
     if (confirm == true) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
       SistemYoneticisi().temizle();
       await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
     }
   }
 

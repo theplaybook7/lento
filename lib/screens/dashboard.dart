@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,7 +14,6 @@ import 'project_archive_screen.dart';
 import 'company_finance_dashboard.dart';
 import 'cari_hesap_screen.dart';
 import 'settings_screen.dart';
-import 'login_screen.dart';
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart' as format_utils;
 
@@ -29,11 +29,23 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
   final GlobalKey _notificationKey = GlobalKey();
 
   late String _companyId;
+  StreamSubscription<User?>? _authSub;
 
   @override
   void initState() {
     super.initState();
     _companyId = SistemYoneticisi().aktifSirket?.id ?? 'default';
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user == null && mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -133,7 +145,6 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
               icon: const Icon(Icons.logout),
               tooltip: 'Çıkış',
               onPressed: () async {
-                Navigator.of(context).popUntil((route) => route.isFirst);
                 SistemYoneticisi().temizle();
                 await FirebaseAuth.instance.signOut();
               },
@@ -148,7 +159,6 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
                   );
                 } else if (value == 'logout') {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
                   SistemYoneticisi().temizle();
                   await FirebaseAuth.instance.signOut();
                 }
@@ -253,7 +263,6 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                       title: const Text('Çıkış'),
                       onTap: () async {
                         Navigator.pop(context);
-                        Navigator.of(context).popUntil((route) => route.isFirst);
                         SistemYoneticisi().temizle();
                         await FirebaseAuth.instance.signOut();
                       },
@@ -726,6 +735,7 @@ class _CarilerTabState extends State<_CarilerTab> {
             stream: FirebaseFirestore.instance.collection('cari_hesaplar').where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
+                if (SistemYoneticisi().cikisYapiliyor) return const SizedBox.shrink();
                 return Center(child: Text('Hata: ${snapshot.error}'));
               }
               if (!snapshot.hasData) {
@@ -1007,6 +1017,7 @@ class _TekliflerListesiState extends State<_TekliflerListesi> {
                     .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.hasError) {
+                if (SistemYoneticisi().cikisYapiliyor) return const SizedBox.shrink();
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
@@ -1150,6 +1161,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
         }
 
         if (snapshot.hasError) {
+          if (SistemYoneticisi().cikisYapiliyor) return const SizedBox.shrink();
           return Center(
             child: Text('Hata: ${snapshot.error}'),
           );

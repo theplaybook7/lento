@@ -1248,7 +1248,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                     // ProjectId boş ise proje seç
                     if (projectId.isEmpty) {
                       if (!mounted) return;
-                      final projects = await FirebaseFirestore.instance.collection('projects').get();
+                      final projects = await FirebaseFirestore.instance.collection('projects').where('companyId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').get();
                       if (projects.docs.isNotEmpty && mounted) {
                         final selected = await showDialog<Map<String, String>>(
                           context: context,
@@ -1302,6 +1302,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           'paraBirimi': paraBirimi,
                           'orijinalTutar': tutar,
                           'kur': kur,
+                          'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
                         });
                         giderId = giderDoc.id;
                         
@@ -1333,6 +1334,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           'paraBirimi': paraBirimi,
                           'orijinalTutar': tutar,
                           'kur': kur,
+                          'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
                         });
                         giderId = gelirDoc.id;
                         
@@ -1773,6 +1775,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                         'paraBirimi': paraBirimi,
                         'orijinalTutar': tutar,
                         'kur': kur,
+                        'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
                       });
                       yeniGiderId = giderDoc.id;
                     }
@@ -2174,7 +2177,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
       );
     }
   }  Future<void> _projeSec() async {
-    final projects = await FirebaseFirestore.instance.collection('projects').get();
+    final projects = await FirebaseFirestore.instance.collection('projects').where('companyId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').get();
     
     if (!mounted) return;
     

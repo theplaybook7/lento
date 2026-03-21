@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import '../project_core.dart';
 import '../theme/app_theme.dart';
 import '../payment_service.dart';
 import '../main.dart' show companyCreationInProgress;
@@ -597,34 +596,8 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                       });
 
                       try {
-                        // ÖNCELİKLE: Şirkette bu email'e sahip personel var mı kontrol et
-                        var sirketSnap = await FirebaseFirestore.instance.collection('sirketler').get();
-                        bool bulundu = false;
-
-                        for (var doc in sirketSnap.docs) {
-                          Sirket s = Sirket.fromFirestore(doc);
-                          try {
-                            s.personelListesi.firstWhere(
-                              (p) => _normalizeEmail(p.email) == _normalizeEmail(emailCtrl.text),
-                            );
-                            bulundu = true;
-                            break;
-                          } catch (e) {
-                            // Bu şirkette yok
-                          }
-                        }
-
-                        // Email personel listesinde yoksa kayıt yapma
-                        if (!bulundu) {
-                          setDialogState(() {
-                            kayitLoading = false;
-                            hataMetni = "Bu email adresi henüz hiçbir şirkete personel olarak eklenmemiş. "
-                                "Lütfen yöneticinizin sizi önce personel olarak eklemesini sağlayın.";
-                          });
-                          return;
-                        }
-
-                        // Email personel listesinde varsa Firebase Auth'ta kullanıcı oluştur
+                        // Firebase Auth'ta kullanıcı oluştur
+                        // Giriş sonrası VeriYuklemeEkrani şirket eşleşmesini kontrol edecek
                         await FirebaseAuth.instance.createUserWithEmailAndPassword(
                           email: emailCtrl.text.trim(),
                           password: passCtrl.text.trim(),

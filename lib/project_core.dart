@@ -141,8 +141,10 @@ class SistemYoneticisi {
   Sirket? aktifSirket;
   PersonelYetki? aktifKullaniciYetkileri;
   String? girisYapanEmail;
+  bool cikisYapiliyor = false;
 
   void temizle() {
+    cikisYapiliyor = true;
     aktifSirket = null;
     aktifKullaniciYetkileri = null;
     girisYapanEmail = null;

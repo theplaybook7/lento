@@ -710,13 +710,17 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
       });
 
       // Loading dialog'ı göster
+      BuildContext? loadingDialogContext;
       if (mounted) {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (ctx) => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          builder: (ctx) {
+            loadingDialogContext = ctx;
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          },
         );
       }
 
@@ -726,12 +730,13 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           installmentId: installment.id,
           paymentPlanId: widget.paymentPlanId,
           projectId: installment.projectId,
-          paidAmount: paidAmount,
+          paidAmount: tlTutar,
           photoUrls: photoUrls,
         );
 
-        if (mounted) {
-          Navigator.pop(context); // Loading dialog kapat
+        // Loading dialog kapat
+        if (loadingDialogContext != null && mounted) {
+          Navigator.of(loadingDialogContext!).pop();
         }
 
         // Mevcut taksit için toplam ödenen hesapla
@@ -748,7 +753,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
 
         final fazlaTutar = totalPaidForInstallment - installment.amount;
 
-        if (fazlaTutar > 0 && mounted) {
+        if (fazlaTutar > 0.01 && mounted) {
           // Sonraki ödenmemiş taksitleri bul
           final sonrakiTaksitler = allInstallments
               .where((t) => t.installmentNumber > installment.installmentNumber && !t.isPaid)
@@ -796,7 +801,9 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
       } catch (e) {
         if (mounted) {
           // Loading dialog açıksa kapat
-          try { Navigator.pop(context); } catch (_) {}
+          if (loadingDialogContext != null) {
+            try { Navigator.of(loadingDialogContext!).pop(); } catch (_) {}
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Firebase hatası: $e')),
           );

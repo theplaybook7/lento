@@ -452,43 +452,16 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-          final bakiye = (data['bakiye'] ?? 0.0) as double;
+          final globalBakiye = (data['bakiye'] ?? 0.0) as double;
           final telefon = data['telefon'] ?? '';
           final email = data['email'] ?? '';
           final adres = data['adres'] ?? '';
 
           return Column(
             children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: bakiye >= 0
-                        ? [Colors.green.shade600, Colors.green.shade400]
-                        : [Colors.red.shade600, Colors.red.shade400],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      bakiye == 0 ? 'Dengede' : (bakiye > 0 ? 'Alacak' : 'Borç'),
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      formatTL(bakiye.abs()),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // Bakiye kartı: projectId yoksa global bakiye göster, varsa hareketlerden hesaplanacak
+              if (widget.projectId == null)
+                _bakiyeKart(globalBakiye),
               if (telefon.isNotEmpty || email.isNotEmpty || adres.isNotEmpty)
                 Container(
                   width: double.infinity,
@@ -656,7 +629,16 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                     }
                     final genelNet = genelToplamAlacak - genelToplamBorc;
 
-                    return ListView.builder(
+                    // Proje içinden açıldıysa bakiye kartını burada göster
+                    final projeBakiyeKart = widget.projectId != null
+                        ? _bakiyeKart(genelNet)
+                        : const SizedBox.shrink();
+
+                    return Column(
+                      children: [
+                        if (widget.projectId != null) projeBakiyeKart,
+                        Expanded(
+                          child: ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: projeGruplari.length + 1, // +1 for summary card
                       itemBuilder: (context, index) {
@@ -775,6 +757,9 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           ),
                         );
                       },
+                    ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -782,6 +767,39 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _bakiyeKart(double bakiye) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: bakiye >= 0
+              ? [Colors.green.shade600, Colors.green.shade400]
+              : [Colors.red.shade600, Colors.red.shade400],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            bakiye == 0 ? 'Dengede' : (bakiye > 0 ? 'Alacak' : 'Borç'),
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            formatTL(bakiye.abs()),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

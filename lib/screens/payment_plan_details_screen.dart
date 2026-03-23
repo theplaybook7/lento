@@ -672,8 +672,6 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
     // Daha önceden hesaplanmış TL tutarını kullan
     final tlTutar = calculatedTlAmount;
     final finalCurrency = selectedCurrencyForSaving;
-    
-    print('DEBUG SAVE: paidAmount=$paidAmount, currency=$finalCurrency, tlTutar=$tlTutar');
 
     try {
       final List<String> photoUrls = [];
@@ -683,33 +681,65 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
         for (var i = 0; i < selectedImages.length; i++) {
           final fileName = 'payment_${installment.id}_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
           final storageRef = FirebaseService().getStorageRef('payment_proofs/$fileName');
-          
-          // Resmi sıkıştır
           final compressedList = await compressImage(selectedImages[i]);
           final compressedBytes = Uint8List.fromList(compressedList);
-          
           await storageRef.putData(compressedBytes);
-          
           final url = await storageRef.getDownloadURL();
           photoUrls.add(url);
         }
       }
 
-      // Ödeme kaydını payment_records subcollection'a ekle
-      final newRecordRef = await FirebaseFirestore.instance
+      // Mevcut taksit için önceden ödenen tutarı hesapla
+      final existingRecords = await FirebaseFirestore.instance
           .collection('payment_installments')
           .doc(installment.id)
           .collection('payment_records')
-          .add({
-        'paidAmount': paidAmount,
-        'currency': finalCurrency,
-        'tlAmount': tlTutar,
-        'createdAt': selectedDate,
-        'photoUrls': photoUrls,
-        'notes': '',
-      });
+          .get();
+      double alreadyPaidForInstallment = 0;
+      for (var r in existingRecords.docs) {
+        final d = r.data();
+        alreadyPaidForInstallment += ((d['tlAmount'] ?? d['paidAmount'] ?? 0) as num).toDouble();
+      }
 
-      // Loading dialog'ı göster
+      final kalanTaksitTutari = installment.amount - alreadyPaidForInstallment;
+      final fazlaTutar = tlTutar - kalanTaksitTutari;
+
+      // Fazla ödeme var mı kontrol et (kaydetmeden ÖNCE)
+      bool transferKabul = false;
+      if (fazlaTutar > 0.01 && kalanTaksitTutari > 0 && mounted) {
+        final sonrakiTaksitler = allInstallments
+            .where((t) => t.installmentNumber > installment.installmentNumber && !t.isPaid)
+            .toList()
+          ..sort((a, b) => a.installmentNumber.compareTo(b.installmentNumber));
+
+        if (sonrakiTaksitler.isNotEmpty) {
+          final transferResult = await showDialog<bool>(
+            context: context,
+            builder: (c) => AlertDialog(
+              title: const Text('Fazla Ödeme'),
+              content: Text(
+                'Bu taksit için kalan: ₺${NumberFormat('#,##0.00', 'tr_TR').format(kalanTaksitTutari)}\n'
+                'Girilen ödeme: ₺${NumberFormat('#,##0.00', 'tr_TR').format(tlTutar)}\n'
+                'Fazla: ₺${NumberFormat('#,##0.00', 'tr_TR').format(fazlaTutar)}\n\n'
+                'Fazla tutar sonraki taksit(ler)e aktarılsın mı?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(c, false),
+                  child: const Text('Hayır, Tümünü Bu Taksitte Tut'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(c, true),
+                  child: const Text('Evet, Aktar'),
+                ),
+              ],
+            ),
+          );
+          transferKabul = transferResult == true;
+        }
+      }
+
+      // Loading dialog
       BuildContext? loadingDialogContext;
       if (mounted) {
         showDialog(
@@ -717,15 +747,64 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           barrierDismissible: false,
           builder: (ctx) {
             loadingDialogContext = ctx;
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           },
         );
       }
 
-      // Taksit bilgilerini güncelle
-      try {
+      if (transferKabul && fazlaTutar > 0.01) {
+        // Bu taksit için sadece kalan tutarı kaydet
+        final buTaksitIcinTutar = kalanTaksitTutari > 0 ? kalanTaksitTutari : 0.0;
+
+        if (buTaksitIcinTutar > 0) {
+          await FirebaseFirestore.instance
+              .collection('payment_installments')
+              .doc(installment.id)
+              .collection('payment_records')
+              .add({
+            'paidAmount': paidAmount,
+            'currency': finalCurrency,
+            'tlAmount': buTaksitIcinTutar,
+            'createdAt': selectedDate,
+            'photoUrls': photoUrls,
+            'notes': 'Orijinal: ₺${NumberFormat('#,##0.00', 'tr_TR').format(tlTutar)} — ₺${NumberFormat('#,##0.00', 'tr_TR').format(fazlaTutar)} sonraki taksitlere aktarıldı',
+          });
+
+          await _firebase.markInstallmentAsPaid(
+            installmentId: installment.id,
+            paymentPlanId: widget.paymentPlanId,
+            projectId: installment.projectId,
+            paidAmount: buTaksitIcinTutar,
+            photoUrls: photoUrls,
+          );
+        }
+
+        // Fazla tutarı sonraki taksitlere aktar
+        final sonrakiTaksitler = allInstallments
+            .where((t) => t.installmentNumber > installment.installmentNumber && !t.isPaid)
+            .toList()
+          ..sort((a, b) => a.installmentNumber.compareTo(b.installmentNumber));
+
+        await _transferExcessToNextInstallments(
+          fazlaTutar: fazlaTutar,
+          sonrakiTaksitler: sonrakiTaksitler,
+          selectedDate: selectedDate,
+        );
+      } else {
+        // Normal kaydet — tüm tutarı bu taksitte tut
+        await FirebaseFirestore.instance
+            .collection('payment_installments')
+            .doc(installment.id)
+            .collection('payment_records')
+            .add({
+          'paidAmount': paidAmount,
+          'currency': finalCurrency,
+          'tlAmount': tlTutar,
+          'createdAt': selectedDate,
+          'photoUrls': photoUrls,
+          'notes': '',
+        });
+
         await _firebase.markInstallmentAsPaid(
           installmentId: installment.id,
           paymentPlanId: widget.paymentPlanId,
@@ -733,103 +812,24 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           paidAmount: tlTutar,
           photoUrls: photoUrls,
         );
+      }
 
-        // Loading dialog kapat
-        if (loadingDialogContext != null && mounted) {
-          Navigator.of(loadingDialogContext!).pop();
-        }
+      // Loading dialog kapat
+      if (loadingDialogContext != null && mounted) {
+        Navigator.of(loadingDialogContext!).pop();
+      }
 
-        // Mevcut taksit için toplam ödenen hesapla
-        final existingRecords = await FirebaseFirestore.instance
-            .collection('payment_installments')
-            .doc(installment.id)
-            .collection('payment_records')
-            .get();
-        double totalPaidForInstallment = 0;
-        for (var r in existingRecords.docs) {
-          final d = r.data();
-          totalPaidForInstallment += ((d['tlAmount'] ?? d['paidAmount'] ?? 0) as num).toDouble();
-        }
-
-        final fazlaTutar = totalPaidForInstallment - installment.amount;
-
-        if (fazlaTutar > 0.01 && mounted) {
-          // Sonraki ödenmemiş taksitleri bul
-          final sonrakiTaksitler = allInstallments
-              .where((t) => t.installmentNumber > installment.installmentNumber && !t.isPaid)
-              .toList()
-            ..sort((a, b) => a.installmentNumber.compareTo(b.installmentNumber));
-
-          if (sonrakiTaksitler.isNotEmpty) {
-            final transferResult = await showDialog<bool>(
-              context: context,
-              builder: (c) => AlertDialog(
-                title: const Text('Fazla Ödeme'),
-                content: Text(
-                  'Bu taksit için ₺${NumberFormat('#,##0.00', 'tr_TR').format(fazlaTutar)} fazla ödeme yapıldı.\n\n'
-                  'Fazla tutar sonraki taksit(ler)e aktarılsın mı?',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(c, false),
-                    child: const Text('Hayır'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(c, true),
-                    child: const Text('Evet, Aktar'),
-                  ),
-                ],
-              ),
-            );
-
-            if (transferResult == true && mounted) {
-              // Orijinal ödeme kaydının TL tutarını taksit tutarıyla sınırla
-              // (fazla kısım transfer kayıtlarıyla aktarılacak)
-              final cappedTlAmount = installment.amount;
-              await FirebaseFirestore.instance
-                  .collection('payment_installments')
-                  .doc(installment.id)
-                  .collection('payment_records')
-                  .doc(newRecordRef.id)
-                  .update({
-                'tlAmount': cappedTlAmount,
-                'notes': 'Orijinal: ₺${NumberFormat('#,##0.00', 'tr_TR').format(tlTutar)} — ₺${NumberFormat('#,##0.00', 'tr_TR').format(fazlaTutar)} sonraki taksitlere aktarıldı',
-              });
-
-              await _transferExcessToNextInstallments(
-                fazlaTutar: fazlaTutar,
-                sonrakiTaksitler: sonrakiTaksitler,
-                selectedDate: selectedDate,
-              );
-
-              // Bu taksitin toplamlarını da yeniden hesapla
-              await _firebase.markInstallmentAsPaid(
-                installmentId: installment.id,
-                paymentPlanId: widget.paymentPlanId,
-                projectId: installment.projectId,
-                paidAmount: cappedTlAmount,
-                photoUrls: photoUrls,
-              );
-            }
-          }
-        }
-
-        if (mounted) {
-          setState(() {});
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${tlTutar.toStringAsFixed(2)} ₺ ödeme kaydedildi')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          // Loading dialog açıksa kapat
-          if (loadingDialogContext != null) {
-            try { Navigator.of(loadingDialogContext!).pop(); } catch (_) {}
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Firebase hatası: $e')),
-          );
-        }
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${tlTutar.toStringAsFixed(2)} ₺ ödeme kaydedildi')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

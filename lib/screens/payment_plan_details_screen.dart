@@ -283,35 +283,34 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                                     subtitle: date != null
                                         ? Text(DateFormat('dd.MM.yyyy HH:mm').format(date.toDate()))
                                         : null,
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (photos.isNotEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.only(right: 8),
-                                            child: Icon(Icons.image, color: Colors.blue.shade400, size: 18),
+                                    trailing: photos.isNotEmpty
+                                        ? Icon(Icons.image, color: Colors.blue.shade400, size: 18)
+                                        : null,
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(20),
+                                        onTap: () => _editPaymentRecord(inst, paymentRecords[idx].id, record),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.shade50,
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: Colors.orange.shade300),
                                           ),
-                                        InkWell(
-                                          borderRadius: BorderRadius.circular(20),
-                                          onTap: () => _editPaymentRecord(inst, paymentRecords[idx].id, record),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.orange.shade50,
-                                              borderRadius: BorderRadius.circular(20),
-                                              border: Border.all(color: Colors.orange.shade300),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.edit, color: Colors.orange.shade700, size: 16),
-                                                const SizedBox(width: 4),
-                                                Text('Düzenle', style: TextStyle(color: Colors.orange.shade700, fontSize: 12, fontWeight: FontWeight.w600)),
-                                              ],
-                                            ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.edit, color: Colors.orange.shade700, size: 16),
+                                              const SizedBox(width: 4),
+                                              Text('Düzenle', style: TextStyle(color: Colors.orange.shade700, fontSize: 12, fontWeight: FontWeight.w600)),
+                                            ],
                                           ),
                                         ),
-                                      ],
+                                      ),
                                     ),
                                   ),
                                   if (photos.isNotEmpty)

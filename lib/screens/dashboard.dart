@@ -846,7 +846,7 @@ class _CarilerTabState extends State<_CarilerTab> {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(
-                                  bakiye == 0 ? 'Dengede' : (alacak ? 'Alacak' : 'Borç'),
+                                  bakiye == 0 ? 'Dengede' : (alacak ? 'Alınan' : 'Ödenen'),
                                   style: TextStyle(
                                     color: bakiye == 0 ? Colors.grey : renk,
                                     fontSize: 11,

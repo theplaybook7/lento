@@ -689,7 +689,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                 ),
                                 title: Text(ad, style: const TextStyle(fontWeight: FontWeight.bold)),
                                 subtitle: Text(
-                                  bakiye == 0 ? 'Dengede' : (bakiye > 0 ? 'Alacak' : 'Borç'),
+                                  bakiye == 0 ? 'Dengede' : (bakiye > 0 ? 'Alınan' : 'Ödenen'),
                                   style: TextStyle(color: renk, fontSize: 12),
                                 ),
                                 trailing: Text(

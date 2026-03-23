@@ -246,7 +246,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    bakiye == 0 ? 'Dengede' : (alacak ? 'Alacak' : 'Borç'),
+                    bakiye == 0 ? 'Dengede' : (alacak ? 'Alınan' : 'Ödenen'),
                     style: TextStyle(
                       color: bakiye == 0 ? Colors.grey : renk,
                       fontSize: 11,
@@ -658,14 +658,14 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                                     children: [
                                       Column(
                                         children: [
-                                          const Text('Toplam Borç', style: TextStyle(color: Colors.red, fontSize: 12)),
+                                          const Text('Toplam Ödenen', style: TextStyle(color: Colors.red, fontSize: 12)),
                                           const SizedBox(height: 4),
                                           Text(formatTL(genelToplamBorc), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
                                         ],
                                       ),
                                       Column(
                                         children: [
-                                          const Text('Toplam Alacak', style: TextStyle(color: Colors.green, fontSize: 12)),
+                                          const Text('Toplam Alınan', style: TextStyle(color: Colors.green, fontSize: 12)),
                                           const SizedBox(height: 4),
                                           Text(formatTL(genelToplamAlacak), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 15)),
                                         ],
@@ -734,12 +734,12 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                               children: [
                                 if (toplamBorc > 0)
                                   Text(
-                                    'Borç: ${formatTL(toplamBorc)}',
+                                    'Ödenen: ${formatTL(toplamBorc)}',
                                     style: const TextStyle(color: Colors.red, fontSize: 11),
                                   ),
                                 if (toplamAlacak > 0)
                                   Text(
-                                    'Alacak: ${formatTL(toplamAlacak)}',
+                                    'Alınan: ${formatTL(toplamAlacak)}',
                                     style: const TextStyle(color: Colors.green, fontSize: 11),
                                   ),
                                 const SizedBox(height: 2),
@@ -787,7 +787,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
       child: Column(
         children: [
           Text(
-            bakiye == 0 ? 'Dengede' : (bakiye > 0 ? 'Alacak' : 'Borç'),
+            bakiye == 0 ? 'Dengede' : (bakiye > 0 ? 'Alınan' : 'Ödenen'),
             style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
           const SizedBox(height: 8),

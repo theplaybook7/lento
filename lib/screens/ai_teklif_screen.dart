@@ -8,6 +8,7 @@ import '../project_core.dart';
 import '../theme/app_theme.dart';
 import '../services/ai_teklif_service.dart';
 import '../services/tcmb_service.dart';
+import '../services/emlak_data_service.dart';
 import '../services/ai_teklif_pdf_service.dart' as ai_pdf;
 
 String _formatN(double n) {
@@ -69,7 +70,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
 
   // Step 5: AI tahminleri
   Map<String, dynamic>? _enflasyonProjeksiyonu;
-
+  Map<String, double>? _minMaxFiyat;
+  String? _pazarAnaliziMetni;
   Map<String, dynamic>? _hesapSonucu;
   String? _aiOzet;
 
@@ -156,15 +158,32 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     }
   }
 
-  void _hesaplaVeAnaliz() {
+  Future<void> _hesaplaVeAnaliz() async {
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = 'TCMB verileri alınıyor...';
+    });
+
     try {
+      // TCMB verisi çekmeyi dene
+      await _aiService.verileriGuncelle();
+
+      setState(() => _loadingMessage = 'İstatistiksel analiz yapılıyor...');
+
       // 1. Enflasyon projeksiyonu
       final projeksiyon = _aiService.enflasyonProjeksiyonu(
         guncelMaliyet: _parseN(_guncelMaliyetCtrl.text),
         toplamM2: _parseN(_toplamM2Ctrl.text),
       );
 
-      // 2. Daire listesini hazırla
+      // 2. Min/Max fiyat önerisi
+      final minMax = _aiService.minMaxFiyatOnerisi(
+        guncelMaliyet: _parseN(_guncelMaliyetCtrl.text),
+        toplamM2: _parseN(_toplamM2Ctrl.text),
+        karOrani: _parseN(_karOraniCtrl.text),
+      );
+
+      // 3. Daire listesini hazırla
       final daireListesi = _daireler.map((d) => {
         'm2': _parseN((d['m2Ctrl'] as TextEditingController).text),
         'kat': d['kat'] as int,
@@ -174,6 +193,17 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         'krediVar': d['krediVar'] as bool,
       }).toList();
 
+      // 4. Pazar analizi
+      setState(() => _loadingMessage = 'Pazar verileri analiz ediliyor...');
+      final pazarMetni = _aiService.pazarAnalizi(
+        il: _ilCtrl.text.trim(),
+        ilce: _ilceCtrl.text.trim(),
+        mahalle: _mahalleCtrl.text.trim(),
+        insaatSuresi: _hesaplananSure,
+        daireler: daireListesi,
+      );
+
+      // 5. Senaryo hesapla
       Map<String, dynamic> sonuc;
 
       if (_senaryo == 2) {
@@ -185,6 +215,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           hibeTutari: _parseN(_hibeTutariCtrl.text),
           krediTutari: _parseN(_krediTutariCtrl.text),
           il: _ilCtrl.text.trim(),
+          ilce: _ilceCtrl.text.trim(),
           insaatSuresi: _hesaplananSure,
         );
       } else {
@@ -198,10 +229,12 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         );
       }
 
-      // 3. Özet rapor
+      // 6. Özet rapor
       final ozet = _aiService.teklifOzetiOlustur(sonuc);
       setState(() {
         _enflasyonProjeksiyonu = projeksiyon;
+        _minMaxFiyat = minMax;
+        _pazarAnaliziMetni = pazarMetni;
         _hesapSonucu = sonuc;
         _aiOzet = ozet;
         _currentStep = 4;
@@ -212,6 +245,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           SnackBar(content: Text('Hata: $e')),
         );
       }
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -273,6 +308,11 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'TCMB API Ayarları',
+            onPressed: _tcmbApiKeyDialog,
+          ),
           IconButton(
             icon: Icon(_showSavedList ? Icons.calculate : Icons.list),
             tooltip: _showSavedList ? 'Yeni Teklif' : 'Kayıtlı Teklifler',
@@ -402,6 +442,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                     _hesapSonucu = null;
                     _aiOzet = null;
                     _enflasyonProjeksiyonu = null;
+                    _minMaxFiyat = null;
+                    _pazarAnaliziMetni = null;
                   }),
                   child: const Text('Yeni Teklif'),
                 ),
@@ -955,48 +997,132 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Enflasyon bilgisi
+          // Veri kaynağı göstergesi
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _aiService.veriKaynagi.contains('canlı')
+                  ? Colors.green.shade50
+                  : Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _aiService.veriKaynagi.contains('canlı')
+                    ? Colors.green.shade300
+                    : Colors.amber.shade300,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _aiService.veriKaynagi.contains('canlı') ? Icons.cloud_done : Icons.storage,
+                  size: 16,
+                  color: _aiService.veriKaynagi.contains('canlı') ? Colors.green.shade700 : Colors.amber.shade800,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Veri: ${_aiService.veriKaynagi}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _aiService.veriKaynagi.contains('canlı') ? Colors.green.shade800 : Colors.amber.shade900,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _tcmbApiKeyDialog,
+                  child: Icon(Icons.settings, size: 16, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // İstatistiksel maliyet tahmini — min/avg/max
           _buildInfoCard(
-            'TCMB İnşaat Maliyet Endeksi',
+            'İstatistiksel Maliyet Tahmini',
             Icons.show_chart,
             Colors.blue,
             [
               'Yıllık İnşaat Enflasyonu: %${(sonuc['yillikEnflasyon'] as double).toStringAsFixed(1)}',
               'İnşaat Süresi: ${sonuc['insaatSuresi']} ay',
               'Güncel m² Maliyet: ${_formatN(sonuc['guncelM2Maliyet'])} ₺',
-              'Enflasyonlu m² Maliyet: ${_formatN(sonuc['enflasyonluM2Maliyet'])} ₺',
-              'Kar Dahil m² Fiyat: ${_formatN(sonuc['karliM2Fiyat'])} ₺',
+              'Tahmini m² Maliyet (ort): ${_formatN(sonuc['enflasyonluM2Maliyet'])} ₺',
+              '  ↳ İyimser: ${_formatN((sonuc['minM2Maliyet'] as num).toDouble())} ₺  |  Kötümser: ${_formatN((sonuc['maxM2Maliyet'] as num).toDouble())} ₺',
             ],
           ),
+
+          // Min/Max m² fiyat önerisi
+          if (_minMaxFiyat != null) ...[
+            const SizedBox(height: 12),
+            _buildInfoCard(
+              'Önerilen m² Satış Fiyat Aralığı',
+              Icons.price_change,
+              Colors.teal,
+              [
+                'En Düşük (iyimser): ${_formatN(_minMaxFiyat!['minM2Fiyat']!)} ₺/m²',
+                'Ortalama: ${_formatN(_minMaxFiyat!['ortM2Fiyat']!)} ₺/m²',
+                'En Yüksek (kötümser): ${_formatN(_minMaxFiyat!['maxM2Fiyat']!)} ₺/m²',
+                '(%${_karOraniCtrl.text} kar oranı dahil)',
+              ],
+            ),
+          ],
 
           if (senaryo == 2 && sonuc['muteahhitDaireleri'] != null) ...[
             const SizedBox(height: 12),
             _buildInfoCard(
-              'Müteahhit Daireleri',
+              'Müteahhit Daireleri — Pazar Satış Tahmini',
               Icons.business,
               Colors.orange,
               [
                 ...((sonuc['muteahhitDaireleri'] as List).map((d) {
-                  return '${d['tip']} ${d['m2']} m² (${d['kat']}. kat) → Tahmini: ${_formatN((d['tahminiSatisFiyati'] as num).toDouble())} ₺';
+                  final min = _formatN((d['minSatisFiyati'] as num).toDouble());
+                  final avg = _formatN((d['tahminiSatisFiyati'] as num).toDouble());
+                  final max = _formatN((d['maxSatisFiyati'] as num).toDouble());
+                  return '${d['tip']} ${d['m2']} m² (${d['kat']}. kat)\n  Min: $min ₺  |  Ort: $avg ₺  |  Max: $max ₺';
                 })),
-                'Toplam Satış Geliri: ${_formatN((sonuc['muteahhitSatisGeliri'] as num).toDouble())} ₺',
+                '',
+                'Toplam Satış Geliri (ort): ${_formatN((sonuc['muteahhitSatisGeliri'] as num).toDouble())} ₺',
+                '  ↳ Min: ${_formatN((sonuc['muteahhitSatisMin'] as num).toDouble())} ₺  |  Max: ${_formatN((sonuc['muteahhitSatisMax'] as num).toDouble())} ₺',
                 'Kalan Maliyet: ${_formatN((sonuc['kalanMaliyet'] as num).toDouble())} ₺',
               ],
             ),
           ],
 
           const SizedBox(height: 12),
-          // Daire bazlı hesap tablosu
           _buildInfoCard(
             'Mal Sahibi Daire Ödemeleri',
             Icons.people,
             Colors.green,
-            [
-              ..._buildDaireOdemeList(sonuc),
-            ],
+            [..._buildDaireOdemeList(sonuc)],
           ),
 
-          // AI Özet
+          // Pazar Analizi
+          if (_pazarAnaliziMetni != null) ...[
+            const SizedBox(height: 12),
+            Card(
+              color: Colors.indigo.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.analytics, color: Colors.indigo.shade700),
+                        const SizedBox(width: 8),
+                        Text('Bölge Pazar Analizi',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo.shade700, fontSize: 14)),
+                      ],
+                    ),
+                    const Divider(),
+                    Text(_pazarAnaliziMetni!, style: const TextStyle(fontSize: 12, height: 1.6, fontFamily: 'monospace')),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          // Özet Rapor
           if (_aiOzet != null) ...[
             const SizedBox(height: 12),
             Card(
@@ -1010,7 +1136,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                       children: [
                         Icon(Icons.smart_toy, color: Colors.purple.shade700),
                         const SizedBox(width: 8),
-                        Text('AI Analiz Özeti',
+                        Text('Analiz Raporu',
                             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.purple.shade700, fontSize: 15)),
                       ],
                     ),
@@ -1021,8 +1147,61 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
 
+  void _tcmbApiKeyDialog() async {
+    final currentKey = await TcmbService.getApiKey() ?? '';
+    final ctrl = TextEditingController(text: currentKey);
 
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('TCMB EVDS API Anahtarı'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Canlı veri almak için TCMB EVDS API anahtarı girin.\n'
+              'evds2.tcmb.gov.tr adresinden ücretsiz alabilirsiniz.\n\n'
+              'Anahtar girilmezse yerleşik veriler kullanılır.',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              decoration: const InputDecoration(
+                labelText: 'API Key',
+                border: OutlineInputBorder(),
+                hintText: 'TCMB EVDS API anahtarınız',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ctrl.dispose();
+              Navigator.pop(ctx);
+            },
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await TcmbService.setApiKey(ctrl.text.trim());
+              ctrl.dispose();
+              if (mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('API anahtarı kaydedildi'), backgroundColor: Colors.green),
+                );
+              }
+            },
+            child: const Text('Kaydet'),
+          ),
         ],
       ),
     );

@@ -541,8 +541,19 @@ class FirebaseService {
       final currentInst = await _db.collection('payment_installments').doc(installmentId).get();
       final currentData = currentInst.data() as Map<String, dynamic>;
       final amount = (currentData['amount'] as num?)?.toDouble() ?? 0;
-      final currentPaidAmount = (currentData['paidAmount'] as num?)?.toDouble() ?? 0;
-      final newPaidAmount = currentPaidAmount + paidAmount;
+      
+      // payment_records'dan gerçek toplam ödenen tutarı hesapla
+      final paymentRecords = await _db
+          .collection('payment_installments')
+          .doc(installmentId)
+          .collection('payment_records')
+          .get();
+      double newPaidAmount = 0;
+      for (var record in paymentRecords.docs) {
+        final rData = record.data();
+        newPaidAmount += ((rData['tlAmount'] ?? rData['paidAmount'] ?? 0) as num).toDouble();
+      }
+      
       final isPaidComplete = newPaidAmount >= amount;
       
       // Taksiti güncelle
@@ -553,7 +564,7 @@ class FirebaseService {
         'photoUrls': photoUrls ?? [],
       });
 
-      // Ödeme planının toplam ödenen tutarını güncelle
+      // Ödeme planının toplam ödenen tutarını güncelle - her taksit için payment_records'dan hesapla
       final installments = await _db
           .collection('payment_installments')
           .where('paymentPlanId', isEqualTo: paymentPlanId)
@@ -571,15 +582,12 @@ class FirebaseService {
 
       final newStatus = totalPaid >= totalAmount
           ? PaymentStatus.completed.name
-          : PaymentStatus.partialPaid.name;
+          : (totalPaid > 0 ? PaymentStatus.partialPaid.name : PaymentStatus.pending.name);
 
       await _db.collection('payment_plans').doc(paymentPlanId).update({
         'paidAmount': totalPaid,
         'status': newStatus,
       });
-
-      // Proje gelirini güncelle
-      await _updateProjectIncome(projectId, paidAmount);
 
       developer.log('Taksit ödendi işaretlendi: $installmentId, Tutar: $paidAmount');
     } catch (e) {

@@ -696,7 +696,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
       }
 
       // Ödeme kaydını payment_records subcollection'a ekle
-      await FirebaseFirestore.instance
+      final newRecordRef = await FirebaseFirestore.instance
           .collection('payment_installments')
           .doc(installment.id)
           .collection('payment_records')
@@ -783,10 +783,32 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
             );
 
             if (transferResult == true && mounted) {
+              // Orijinal ödeme kaydının TL tutarını taksit tutarıyla sınırla
+              // (fazla kısım transfer kayıtlarıyla aktarılacak)
+              final cappedTlAmount = installment.amount;
+              await FirebaseFirestore.instance
+                  .collection('payment_installments')
+                  .doc(installment.id)
+                  .collection('payment_records')
+                  .doc(newRecordRef.id)
+                  .update({
+                'tlAmount': cappedTlAmount,
+                'notes': 'Orijinal: ₺${NumberFormat('#,##0.00', 'tr_TR').format(tlTutar)} — ₺${NumberFormat('#,##0.00', 'tr_TR').format(fazlaTutar)} sonraki taksitlere aktarıldı',
+              });
+
               await _transferExcessToNextInstallments(
                 fazlaTutar: fazlaTutar,
                 sonrakiTaksitler: sonrakiTaksitler,
                 selectedDate: selectedDate,
+              );
+
+              // Bu taksitin toplamlarını da yeniden hesapla
+              await _firebase.markInstallmentAsPaid(
+                installmentId: installment.id,
+                paymentPlanId: widget.paymentPlanId,
+                projectId: installment.projectId,
+                paidAmount: cappedTlAmount,
+                photoUrls: photoUrls,
               );
             }
           }

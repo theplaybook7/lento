@@ -140,6 +140,7 @@ class AiTeklifService {
     required String il,
     required String ilce,
     required int insaatSuresi,
+    String? mahalle,
   }) {
     final proj = enflasyonProjeksiyonu(
       guncelMaliyet: guncelM2Maliyet,
@@ -175,6 +176,7 @@ class AiTeklifService {
           kat: kat,
           tip: tip,
           insaatSuresi: insaatSuresi,
+          mahalle: mahalle,
         );
 
         final avgFiyat = tahmin['avgToplam']!;

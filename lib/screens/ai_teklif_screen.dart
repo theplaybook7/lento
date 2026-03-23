@@ -48,22 +48,25 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   bool _isLoading = false;
   String _loadingMessage = '';
 
-  // Step 1: Konum bilgileri (dropdown)
+  // Step 1: Konum bilgileri
   String? _secilenIl;
   String? _secilenIlce;
-  final _mahalleCtrl = TextEditingController();
+  String? _secilenMahalle;
   List<String> _ilListesi = [];
   List<String> _ilceListesi = [];
+  List<String> _mahalleListesi = [];
 
-  // Step 2: İnşaat bilgileri
-  final _toplamM2Ctrl = TextEditingController();
+  // Step 2: İnşaat bilgileri — kat tipi bazında m²
+  final _bodrumM2Ctrl = TextEditingController();
+  final _zeminM2Ctrl = TextEditingController();
+  final _normalM2Ctrl = TextEditingController();
   final _bodrumKatSayisiCtrl = TextEditingController(text: '1');
   final _normalKatSayisiCtrl = TextEditingController(text: '5');
   final _guncelMaliyetCtrl = TextEditingController();
   final _karOraniCtrl = TextEditingController(text: '20');
 
   // Step 3: Kroki + daire bilgileri
-  final List<Map<String, dynamic>> _katlar = []; // her kat: {ad, kat, daireler: [{...}], katAlaniCtrl}
+  final List<Map<String, dynamic>> _katlar = [];
   int _senaryo = 1;
 
   // Step 4: Hibe/Kredi
@@ -80,6 +83,19 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   // Kayıtlı AI teklifler
   bool _showSavedList = false;
 
+  /// Hesaplanmış toplam m²
+  double get _toplamM2 {
+    final bodrum = int.tryParse(_bodrumKatSayisiCtrl.text) ?? 0;
+    final normal = int.tryParse(_normalKatSayisiCtrl.text) ?? 0;
+    final bodrumM2 = _parseN(_bodrumM2Ctrl.text);
+    final zeminM2 = _parseN(_zeminM2Ctrl.text);
+    final normalM2 = _parseN(_normalM2Ctrl.text);
+    double toplam = bodrum * bodrumM2;
+    if (normal >= 1) toplam += zeminM2;
+    if (normal > 1) toplam += (normal - 1) * normalM2;
+    return toplam;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -88,8 +104,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
 
   @override
   void dispose() {
-    _mahalleCtrl.dispose();
-    _toplamM2Ctrl.dispose();
+    _bodrumM2Ctrl.dispose();
+    _zeminM2Ctrl.dispose();
+    _normalM2Ctrl.dispose();
     _bodrumKatSayisiCtrl.dispose();
     _normalKatSayisiCtrl.dispose();
     _guncelMaliyetCtrl.dispose();
@@ -110,11 +127,10 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   int get _toplamKatSayisi {
     final bodrum = int.tryParse(_bodrumKatSayisiCtrl.text) ?? 0;
     final normal = int.tryParse(_normalKatSayisiCtrl.text) ?? 0;
-    return bodrum + (normal > 0 ? 1 : 0) + (normal > 1 ? normal - 1 : 0); // bodrum + zemin + normal
+    return bodrum + (normal > 0 ? 1 : 0) + (normal > 1 ? normal - 1 : 0);
   }
 
   void _krokiOlustur() {
-    // Dispose old controllers
     for (final k in _katlar) {
       (k['katAlaniCtrl'] as TextEditingController).dispose();
       for (final d in (k['daireler'] as List)) {
@@ -127,17 +143,16 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
 
     final bodrum = int.tryParse(_bodrumKatSayisiCtrl.text) ?? 0;
     final normal = int.tryParse(_normalKatSayisiCtrl.text) ?? 0;
-    final toplamM2 = _parseN(_toplamM2Ctrl.text);
-    final toplamKat = bodrum + (normal > 0 ? normal : 0); // zemin dahil
-    final katAlani = toplamKat > 0 ? toplamM2 / toplamKat : 0.0;
-    final katAlaniStr = katAlani > 0 ? _formatN(katAlani) : '';
+    final bodrumM2 = _parseN(_bodrumM2Ctrl.text);
+    final zeminM2 = _parseN(_zeminM2Ctrl.text);
+    final normalM2 = _parseN(_normalM2Ctrl.text);
 
-    // Bodrum katlar (kat numarası: -1, -2, ...)
+    // Bodrum katlar
     for (int i = bodrum; i >= 1; i--) {
       _katlar.add({
         'ad': '$i. Bodrum Kat',
         'kat': -i,
-        'katAlaniCtrl': TextEditingController(text: katAlaniStr),
+        'katAlaniCtrl': TextEditingController(text: bodrumM2 > 0 ? _formatN(bodrumM2) : ''),
         'daireler': <Map<String, dynamic>>[],
       });
     }
@@ -146,21 +161,21 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       _katlar.add({
         'ad': 'Zemin Kat',
         'kat': 0,
-        'katAlaniCtrl': TextEditingController(text: katAlaniStr),
+        'katAlaniCtrl': TextEditingController(text: zeminM2 > 0 ? _formatN(zeminM2) : ''),
         'daireler': <Map<String, dynamic>>[],
       });
     }
-    // Normal katlar (1, 2, 3, ...)
+    // Normal katlar
     for (int i = 1; i < normal; i++) {
       _katlar.add({
         'ad': '$i. Normal Kat',
         'kat': i,
-        'katAlaniCtrl': TextEditingController(text: katAlaniStr),
+        'katAlaniCtrl': TextEditingController(text: normalM2 > 0 ? _formatN(normalM2) : ''),
         'daireler': <Map<String, dynamic>>[],
       });
     }
 
-    // Her kata varsayılan 2 daire ekle
+    // Her kata 2 daire
     int no = 1;
     for (final k in _katlar) {
       final daireList = k['daireler'] as List<Map<String, dynamic>>;
@@ -194,7 +209,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     return count;
   }
 
-  int get _hesaplananSure => TcmbService.insaatSuresiHesapla(_parseN(_toplamM2Ctrl.text));
+  int get _hesaplananSure => TcmbService.insaatSuresiHesapla(_toplamM2);
 
   List<String> _tiplerForKat(int katIndex) {
     final enAlt = katIndex == 0;
@@ -205,12 +220,75 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     return tipler;
   }
 
+  // ── Cross-floor phantom hücreleri ──
+
+  /// Belirli bir kat için diğer katlardan gelen phantom hücreleri toplar
+  List<Map<String, dynamic>> _phantomCellsForFloor(int katIndex) {
+    final targetKat = _katlar[katIndex]['kat'] as int;
+    final phantoms = <Map<String, dynamic>>[];
+
+    for (int i = 0; i < _katlar.length; i++) {
+      if (i == katIndex) continue;
+      final sourceKat = _katlar[i]['kat'] as int;
+      final daireler = _katlar[i]['daireler'] as List;
+
+      for (final d in daireler) {
+        final tip = d['tip'] as String;
+        final no = d['no'] as int;
+
+        if (tip == 'Dubleks' && sourceKat + 1 == targetKat) {
+          final ustM2 = _parseN((d['ustM2Ctrl'] as TextEditingController).text);
+          if (ustM2 > 0) {
+            phantoms.add({
+              'tip': 'Dubleks Üst',
+              'label': 'D$no Üst',
+              'm2': ustM2,
+              'sourceNo': no,
+              'sourceKatIndex': i,
+            });
+          }
+        } else if (tip == 'Ters Dubleks' && sourceKat - 1 == targetKat) {
+          final altM2 = _parseN((d['altM2Ctrl'] as TextEditingController).text);
+          if (altM2 > 0) {
+            phantoms.add({
+              'tip': 'TD Alt',
+              'label': 'D$no Alt',
+              'm2': altM2,
+              'sourceNo': no,
+              'sourceKatIndex': i,
+            });
+          }
+        } else if (tip == 'Depolu Dükkan' && sourceKat - 1 == targetKat) {
+          final altM2 = _parseN((d['altM2Ctrl'] as TextEditingController).text);
+          if (altM2 > 0) {
+            phantoms.add({
+              'tip': 'Depo',
+              'label': 'D$no Depo',
+              'm2': altM2,
+              'sourceNo': no,
+              'sourceKatIndex': i,
+            });
+          }
+        }
+      }
+    }
+    return phantoms;
+  }
+
+  /// Cross-floor m² toplamı (phantom hücreler)
+  double _crossFloorM2ForFloor(int katIndex) {
+    double total = 0;
+    for (final p in _phantomCellsForFloor(katIndex)) {
+      total += p['m2'] as double;
+    }
+    return total;
+  }
+
   // Sığınak kuralı kontrolü
   Map<String, dynamic> _siginakKontrolu() {
     int konutSayisi = 0;
     double toplamTicariM2 = 0;
-    double mevcutSiginakM2 = 0;
-    double toplamInsaatAlani = _parseN(_toplamM2Ctrl.text);
+    double toplamInsaatAlani = _toplamM2;
 
     for (final k in _katlar) {
       for (final d in (k['daireler'] as List)) {
@@ -234,26 +312,23 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     return {
       'gerekli': siginakSart,
       'gerekenM2': gerekenSiginakM2,
-      'mevcutM2': mevcutSiginakM2,
+      'mevcutM2': 0.0,
       'konutSayisi': konutSayisi,
-      'yeterli': !siginakSart || mevcutSiginakM2 >= gerekenSiginakM2,
+      'yeterli': !siginakSart,
     };
   }
 
   bool _validateStep(int step) {
     switch (step) {
       case 0:
-        return _secilenIl != null &&
-            _secilenIlce != null &&
-            _mahalleCtrl.text.trim().isNotEmpty;
+        return _secilenIl != null && _secilenIlce != null;
       case 1:
-        return _parseN(_toplamM2Ctrl.text) > 0 &&
+        return _toplamM2 > 0 &&
             (int.tryParse(_normalKatSayisiCtrl.text) ?? 0) > 0 &&
             _parseN(_guncelMaliyetCtrl.text) > 0 &&
             _parseN(_karOraniCtrl.text) > 0;
       case 2:
         if (_katlar.isEmpty) return false;
-        // Her katta en az 1 daire olmalı (her dairede m2 girilmeli)
         for (final k in _katlar) {
           final daireler = k['daireler'] as List;
           if (daireler.isEmpty) return false;
@@ -264,6 +339,25 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               );
               return false;
             }
+          }
+        }
+        // Cross-floor alan kontrolü
+        for (int i = 0; i < _katlar.length; i++) {
+          final katAlani = _parseN((_katlar[i]['katAlaniCtrl'] as TextEditingController).text);
+          final crossM2 = _crossFloorM2ForFloor(i);
+          final daireler = _katlar[i]['daireler'] as List;
+          double daireM2 = 0;
+          for (final d in daireler) {
+            daireM2 += _parseN((d['m2Ctrl'] as TextEditingController).text);
+          }
+          if (katAlani > 0 && (daireM2 + crossM2) > katAlani * 1.1) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${_katlar[i]['ad']}: Toplam alan (${_formatN(daireM2 + crossM2)} m²) kat alanını (${_formatN(katAlani)} m²) aşıyor!'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return false;
           }
         }
         if (_senaryo == 2) {
@@ -292,7 +386,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       for (final d in (k['daireler'] as List)) {
         final tip = d['tip'] as String;
         double m2 = _parseN((d['m2Ctrl'] as TextEditingController).text);
-        // Dubleks/TersDubleks toplam m2
         if (tip == 'Dubleks') {
           m2 += _parseN((d['ustM2Ctrl'] as TextEditingController).text);
         } else if (tip == 'Ters Dubleks' || tip == 'Depolu Dükkan') {
@@ -318,7 +411,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     });
 
     try {
-      // TCMB verisi çekmeyi dene
       final tcmbBasarili = await _aiService.verileriGuncelle();
 
       if (!tcmbBasarili && _aiService.tcmbHataMesaji != null && mounted) {
@@ -335,41 +427,38 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
 
       final il = _secilenIl ?? '';
       final ilce = _secilenIlce ?? '';
+      final mahalle = _secilenMahalle ?? '';
+      final toplamM2 = _toplamM2;
       final daireListesi = _daireListesiHazirla();
 
-      // 1. Enflasyon projeksiyonu
       final projeksiyon = _aiService.enflasyonProjeksiyonu(
         guncelMaliyet: _parseN(_guncelMaliyetCtrl.text),
-        toplamM2: _parseN(_toplamM2Ctrl.text),
+        toplamM2: toplamM2,
       );
 
-      // 2. Min/Max fiyat önerisi
       final minMax = _aiService.minMaxFiyatOnerisi(
         guncelMaliyet: _parseN(_guncelMaliyetCtrl.text),
-        toplamM2: _parseN(_toplamM2Ctrl.text),
+        toplamM2: toplamM2,
         karOrani: _parseN(_karOraniCtrl.text),
       );
 
-      // 3. Pazar analizi
       setState(() => _loadingMessage = 'Pazar verileri analiz ediliyor...');
       final pazarMetni = _aiService.pazarAnalizi(
         il: il,
         ilce: ilce,
-        mahalle: _mahalleCtrl.text.trim(),
+        mahalle: mahalle,
         insaatSuresi: _hesaplananSure,
         daireler: daireListesi,
       );
 
-      // 4. Sığınak kontrolü
       final siginak = _siginakKontrolu();
 
-      // 5. Senaryo hesapla
       Map<String, dynamic> sonuc;
 
       if (_senaryo == 2) {
         sonuc = _aiService.senaryo2Hesapla(
           guncelM2Maliyet: _parseN(_guncelMaliyetCtrl.text),
-          toplamInsaatM2: _parseN(_toplamM2Ctrl.text),
+          toplamInsaatM2: toplamM2,
           karOrani: _parseN(_karOraniCtrl.text),
           daireler: daireListesi,
           hibeTutari: _parseN(_hibeTutariCtrl.text),
@@ -377,11 +466,12 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           il: il,
           ilce: ilce,
           insaatSuresi: _hesaplananSure,
+          mahalle: mahalle,
         );
       } else {
         sonuc = _aiService.senaryo1Hesapla(
           guncelM2Maliyet: _parseN(_guncelMaliyetCtrl.text),
-          toplamInsaatM2: _parseN(_toplamM2Ctrl.text),
+          toplamInsaatM2: toplamM2,
           karOrani: _parseN(_karOraniCtrl.text),
           daireler: daireListesi,
           hibeTutari: _parseN(_hibeTutariCtrl.text),
@@ -389,10 +479,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         );
       }
 
-      // Sığınak bilgisini sonuca ekle
       sonuc['siginak'] = siginak;
 
-      // 6. Özet rapor
       final ozet = _aiService.teklifOzetiOlustur(sonuc);
       setState(() {
         _enflasyonProjeksiyonu = projeksiyon;
@@ -424,7 +512,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         'sirket': sirketAd,
         'il': _secilenIl ?? '',
         'ilce': _secilenIlce ?? '',
-        'mahalle': _mahalleCtrl.text.trim(),
+        'mahalle': _secilenMahalle ?? '',
         'senaryo': _senaryo,
         'hesapSonucu': _hesapSonucu,
         'aiOzet': _aiOzet,
@@ -450,35 +538,35 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     });
 
     try {
-      final pdfBytes = await _generateAiTeklifPdf();
-      if (mounted) {
-        await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF hatası: $e')));
-      }
-    } finally {
+      final pdfData = await _generateAiTeklifPdf();
       setState(() => _isLoading = false);
+      if (!mounted) return;
+
+      await Printing.layoutPdf(
+        onLayout: (_) async => pdfData,
+        name: 'AI_Teklif_${DateTime.now().millisecondsSinceEpoch}',
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF hatası: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
+
+  // ═══════════════ BUILD ═══════════════
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Teklif Asistanı'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
+        title: const Text('AI Teklif Analizi'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'TCMB API Ayarları',
-            onPressed: _tcmbApiKeyDialog,
-          ),
-          IconButton(
-            icon: Icon(_showSavedList ? Icons.calculate : Icons.list),
-            tooltip: _showSavedList ? 'Yeni Teklif' : 'Kayıtlı Teklifler',
+            icon: const Icon(Icons.list_alt),
+            tooltip: 'Kayıtlı Teklifler',
             onPressed: () => setState(() => _showSavedList = !_showSavedList),
           ),
         ],
@@ -507,35 +595,30 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           .collection('ai_teklifler')
           .where('sirketId', isEqualTo: sirketId)
           .orderBy('tarih', descending: true)
+          .limit(20)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return const Center(child: Text('Kayıtlı AI teklif bulunamadı.'));
-        }
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) return const Center(child: Text('Kayıtlı teklif yok'));
         return ListView.builder(
+          padding: const EdgeInsets.all(12),
           itemCount: docs.length,
-          itemBuilder: (_, i) {
-            final data = docs[i].data() as Map<String, dynamic>;
-            final tarih = (data['tarih'] as Timestamp?)?.toDate();
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
             return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: data['senaryo'] == 1 ? Colors.blue : Colors.orange,
-                  child: Text('S${data['senaryo']}', style: const TextStyle(color: Colors.white)),
-                ),
-                title: Text('${data['il']} / ${data['ilce']} / ${data['mahalle']}'),
-                subtitle: Text(
-                  tarih != null ? DateFormat('dd.MM.yyyy HH:mm').format(tarih) : '',
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: () => docs[i].reference.delete(),
-                ),
+                title: Text('${data['il']} / ${data['ilce']}'),
+                subtitle: Text('Senaryo ${data['senaryo']} — ${data['mahalle'] ?? ''}'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  setState(() {
+                    _hesapSonucu = data['hesapSonucu'] as Map<String, dynamic>?;
+                    _aiOzet = data['aiOzet'] as String?;
+                    _showSavedList = false;
+                    _currentStep = 4;
+                  });
+                },
               ),
             );
           },
@@ -548,6 +631,15 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     return Stepper(
       currentStep: _currentStep,
       type: StepperType.vertical,
+      physics: const ClampingScrollPhysics(),
+      onStepContinue: () {
+        if (_currentStep == 3) {
+          _hesaplaVeAnaliz();
+        } else if (_validateStep(_currentStep)) {
+          if (_currentStep == 1 && _katlar.isEmpty) _krokiOlustur();
+          setState(() => _currentStep++);
+        }
+      },
       controlsBuilder: (context, details) {
         return Padding(
           padding: const EdgeInsets.only(top: 12),
@@ -555,25 +647,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             children: [
               if (_currentStep < 4)
                 ElevatedButton(
-                  onPressed: () {
-                    if (_currentStep == 3) {
-                      _hesaplaVeAnaliz();
-                    } else if (_validateStep(_currentStep)) {
-                      if (_currentStep == 1) {
-                        _krokiOlustur();
-                      }
-                      setState(() => _currentStep++);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Lütfen tüm alanları doldurun')),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
-                  child: Text(
-                    _currentStep == 3 ? 'Hesapla ve Analiz Et' : 'Devam',
-                    style: const TextStyle(color: Colors.white),
-                  ),
+                  onPressed: details.onStepContinue,
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
+                  child: Text(_currentStep == 3 ? 'Hesapla ve Analiz Et' : 'Devam'),
                 ),
               if (_currentStep == 4) ...[
                 ElevatedButton.icon(
@@ -619,7 +695,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         Step(
           title: const Text('Konum Bilgileri'),
           subtitle: _currentStep > 0
-              ? Text('${_secilenIl ?? ""} / ${_secilenIlce ?? ""} / ${_mahalleCtrl.text}')
+              ? Text('${_secilenIl ?? ""} / ${_secilenIlce ?? ""} / ${_secilenMahalle ?? ""}')
               : null,
           isActive: _currentStep >= 0,
           state: _currentStep > 0 ? StepState.complete : StepState.indexed,
@@ -628,7 +704,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         Step(
           title: const Text('İnşaat Bilgileri'),
           subtitle: _currentStep > 1
-              ? Text('${_formatN(_parseN(_toplamM2Ctrl.text))} m² • ${_hesaplananSure} ay • %${_karOraniCtrl.text} kar')
+              ? Text('${_formatN(_toplamM2)} m² • ${_hesaplananSure} ay • %${_karOraniCtrl.text} kar')
               : null,
           isActive: _currentStep >= 1,
           state: _currentStep > 1 ? StepState.complete : StepState.indexed,
@@ -659,7 +735,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     );
   }
 
-  // ═══════════════ STEP 1: Konum (Dropdown) ═══════════════
+  // ═══════════════ STEP 1: Konum (İstanbul + Mahalle Dropdown) ═══════════════
 
   Widget _buildStep1() {
     return Column(
@@ -680,7 +756,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             setState(() {
               _secilenIl = v;
               _secilenIlce = null;
+              _secilenMahalle = null;
               _ilceListesi = v != null ? EmlakDataService.ilceListesi(v) : [];
+              _mahalleListesi = [];
             });
           },
         ),
@@ -698,32 +776,40 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               ? _ilceListesi.map((ilce) => DropdownMenuItem(value: ilce, child: Text(ilce))).toList()
               : [const DropdownMenuItem(value: null, child: Text('Önce il seçin'))],
           onChanged: _ilceListesi.isNotEmpty
-              ? (v) => setState(() => _secilenIlce = v)
+              ? (v) {
+                  setState(() {
+                    _secilenIlce = v;
+                    _secilenMahalle = null;
+                    _mahalleListesi = (v != null && _secilenIl != null)
+                        ? EmlakDataService.mahalleListesi(_secilenIl!, v)
+                        : [];
+                  });
+                }
               : null,
         ),
-        if (_secilenIl != null && _ilceListesi.isEmpty) ...[
-          const SizedBox(height: 8),
-          // İl var ama ilçe listesi yok, serbest yazabilsin
-          TextField(
-            onChanged: (v) => _secilenIlce = v.trim().isNotEmpty ? v.trim() : null,
-            decoration: const InputDecoration(
-              labelText: 'İlçe (yazın)',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.edit_location_alt),
-              hintText: 'İlçe adını yazın',
-            ),
-          ),
-        ],
         const SizedBox(height: 12),
-        TextField(
-          controller: _mahalleCtrl,
-          decoration: const InputDecoration(labelText: 'Mahalle', border: OutlineInputBorder(), prefixIcon: Icon(Icons.map)),
+        // Mahalle dropdown
+        DropdownButtonFormField<String>(
+          value: _secilenMahalle,
+          decoration: const InputDecoration(
+            labelText: 'Mahalle',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.map),
+          ),
+          isExpanded: true,
+          items: _mahalleListesi.isNotEmpty
+              ? _mahalleListesi.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList()
+              : [const DropdownMenuItem(value: null, child: Text('Önce ilçe seçin'))],
+          onChanged: _mahalleListesi.isNotEmpty
+              ? (v) => setState(() => _secilenMahalle = v)
+              : null,
         ),
         // Bölge fiyat bilgisi
         if (_secilenIl != null && _secilenIlce != null) ...[
           const SizedBox(height: 12),
           Builder(builder: (_) {
-            final fiyat = EmlakDataService.ilceM2Fiyat(_secilenIl!, _secilenIlce!);
+            final fiyat = EmlakDataService.ilceM2Fiyat(_secilenIl!, _secilenIlce!, mahalle: _secilenMahalle);
+            final kaynakLabel = _secilenMahalle != null ? 'Mahalle' : 'İlçe';
             return Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -738,12 +824,15 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                     children: [
                       Icon(Icons.info_outline, size: 16, color: Colors.teal.shade700),
                       const SizedBox(width: 6),
-                      Text('Bölge Sıfır Bina m² Fiyatları', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal.shade700, fontSize: 13)),
+                      Text('$kaynakLabel Bazında Sıfır Bina m² Fiyatları',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal.shade700, fontSize: 13)),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text('En Düşük: ${_formatN(fiyat['min']!)} ₺  •  Ortalama: ${_formatN(fiyat['avg']!)} ₺  •  En Yüksek: ${_formatN(fiyat['max']!)} ₺',
-                      style: const TextStyle(fontSize: 12)),
+                  Text(
+                    'En Düşük: ${_formatN(fiyat['min']!)} ₺  •  Ortalama: ${_formatN(fiyat['avg']!)} ₺  •  En Yüksek: ${_formatN(fiyat['max']!)} ₺',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 ],
               ),
             );
@@ -753,44 +842,12 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     );
   }
 
-  // ═══════════════ STEP 2: İnşaat Bilgileri ═══════════════
+  // ═══════════════ STEP 2: İnşaat Bilgileri (Kat bazında m²) ═══════════════
 
   Widget _buildStep2() {
     return Column(
       children: [
-        TextField(
-          controller: _toplamM2Ctrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [_TBinlikFormatter()],
-          decoration: const InputDecoration(
-            labelText: 'Toplam İnşaat Alanı (m²)',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.square_foot),
-          ),
-          onChanged: (_) => setState(() {}),
-        ),
-        if (_parseN(_toplamM2Ctrl.text) > 0) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.timer, color: Colors.blue.shade700, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  'Tahmini İnşaat Süresi: $_hesaplananSure ay',
-                  style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 12),
+        // Kat sayıları
         Row(
           children: [
             Expanded(
@@ -802,6 +859,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.vertical_align_bottom),
                 ),
+                onChanged: (_) => setState(() {}),
               ),
             ),
             const SizedBox(width: 12),
@@ -815,11 +873,100 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                   prefixIcon: Icon(Icons.layers),
                   hintText: 'Zemin dahil',
                 ),
+                onChanged: (_) => setState(() {}),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
+
+        // Kat bazında m² girişleri
+        if ((int.tryParse(_bodrumKatSayisiCtrl.text) ?? 0) > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: TextField(
+              controller: _bodrumM2Ctrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [_TBinlikFormatter()],
+              decoration: InputDecoration(
+                labelText: 'Bodrum Kat m² (her bir bodrum)',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.vertical_align_bottom),
+                suffixText: '× ${_bodrumKatSayisiCtrl.text} kat',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        if ((int.tryParse(_normalKatSayisiCtrl.text) ?? 0) >= 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: TextField(
+              controller: _zeminM2Ctrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [_TBinlikFormatter()],
+              decoration: const InputDecoration(
+                labelText: 'Zemin Kat m²',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.home_work),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        if ((int.tryParse(_normalKatSayisiCtrl.text) ?? 0) > 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: TextField(
+              controller: _normalM2Ctrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [_TBinlikFormatter()],
+              decoration: InputDecoration(
+                labelText: 'Normal Kat m² (her bir kat)',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.layers),
+                suffixText: '× ${(int.tryParse(_normalKatSayisiCtrl.text) ?? 0) - 1} kat',
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+
+        // Toplam m² ve süre göstergesi
+        if (_toplamM2 > 0) ...[
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.square_foot, color: Colors.blue.shade700, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Toplam İnşaat Alanı: ${_formatN(_toplamM2)} m²',
+                      style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.timer, color: Colors.blue.shade700, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Tahmini İnşaat Süresi: $_hesaplananSure ay',
+                      style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
         TextField(
           controller: _guncelMaliyetCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -849,110 +996,73 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   // ═══════════════ STEP 3: Kroki + Daire Bilgileri ═══════════════
 
   Widget _buildStep3() {
+    // Senaryo seçimi
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Senaryo seçimi
-        Card(
-          color: Colors.amber.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Senaryo Seçin:', style: TextStyle(fontWeight: FontWeight.bold)),
-                RadioListTile<int>(
-                  title: const Text('Müteahhit daire almıyor'),
-                  subtitle: const Text('Saf m² fiyatı ile hesaplama'),
-                  value: 1,
-                  groupValue: _senaryo,
-                  onChanged: (v) => setState(() => _senaryo = v!),
-                  dense: true,
-                ),
-                RadioListTile<int>(
-                  title: const Text('Müteahhit daire alıyor'),
-                  subtitle: const Text('Daire satış geliri düşülerek hesaplama'),
-                  value: 2,
-                  groupValue: _senaryo,
-                  onChanged: (v) => setState(() => _senaryo = v!),
-                  dense: true,
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        if (_senaryo == 2) ...[
-          const SizedBox(height: 8),
-          Card(
-            color: Colors.orange.shade100,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: Colors.orange.shade400, width: 2),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Icon(Icons.touch_app, color: Colors.orange.shade800, size: 24),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Builder(builder: (_) {
-                      int muteahhitCount = 0, malSahibiCount = 0;
-                      for (final k in _katlar) {
-                        for (final d in (k['daireler'] as List)) {
-                          if (d['sahip'] == 'muteahhit') muteahhitCount++;
-                          else malSahibiCount++;
-                        }
-                      }
-                      return Text(
-                        'Dairelere tıklayarak müteahhitin alacağı daireleri seçin.\n'
-                        'Müteahhit: $muteahhitCount  •  Mal Sahibi: $malSahibiCount',
-                        style: TextStyle(color: Colors.orange.shade900, fontSize: 13, fontWeight: FontWeight.w500),
-                      );
-                    }),
-                  ),
-                ],
+        Row(
+          children: [
+            Expanded(
+              child: RadioListTile<int>(
+                title: const Text('Senaryo 1', style: TextStyle(fontSize: 13)),
+                subtitle: const Text('Müteahhit daire almıyor', style: TextStyle(fontSize: 11)),
+                value: 1,
+                groupValue: _senaryo,
+                onChanged: (v) => setState(() => _senaryo = v!),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
               ),
             ),
+            Expanded(
+              child: RadioListTile<int>(
+                title: const Text('Senaryo 2', style: TextStyle(fontSize: 13)),
+                subtitle: const Text('Müteahhit daire alıyor', style: TextStyle(fontSize: 11)),
+                value: 2,
+                groupValue: _senaryo,
+                onChanged: (v) => setState(() => _senaryo = v!),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
+        ),
+
+        if (_senaryo == 2)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              border: Border.all(color: Colors.orange.shade200),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Dairelere tıklayarak müteahhit/mal sahibi atayın',
+              style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+            ),
           ),
-        ],
 
         // Sığınak uyarısı
         Builder(builder: (_) {
           final s = _siginakKontrolu();
           if (!s['gerekli']) return const SizedBox.shrink();
-          return Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: s['yeterli'] ? Colors.green.shade50 : Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: s['yeterli'] ? Colors.green.shade300 : Colors.red.shade300),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    s['yeterli'] ? Icons.check_circle : Icons.warning,
-                    color: s['yeterli'] ? Colors.green.shade700 : Colors.red.shade700,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Sığınak Gereksinimi: ${(s['gerekenM2'] as double).toStringAsFixed(0)} m² '
-                      '(${s['konutSayisi']} konut × 4 m²)\n'
-                      '${s['yeterli'] ? "Yeterli" : "Yetersiz — Sığınak eklemeyi unutmayın"}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: s['yeterli'] ? Colors.green.shade800 : Colors.red.shade800,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: s['yeterli'] ? Colors.green.shade50 : Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: s['yeterli'] ? Colors.green.shade300 : Colors.amber.shade300),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.shield, color: s['yeterli'] ? Colors.green : Colors.amber.shade700, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Sığınak gerekli: ${(s['gerekenM2'] as double).toStringAsFixed(0)} m²',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: s['yeterli'] ? Colors.green.shade800 : Colors.amber.shade900, fontSize: 12),
+                ),
+              ],
             ),
           );
         }),
@@ -987,7 +1097,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                   ],
                 ),
               ),
-              // Katlar (üstten alta, normal → zemin → bodrum)
+              // Katlar (üstten alta)
               for (int i = _katlar.length - 1; i >= 0; i--)
                 _buildKatSatiri(i),
             ],
@@ -1014,7 +1124,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         Center(
           child: Text(
             'Dairenin detaylarını düzenlemek için üzerine uzun basın\n'
-            'Kat alanını ve daire sayısını her kat için ayrı ayarlayabilirsiniz',
+            'Her bölüm için × butonuyla çıkarma yapabilirsiniz',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
           ),
@@ -1029,8 +1139,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     final kat = katData['kat'] as int;
     final katAlaniCtrl = katData['katAlaniCtrl'] as TextEditingController;
     final daireler = katData['daireler'] as List<Map<String, dynamic>>;
+    final phantoms = _phantomCellsForFloor(katIndex);
 
-    // Renk kodlaması: bodrum=gri, zemin=turuncu-açık, normal=beyaz
+    // Renk
     Color katBg;
     if (kat < 0) {
       katBg = Colors.grey.shade100;
@@ -1040,6 +1151,16 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       katBg = Colors.white;
     }
 
+    // Alan kullanımı
+    final katAlani = _parseN(katAlaniCtrl.text);
+    double daireM2 = 0;
+    for (final d in daireler) {
+      daireM2 += _parseN((d['m2Ctrl'] as TextEditingController).text);
+    }
+    final crossM2 = _crossFloorM2ForFloor(katIndex);
+    final toplam = daireM2 + crossM2;
+    final alanAsimi = katAlani > 0 && toplam > katAlani;
+
     return Container(
       decoration: BoxDecoration(
         color: katBg,
@@ -1047,7 +1168,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       ),
       child: Column(
         children: [
-          // Kat başlığı + kat alanı + daire ekle/sil
+          // Kat başlığı
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             color: kat < 0 ? Colors.grey.shade200 : (kat == 0 ? Colors.amber.shade100 : Colors.blue.shade50),
@@ -1072,11 +1193,27 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                     ),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 const SizedBox(width: 4),
                 Text('m²', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
                 const Spacer(),
+                // Alan kullanımı göstergesi
+                if (katAlani > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: alanAsimi ? Colors.red.shade50 : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: alanAsimi ? Colors.red.shade300 : Colors.green.shade300),
+                    ),
+                    child: Text(
+                      'Kalan: ${_formatN(katAlani - toplam)}',
+                      style: TextStyle(fontSize: 9, color: alanAsimi ? Colors.red.shade700 : Colors.green.shade700, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                const SizedBox(width: 4),
                 // Daire ekle
                 SizedBox(
                   height: 28,
@@ -1097,42 +1234,36 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                     },
                   ),
                 ),
-                // Daire sil
-                if (daireler.length > 1)
-                  SizedBox(
-                    height: 28,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(Icons.remove_circle, color: Colors.red.shade600, size: 22),
-                      tooltip: 'Son Bölümü Sil',
-                      onPressed: () {
-                        setState(() {
-                          final removed = daireler.removeLast();
-                          (removed['m2Ctrl'] as TextEditingController).dispose();
-                          (removed['ustM2Ctrl'] as TextEditingController).dispose();
-                          (removed['altM2Ctrl'] as TextEditingController).dispose();
-                        });
-                      },
-                    ),
-                  ),
               ],
             ),
           ),
-          // Daireler
+          // Daireler + phantom hücreler
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: daireler.asMap().entries.map((entry) {
-                final isLast = entry.key == daireler.length - 1;
-                return Expanded(
-                  child: Container(
-                    decoration: isLast
-                        ? null
-                        : BoxDecoration(border: Border(right: BorderSide(color: Colors.grey.shade400))),
-                    child: _buildDaireHucre(entry.value, katIndex),
-                  ),
-                );
-              }).toList(),
+              children: [
+                ...daireler.asMap().entries.map((entry) {
+                  return Expanded(
+                    child: Container(
+                      decoration: entry.key < daireler.length - 1 || phantoms.isNotEmpty
+                          ? BoxDecoration(border: Border(right: BorderSide(color: Colors.grey.shade400)))
+                          : null,
+                      child: _buildDaireHucre(entry.value, katIndex),
+                    ),
+                  );
+                }),
+                ...phantoms.asMap().entries.map((entry) {
+                  final isLast = entry.key == phantoms.length - 1;
+                  return Expanded(
+                    child: Container(
+                      decoration: !isLast
+                          ? BoxDecoration(border: Border(right: BorderSide(color: Colors.grey.shade400)))
+                          : null,
+                      child: _buildPhantomHucre(entry.value),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
         ],
@@ -1147,6 +1278,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     final tip = daire['tip'] as String;
     final hibeVar = daire['hibeVar'] as bool;
     final krediVar = daire['krediVar'] as bool;
+    final daireler = _katlar[katIndex]['daireler'] as List;
 
     Color bgColor;
     if (_senaryo == 2) {
@@ -1155,7 +1287,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       bgColor = Colors.transparent;
     }
 
-    // Dubleks/Ters Dubleks ikonu
     String tipGosterge = '';
     if (tip == 'Dubleks') tipGosterge = 'D↑';
     else if (tip == 'Ters Dubleks') tipGosterge = 'D↓';
@@ -1170,71 +1301,150 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               })
           : () => _daireDuzenleDialog(daire, katIndex),
       onLongPress: () => _daireDuzenleDialog(daire, katIndex),
-      child: Container(
-        color: bgColor,
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
+      child: Stack(
+        children: [
+          Container(
+            color: bgColor,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('D$no', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                if (_senaryo == 2) ...[
-                  const SizedBox(width: 3),
-                  Icon(
-                    isMuteahhit ? Icons.construction : Icons.home,
-                    size: 12,
-                    color: isMuteahhit ? Colors.orange.shade700 : Colors.blue.shade700,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('D$no', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    if (_senaryo == 2) ...[
+                      const SizedBox(width: 3),
+                      Icon(
+                        isMuteahhit ? Icons.construction : Icons.home,
+                        size: 12,
+                        color: isMuteahhit ? Colors.orange.shade700 : Colors.blue.shade700,
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                SizedBox(
+                  width: 55,
+                  height: 24,
+                  child: TextField(
+                    controller: m2Ctrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [_TBinlikFormatter()],
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      hintText: 'm²',
+                      hintStyle: TextStyle(fontSize: 9, color: Colors.grey.shade400),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                    ),
+                    onChanged: (_) => setState(() {}),
                   ),
-                ],
+                ),
+                if (tipGosterge.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: tip.contains('Dükkan') ? Colors.purple.shade50 : Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text(tipGosterge, style: TextStyle(fontSize: 9, color: Colors.indigo.shade700, fontWeight: FontWeight.bold)),
+                  )
+                else
+                  Text(tip, style: TextStyle(fontSize: 9, color: Colors.grey.shade500)),
+                if (hibeVar || krediVar)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hibeVar) Text('H', style: TextStyle(fontSize: 8, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+                      if (hibeVar && krediVar) const Text(' ', style: TextStyle(fontSize: 8)),
+                      if (krediVar) Text('K', style: TextStyle(fontSize: 8, color: Colors.purple.shade700, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
               ],
             ),
-            const SizedBox(height: 2),
-            // Inline m2 giriş
-            SizedBox(
-              width: 55,
-              height: 24,
-              child: TextField(
-                controller: m2Ctrl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [_TBinlikFormatter()],
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-                decoration: InputDecoration(
-                  hintText: 'm²',
-                  hintStyle: TextStyle(fontSize: 9, color: Colors.grey.shade400),
-                  isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          ),
+          // Bölüm çıkarma butonu (Task 1)
+          if (daireler.length > 1)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    daireler.remove(daire);
+                    (daire['m2Ctrl'] as TextEditingController).dispose();
+                    (daire['ustM2Ctrl'] as TextEditingController).dispose();
+                    (daire['altM2Ctrl'] as TextEditingController).dispose();
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.close, size: 12, color: Colors.red.shade400),
                 ),
               ),
             ),
-            if (tipGosterge.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: tip.contains('Dükkan') ? Colors.purple.shade50 : Colors.indigo.shade50,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(tipGosterge, style: TextStyle(fontSize: 9, color: Colors.indigo.shade700, fontWeight: FontWeight.bold)),
-              )
-            else
-              Text(tip, style: TextStyle(fontSize: 9, color: Colors.grey.shade500)),
-            if (hibeVar || krediVar)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (hibeVar) Text('H', style: TextStyle(fontSize: 8, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
-                  if (hibeVar && krediVar) const Text(' ', style: TextStyle(fontSize: 8)),
-                  if (krediVar) Text('K', style: TextStyle(fontSize: 8, color: Colors.purple.shade700, fontWeight: FontWeight.bold)),
-                ],
-              ),
-          ],
-        ),
+        ],
+      ),
+    );
+  }
+
+  /// Phantom hücre — cross-floor birim gösterimi (Tasks 2-4)
+  Widget _buildPhantomHucre(Map<String, dynamic> phantom) {
+    final label = phantom['label'] as String;
+    final tip = phantom['tip'] as String;
+    final m2 = phantom['m2'] as double;
+
+    Color bgColor;
+    IconData icon;
+    if (tip == 'Depo') {
+      bgColor = Colors.brown.shade50;
+      icon = Icons.warehouse;
+    } else if (tip == 'TD Alt') {
+      bgColor = Colors.indigo.shade50;
+      icon = Icons.arrow_downward;
+    } else {
+      bgColor = Colors.deepPurple.shade50;
+      icon = Icons.arrow_upward;
+    }
+
+    return Container(
+      color: bgColor,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey.shade600),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey.shade700),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${_formatN(m2)} m²',
+            style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+          ),
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(tip, style: TextStyle(fontSize: 8, color: Colors.grey.shade600)),
+          ),
+        ],
       ),
     );
   }
@@ -1301,6 +1511,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                       prefixIcon: Icon(Icons.arrow_upward),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text('Üst kat m² bir üst kattan düşülür ve krokide görünür',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
                 ],
                 if (tempTip == 'Ters Dubleks' || tempTip == 'Depolu Dükkan') ...[
                   const SizedBox(height: 12),
@@ -1313,6 +1526,13 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.arrow_downward),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    tempTip == 'Depolu Dükkan'
+                        ? 'Depo m² alt kattan düşülür ve krokide görünür'
+                        : 'Alt kat m² alt kattan düşülür ve krokide görünür',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -1444,8 +1664,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             children: [
               const Text('Özet:', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Konum: ${_secilenIl ?? ""} / ${_secilenIlce ?? ""} / ${_mahalleCtrl.text}'),
-              Text('Toplam Alan: ${_toplamM2Ctrl.text} m²'),
+              Text('Konum: ${_secilenIl ?? ""} / ${_secilenIlce ?? ""} / ${_secilenMahalle ?? ""}'),
+              Text('Toplam Alan: ${_formatN(_toplamM2)} m²'),
               Text('Süre: $_hesaplananSure ay'),
               Text('Maliyet: ${_guncelMaliyetCtrl.text} ₺/m²  •  Kar: %${_karOraniCtrl.text}'),
               Text('Bölüm: $_toplamDaireSayisi  •  Senaryo ${_senaryo == 1 ? "1 (daire almıyor)" : "2 (daire alıyor)"}'),
@@ -1469,7 +1689,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     );
   }
 
-  // ═══════════════ STEP 5: Sonuçlar (Geliştirilmiş UI) ═══════════════
+  // ═══════════════ STEP 5: Sonuçlar ═══════════════
 
   Widget _buildStep5() {
     final sonuc = _hesapSonucu!;
@@ -1479,11 +1699,10 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Veri kaynağı göstergesi
           _buildVeriKaynagiWidget(),
           const SizedBox(height: 12),
 
-          // ── Maliyet Analizi ──
+          // Maliyet Analizi
           _buildGradientCard(
             title: 'Maliyet Analizi',
             icon: Icons.show_chart,
@@ -1505,7 +1724,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           ),
           const SizedBox(height: 10),
 
-          // ── Fiyat Önerisi ──
+          // Fiyat Önerisi
           if (_minMaxFiyat != null)
             _buildGradientCard(
               title: 'Önerilen m² Satış Fiyatı',
@@ -1529,7 +1748,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             ),
           const SizedBox(height: 10),
 
-          // ── Sığınak Bilgisi ──
+          // Sığınak
           if (sonuc['siginak'] != null) ...[
             Builder(builder: (_) {
               final s = sonuc['siginak'] as Map<String, dynamic>;
@@ -1564,7 +1783,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             }),
           ],
 
-          // ── Müteahhit Daireleri ──
+          // Müteahhit Daireleri
           if (senaryo == 2 && sonuc['muteahhitDaireleri'] != null) ...[
             _buildGradientCard(
               title: 'Müteahhit Daireleri — Satış Tahmini',
@@ -1608,7 +1827,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             const SizedBox(height: 10),
           ],
 
-          // ── Mal Sahibi Daire Ödemeleri ──
+          // Mal Sahibi Daire Ödemeleri
           Card(
             elevation: 2,
             child: Padding(
@@ -1632,7 +1851,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           ),
           const SizedBox(height: 10),
 
-          // ── Pazar Analizi ──
+          // Pazar Analizi
           if (_pazarAnaliziMetni != null)
             Card(
               elevation: 2,
@@ -1649,7 +1868,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             ),
           const SizedBox(height: 10),
 
-          // ── Özet Rapor ──
+          // Özet Rapor
           if (_aiOzet != null)
             Card(
               elevation: 2,
@@ -1669,7 +1888,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     );
   }
 
-  // ══════════ UI Helper Widgets ══════════
+  // ══════════ UI Helpers ══════════
 
   Widget _buildVeriKaynagiWidget() {
     final canli = _aiService.veriKaynagi.contains('canlı');
@@ -1878,7 +2097,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               if (!ctx.mounted) return;
               Navigator.pop(ctx);
 
-              // Bağlantı testi
               if (key.isNotEmpty && mounted) {
                 setState(() {
                   _isLoading = true;
@@ -1923,7 +2141,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       aiOzet: _aiOzet ?? '',
       il: _secilenIl ?? '',
       ilce: _secilenIlce ?? '',
-      mahalle: _mahalleCtrl.text.trim(),
+      mahalle: _secilenMahalle ?? '',
       firmaAdi: SistemYoneticisi().aktifSirket?.ad ?? '',
       firmaLogosu: SistemYoneticisi().aktifSirket?.logo,
     );

@@ -287,11 +287,29 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         if (photos.isNotEmpty)
-                                          Icon(Icons.image, color: Colors.blue.shade400, size: 18),
-                                        const SizedBox(width: 4),
+                                          Padding(
+                                            padding: const EdgeInsets.only(right: 8),
+                                            child: Icon(Icons.image, color: Colors.blue.shade400, size: 18),
+                                          ),
                                         InkWell(
+                                          borderRadius: BorderRadius.circular(20),
                                           onTap: () => _editPaymentRecord(inst, paymentRecords[idx].id, record),
-                                          child: Icon(Icons.edit, color: Colors.grey.shade600, size: 18),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.shade50,
+                                              borderRadius: BorderRadius.circular(20),
+                                              border: Border.all(color: Colors.orange.shade300),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.edit, color: Colors.orange.shade700, size: 16),
+                                                const SizedBox(width: 4),
+                                                Text('Düzenle', style: TextStyle(color: Colors.orange.shade700, fontSize: 12, fontWeight: FontWeight.w600)),
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       ],
                                     ),

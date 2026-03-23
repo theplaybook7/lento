@@ -646,9 +646,26 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                           final cariData = cariDoc.data() as Map<String, dynamic>;
                           final ad = cariData['ad'] ?? 'İsimsiz';
                           final tip = cariData['tip'] ?? 'musteri';
-                          final bakiye = (cariData['bakiye'] as num?)?.toDouble() ?? 0.0;
                           final ikon = tip == 'musteri' ? Icons.person : Icons.business;
-                          final renk = bakiye > 0 ? Colors.green : (bakiye < 0 ? Colors.red : Colors.grey);
+
+                          return FutureBuilder<QuerySnapshot>(
+                            future: FirebaseFirestore.instance
+                                .collection('cari_hesaplar')
+                                .doc(cariDoc.id)
+                                .collection('hareketler')
+                                .where('projeId', isEqualTo: widget.projectId)
+                                .get(),
+                            builder: (context, hareketSnap) {
+                              double bakiye = 0;
+                              if (hareketSnap.hasData) {
+                                for (var h in hareketSnap.data!.docs) {
+                                  final hData = h.data() as Map<String, dynamic>;
+                                  final tutarTL = ((hData['tutarTL'] ?? hData['tutar'] ?? 0.0) as num).toDouble();
+                                  final hTip = hData['tip'] ?? 'borc';
+                                  bakiye += hTip == 'alacak' ? tutarTL : -tutarTL;
+                                }
+                              }
+                              final renk = bakiye > 0 ? Colors.green : (bakiye < 0 ? Colors.red : Colors.grey);
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
@@ -685,6 +702,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                 ),
                               ),
                             ),
+                          );
+                            },
                           );
                         },
                       ),

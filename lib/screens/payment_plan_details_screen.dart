@@ -283,9 +283,18 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                                     subtitle: date != null
                                         ? Text(DateFormat('dd.MM.yyyy HH:mm').format(date.toDate()))
                                         : null,
-                                    trailing: photos.isNotEmpty
-                                        ? Icon(Icons.image, color: Colors.blue.shade400, size: 18)
-                                        : null,
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (photos.isNotEmpty)
+                                          Icon(Icons.image, color: Colors.blue.shade400, size: 18),
+                                        const SizedBox(width: 4),
+                                        InkWell(
+                                          onTap: () => _editPaymentRecord(inst, paymentRecords[idx].id, record),
+                                          child: Icon(Icons.edit, color: Colors.grey.shade600, size: 18),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   if (photos.isNotEmpty)
                                     Padding(
@@ -724,6 +733,252 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
         SnackBar(content: Text('Dosya yükleme hatası: $e')),
       );
     }
+  }
+
+  void _editPaymentRecord(PaymentInstallment installment, String recordId, Map<String, dynamic> record) async {
+    final originalPaidAmount = (record['paidAmount'] as num?)?.toDouble() ?? 0;
+    final originalCurrency = record['currency'] as String? ?? 'TL';
+    final originalTlAmount = (record['tlAmount'] as num?)?.toDouble() ?? originalPaidAmount;
+    final originalDate = record['createdAt'] as Timestamp?;
+    final existingPhotos = List<String>.from(record['photoUrls'] ?? []);
+
+    final paidAmountCtrl = TextEditingController(text: originalPaidAmount.toString());
+    DateTime selectedDate = originalDate?.toDate() ?? DateTime.now();
+    final tarihCtrl = TextEditingController(text: DateFormat('dd.MM.yyyy').format(selectedDate));
+    String paraBirimi = originalCurrency;
+    final kurUSDCtrl = TextEditingController();
+    final kurEURCtrl = TextEditingController();
+    final kurGBPCtrl = TextEditingController();
+    final altinKurCtrl = TextEditingController();
+    final List<XFile> selectedImages = [];
+    final List<String> keptPhotos = List<String>.from(existingPhotos);
+
+    // Eğer orijinal kur bilgisi varsa, ters hesaplamayla kuru bul
+    if (originalCurrency != 'TL' && originalPaidAmount > 0) {
+      final kur = originalTlAmount / originalPaidAmount;
+      final kurStr = kur.toStringAsFixed(4);
+      if (originalCurrency == 'USD') kurUSDCtrl.text = kurStr;
+      if (originalCurrency == 'EUR') kurEURCtrl.text = kurStr;
+      if (originalCurrency == 'GBP') kurGBPCtrl.text = kurStr;
+      if (originalCurrency == 'ALTIN') altinKurCtrl.text = kurStr;
+    }
+
+    late String selectedCurrencyForSaving;
+    late double calculatedTlAmount;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Ödeme Düzenle'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: paraBirimi,
+                    decoration: const InputDecoration(
+                      labelText: 'Para Birimi',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ['TL', 'USD', 'EUR', 'GBP', 'ALTIN']
+                        .map((pb) => DropdownMenuItem(value: pb, child: Text(pb)))
+                        .toList(),
+                    onChanged: (v) => setState(() => paraBirimi = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: paidAmountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Ödenen Tutar ($paraBirimi)',
+                      prefixIcon: const Icon(Icons.monetization_on),
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (val) {
+                      if (paraBirimi != 'TL') setState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  if (paraBirimi == 'USD') ...[TextField(controller: kurUSDCtrl, decoration: const InputDecoration(labelText: 'USD Kuru (TL) *', border: OutlineInputBorder(), hintText: 'Örn: 34,50'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (val) => setState(() {})), const SizedBox(height: 12)],
+                  if (paraBirimi == 'EUR') ...[TextField(controller: kurEURCtrl, decoration: const InputDecoration(labelText: 'EUR Kuru (TL) *', border: OutlineInputBorder(), hintText: 'Örn: 37,50'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (val) => setState(() {})), const SizedBox(height: 12)],
+                  if (paraBirimi == 'GBP') ...[TextField(controller: kurGBPCtrl, decoration: const InputDecoration(labelText: 'GBP Kuru (TL) *', border: OutlineInputBorder(), hintText: 'Örn: 43,50'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (val) => setState(() {})), const SizedBox(height: 12)],
+                  if (paraBirimi == 'ALTIN') ...[TextField(controller: altinKurCtrl, decoration: const InputDecoration(labelText: 'Gram Fiyatı (TL) *', border: OutlineInputBorder(), hintText: 'Örn: 2.850,00'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (val) => setState(() {})), const SizedBox(height: 12)],
+                  if (paraBirimi != 'TL') ...[Builder(builder: (context) {
+                    final tutar = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+                    double kur = 0;
+                    if (paraBirimi == 'USD') kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
+                    else if (paraBirimi == 'EUR') kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
+                    else if (paraBirimi == 'GBP') kur = double.tryParse(kurGBPCtrl.text.replaceAll(',', '.')) ?? 0;
+                    else if (paraBirimi == 'ALTIN') kur = double.tryParse(altinKurCtrl.text.replaceAll(',', '.')) ?? 0;
+                    if (tutar > 0 && kur > 0) {
+                      final tlKarsilik = tutar * kur;
+                      return Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.blue.shade50, border: Border.all(color: Colors.blue.shade200), borderRadius: BorderRadius.circular(8)), child: Text('TL Karşılığı: ${tlKarsilik.toStringAsFixed(2)} ₺', style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w600)));
+                    }
+                    return const SizedBox.shrink();
+                  }), const SizedBox(height: 12)],
+                  TextField(
+                    controller: tarihCtrl,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'Ödeme Tarihi',
+                      prefixIcon: const Icon(Icons.calendar_today),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_month),
+                        onPressed: () async {
+                          final picked = await showDatePicker(context: context, initialDate: selectedDate, firstDate: DateTime(2000), lastDate: DateTime.now());
+                          if (picked != null) {
+                            setState(() { selectedDate = picked; tarihCtrl.text = DateFormat('dd.MM.yyyy').format(selectedDate); });
+                          }
+                        },
+                      ),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Mevcut fotoğraflar
+                  if (keptPhotos.isNotEmpty) ...[const Align(alignment: Alignment.centerLeft, child: Text('Mevcut Fotoğraflar:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))), const SizedBox(height: 8), Wrap(spacing: 8, children: keptPhotos.asMap().entries.map((entry) => Stack(children: [GestureDetector(onTap: () => _showImagePreview(entry.value), child: Container(width: 60, height: 60, decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.grey.shade300)), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.network(entry.value, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image, size: 20))))), Positioned(right: 0, top: 0, child: GestureDetector(onTap: () => setState(() => keptPhotos.removeAt(entry.key)), child: Container(decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), child: const Icon(Icons.close, size: 16, color: Colors.white))))],)).toList()), const SizedBox(height: 12)],
+                  ElevatedButton.icon(onPressed: () async { final picker = ImagePicker(); final pickedFile = await picker.pickImage(source: ImageSource.camera); if (pickedFile != null) setState(() => selectedImages.add(pickedFile)); }, icon: const Icon(Icons.camera_alt), label: const Text('Fotoğraf Çek')),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(onPressed: () async { final picker = ImagePicker(); final pickedFiles = await picker.pickMultiImage(); if (pickedFiles.isNotEmpty) setState(() => selectedImages.addAll(pickedFiles)); }, icon: const Icon(Icons.photo_library), label: const Text('Galeriden Seç'), style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade600)),
+                  if (selectedImages.isNotEmpty) ...[const SizedBox(height: 12), Text('✓ ${selectedImages.length} yeni fotoğraf seçildi', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold))],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c), child: const Text('İptal')),
+              TextButton(
+                onPressed: () {
+                  final paidAmount = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+                  if (paidAmount <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Geçerli bir tutar girin')));
+                    return;
+                  }
+                  double tlTutar = paidAmount;
+                  if (paraBirimi != 'TL') {
+                    double kur = 0;
+                    if (paraBirimi == 'USD') kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
+                    else if (paraBirimi == 'EUR') kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
+                    else if (paraBirimi == 'GBP') kur = double.tryParse(kurGBPCtrl.text.replaceAll(',', '.')) ?? 0;
+                    else if (paraBirimi == 'ALTIN') kur = double.tryParse(altinKurCtrl.text.replaceAll(',', '.')) ?? 0;
+                    if (kur <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$paraBirimi kuru giriniz')));
+                      return;
+                    }
+                    tlTutar = paidAmount * kur;
+                  }
+                  selectedCurrencyForSaving = paraBirimi;
+                  calculatedTlAmount = tlTutar;
+                  Navigator.pop(c, true);
+                },
+                child: const Text('Güncelle'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (result != true) return;
+
+    final paidAmount = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+    if (paidAmount <= 0) return;
+    final tlTutar = calculatedTlAmount;
+    final finalCurrency = selectedCurrencyForSaving;
+
+    try {
+      // Yeni fotoğrafları yükle
+      final List<String> newPhotoUrls = [];
+      if (selectedImages.isNotEmpty) {
+        for (var i = 0; i < selectedImages.length; i++) {
+          final fileName = 'payment_${installment.id}_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          final storageRef = FirebaseService().getStorageRef('payment_proofs/$fileName');
+          final compressedList = await compressImage(selectedImages[i]);
+          final compressedBytes = Uint8List.fromList(compressedList);
+          await storageRef.putData(compressedBytes);
+          final url = await storageRef.getDownloadURL();
+          newPhotoUrls.add(url);
+        }
+      }
+
+      final allPhotos = [...keptPhotos, ...newPhotoUrls];
+
+      // Ödeme kaydını güncelle
+      await FirebaseFirestore.instance
+          .collection('payment_installments')
+          .doc(installment.id)
+          .collection('payment_records')
+          .doc(recordId)
+          .update({
+        'paidAmount': paidAmount,
+        'currency': finalCurrency,
+        'tlAmount': tlTutar,
+        'createdAt': selectedDate,
+        'photoUrls': allPhotos,
+      });
+
+      // Taksit ve plan toplamlarını yeniden hesapla
+      await _recalculateInstallmentTotals(installment);
+
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ödeme güncellendi')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Güncelleme hatası: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _recalculateInstallmentTotals(PaymentInstallment installment) async {
+    // payment_records'dan toplam TL tutarını hesapla
+    final records = await FirebaseFirestore.instance
+        .collection('payment_installments')
+        .doc(installment.id)
+        .collection('payment_records')
+        .get();
+
+    double totalPaid = 0;
+    for (var r in records.docs) {
+      final d = r.data();
+      totalPaid += ((d['tlAmount'] ?? d['paidAmount'] ?? 0) as num).toDouble();
+    }
+
+    final isPaidComplete = totalPaid >= installment.amount;
+
+    // Taksiti güncelle
+    await FirebaseFirestore.instance.collection('payment_installments').doc(installment.id).update({
+      'isPaid': isPaidComplete,
+      'paidAmount': totalPaid,
+      'paidDate': isPaidComplete ? DateTime.now() : null,
+    });
+
+    // Plan toplamlarını güncelle
+    final installments = await FirebaseFirestore.instance
+        .collection('payment_installments')
+        .where('paymentPlanId', isEqualTo: widget.paymentPlanId)
+        .get();
+
+    double planTotalPaid = 0;
+    for (var doc in installments.docs) {
+      planTotalPaid += (doc.data()['paidAmount'] as num?)?.toDouble() ?? 0;
+    }
+
+    final plan = await FirebaseFirestore.instance.collection('payment_plans').doc(widget.paymentPlanId).get();
+    final planData = plan.data() as Map<String, dynamic>;
+    final totalAmount = (planData['totalAmount'] as num?)?.toDouble() ?? 0;
+    final newStatus = planTotalPaid >= totalAmount ? 'completed' : 'partialPaid';
+
+    await FirebaseFirestore.instance.collection('payment_plans').doc(widget.paymentPlanId).update({
+      'paidAmount': planTotalPaid,
+      'status': newStatus,
+    });
   }
 
   void _showImagePreview(String imageUrl) {

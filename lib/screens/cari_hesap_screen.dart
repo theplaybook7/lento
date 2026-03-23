@@ -632,11 +632,75 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                       projeGruplari[key]!.add(hareketData);
                     }
 
+                    // Tüm projelerden toplam borç ve alacak hesapla
+                    double genelToplamBorc = 0;
+                    double genelToplamAlacak = 0;
+                    for (var doc in docsWithTarih) {
+                      final d = doc.data() as Map<String, dynamic>;
+                      final tutarTL = ((d['tutarTL'] ?? d['tutar'] ?? 0.0) as num).toDouble();
+                      final t = d['tip'] ?? 'borc';
+                      if (t == 'borc') {
+                        genelToplamBorc += tutarTL;
+                      } else {
+                        genelToplamAlacak += tutarTL;
+                      }
+                    }
+                    final genelNet = genelToplamAlacak - genelToplamBorc;
+
                     return ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: projeGruplari.length,
+                      itemCount: projeGruplari.length + 1, // +1 for summary card
                       itemBuilder: (context, index) {
-                        final projeKey = projeGruplari.keys.elementAt(index);
+                        if (index == 0) {
+                          // Genel özet kartı
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            color: Colors.blue.shade50,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  const Text('Genel Özet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          const Text('Toplam Borç', style: TextStyle(color: Colors.red, fontSize: 12)),
+                                          const SizedBox(height: 4),
+                                          Text(formatTL(genelToplamBorc), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
+                                        ],
+                                      ),
+                                      Column(
+                                        children: [
+                                          const Text('Toplam Alacak', style: TextStyle(color: Colors.green, fontSize: 12)),
+                                          const SizedBox(height: 4),
+                                          Text(formatTL(genelToplamAlacak), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 15)),
+                                        ],
+                                      ),
+                                      Column(
+                                        children: [
+                                          const Text('Net', style: TextStyle(fontSize: 12)),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            formatTL(genelNet.abs()),
+                                            style: TextStyle(
+                                              color: genelNet >= 0 ? Colors.green : Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        final projeKey = projeGruplari.keys.elementAt(index - 1);
                         final hareketler = projeGruplari[projeKey]!;
                         final projeAd = hareketler.first['_projeAd'] as String;
                         
@@ -1228,61 +1292,58 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                   String projeId = '';
                   String projeAd = '';
                   
-                  // Eğer ödeme veya tahsilat ise giderlere kaydetto
+                  // Eğer ödeme veya tahsilat ise giderlere kaydet
                   if (tip == 'borc' || tip == 'alacak') {
-                    // Cari kaydından projectId'yi al
-                    final cariDoc = await FirebaseFirestore.instance.collection('cari_hesaplar').doc(widget.cariId).get();
-                    var projectId = cariDoc.data()?['projectId'] ?? '';
+                    // Şirketin tüm projelerini al
+                    if (!mounted) return;
+                    final projects = await FirebaseFirestore.instance
+                        .collection('projects')
+                        .where('companyId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
+                        .get();
                     
-                    // Zaten atanmış proje varsa adını al
-                    if (projectId.isNotEmpty) {
+                    var projectId = '';
+                    
+                    if (projects.docs.length == 1) {
+                      // Tek proje varsa otomatik seç
+                      projectId = projects.docs.first.id;
                       projeId = projectId;
-                      try {
-                        final projeDoc = await FirebaseFirestore.instance.collection('projects').doc(projectId).get();
-                        projeAd = projeDoc.data()?['name'] ?? 'Proje';
-                      } catch (_) {
-                        projeAd = 'Proje';
+                      projeAd = projects.docs.first.data()['name'] ?? 'Proje';
+                    } else if (projects.docs.isNotEmpty && mounted) {
+                      // Birden fazla proje varsa her zaman sor
+                      final selected = await showDialog<Map<String, String>>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Proje Seç'),
+                          content: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: projects.docs.map((doc) {
+                                final pAd = doc.data()['name'] ?? 'İsimsiz';
+                                return ListTile(
+                                  title: Text(pAd),
+                                  onTap: () => Navigator.pop(ctx, {'id': doc.id, 'ad': pAd}),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      );
+                      
+                      if (selected != null) {
+                        projectId = selected['id']!;
+                        projeId = projectId;
+                        projeAd = selected['ad']!;
                       }
                     }
                     
-                    // ProjectId boş ise proje seç
-                    if (projectId.isEmpty) {
-                      if (!mounted) return;
-                      final projects = await FirebaseFirestore.instance.collection('projects').where('companyId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').get();
-                      if (projects.docs.isNotEmpty && mounted) {
-                        final selected = await showDialog<Map<String, String>>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Proje Seç'),
-                            content: SingleChildScrollView(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: projects.docs.map((doc) {
-                                  final pAd = doc.data()['name'] ?? 'İsimsiz';
-                                  return ListTile(
-                                    title: Text(pAd),
-                                    onTap: () => Navigator.pop(ctx, {'id': doc.id, 'ad': pAd}),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
-                        );
-                        
-                        if (selected != null) {
-                          projectId = selected['id']!;
-                          projeId = projectId;
-                          projeAd = selected['ad']!;
-                          // Cari'ye proje atama yap
-                          await FirebaseFirestore.instance
-                              .collection('cari_hesaplar')
-                              .doc(widget.cariId)
-                              .update({
-                                'projectId': projectId,
-                                'projectIds': FieldValue.arrayUnion([projectId]),
-                              });
-                        }
-                      }
+                    // Seçilen projeyi cari'nin projectIds listesine ekle
+                    if (projectId.isNotEmpty) {
+                      await FirebaseFirestore.instance
+                          .collection('cari_hesaplar')
+                          .doc(widget.cariId)
+                          .update({
+                            'projectIds': FieldValue.arrayUnion([projectId]),
+                          });
                     }
                     
                     // ProjectId varsa gelir/gider kaydet

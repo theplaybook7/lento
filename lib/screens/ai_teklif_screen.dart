@@ -69,7 +69,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
 
   // Step 5: AI tahminleri
   Map<String, dynamic>? _enflasyonProjeksiyonu;
-  Map<String, dynamic>? _satisFiyatTahmini;
+
   Map<String, dynamic>? _hesapSonucu;
   String? _aiOzet;
 
@@ -156,22 +156,13 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     }
   }
 
-  Future<void> _hesaplaVeAnaliz() async {
-    setState(() {
-      _isLoading = true;
-      _loadingMessage = 'TCMB\'den inşaat maliyet endeksi alınıyor...';
-    });
-
+  void _hesaplaVeAnaliz() {
     try {
       // 1. Enflasyon projeksiyonu
-      final projeksiyon = await _aiService.enflasyonProjeksiyonu(
+      final projeksiyon = _aiService.enflasyonProjeksiyonu(
         guncelMaliyet: _parseN(_guncelMaliyetCtrl.text),
         toplamM2: _parseN(_toplamM2Ctrl.text),
       );
-      setState(() {
-        _enflasyonProjeksiyonu = projeksiyon;
-        _loadingMessage = 'Hesaplamalar yapılıyor...';
-      });
 
       // 2. Daire listesini hazırla
       final daireListesi = _daireler.map((d) => {
@@ -186,50 +177,18 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       Map<String, dynamic> sonuc;
 
       if (_senaryo == 2) {
-        // Müteahhit daire alıyorsa: önce satış fiyatı tahmin et
-        final muteahhitDaireler = daireListesi
-            .where((d) => d['sahip'] == 'muteahhit')
-            .toList();
-
-        if (muteahhitDaireler.isNotEmpty) {
-          setState(() => _loadingMessage = 'AI daire satış fiyatları tahmin ediliyor...');
-          _satisFiyatTahmini = await _aiService.daireSatisFiyatiTahminEt(
-            il: _ilCtrl.text.trim(),
-            ilce: _ilceCtrl.text.trim(),
-            mahalle: _mahalleCtrl.text.trim(),
-            daireler: muteahhitDaireler,
-            insaatSuresi: _hesaplananSure,
-          );
-        }
-
-        // Satış fiyatlarını map'e dönüştür
-        final satisFiyatlari = <String, double>{};
-        if (_satisFiyatTahmini != null) {
-          final tahminler = _satisFiyatTahmini!['tahminler'] as List? ?? [];
-          int mutIndex = 0;
-          for (int i = 0; i < daireListesi.length; i++) {
-            if (daireListesi[i]['sahip'] == 'muteahhit') {
-              if (mutIndex < tahminler.length) {
-                satisFiyatlari[i.toString()] =
-                    (tahminler[mutIndex]['fiyat'] as num).toDouble();
-              }
-              mutIndex++;
-            }
-          }
-        }
-
-        sonuc = await _aiService.senaryo2Hesapla(
+        sonuc = _aiService.senaryo2Hesapla(
           guncelM2Maliyet: _parseN(_guncelMaliyetCtrl.text),
           toplamInsaatM2: _parseN(_toplamM2Ctrl.text),
           karOrani: _parseN(_karOraniCtrl.text),
           daireler: daireListesi,
           hibeTutari: _parseN(_hibeTutariCtrl.text),
           krediTutari: _parseN(_krediTutariCtrl.text),
-          konum: '${_ilCtrl.text}/${_ilceCtrl.text}/${_mahalleCtrl.text}',
-          muteahhitDaireSatisFiyatlari: satisFiyatlari,
+          il: _ilCtrl.text.trim(),
+          insaatSuresi: _hesaplananSure,
         );
       } else {
-        sonuc = await _aiService.senaryo1Hesapla(
+        sonuc = _aiService.senaryo1Hesapla(
           guncelM2Maliyet: _parseN(_guncelMaliyetCtrl.text),
           toplamInsaatM2: _parseN(_toplamM2Ctrl.text),
           karOrani: _parseN(_karOraniCtrl.text),
@@ -239,14 +198,11 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         );
       }
 
+      // 3. Özet rapor
+      final ozet = _aiService.teklifOzetiOlustur(sonuc);
       setState(() {
+        _enflasyonProjeksiyonu = projeksiyon;
         _hesapSonucu = sonuc;
-        _loadingMessage = 'AI özet rapor hazırlanıyor...';
-      });
-
-      // 3. AI özet
-      final ozet = await _aiService.teklifOzetiOlustur(sonuc);
-      setState(() {
         _aiOzet = ozet;
         _currentStep = 4;
       });
@@ -256,8 +212,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           SnackBar(content: Text('Hata: $e')),
         );
       }
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
@@ -448,7 +402,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                     _hesapSonucu = null;
                     _aiOzet = null;
                     _enflasyonProjeksiyonu = null;
-                    _satisFiyatTahmini = null;
                   }),
                   child: const Text('Yeni Teklif'),
                 ),
@@ -1069,39 +1022,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             ),
           ],
 
-          // Satış fiyat tahmini onay/düzenleme
-          if (_satisFiyatTahmini != null) ...[
-            const SizedBox(height: 12),
-            Card(
-              color: Colors.amber.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.amber.shade800),
-                        const SizedBox(width: 8),
-                        const Text('Daire Satış Tahminleri (AI)',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _satisFiyatTahmini!['aciklama'] ?? '',
-                      style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'ℹ️ Bu tahmini fiyatları onaylayın veya düzenleyip yeniden hesaplatın.',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+
         ],
       ),
     );

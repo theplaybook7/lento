@@ -1,74 +1,36 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'tcmb_service.dart';
 
 class AiTeklifService {
-  static const String _geminiApiKey = 'AIzaSyCKiWnxhgb2xzby3RD7ZEGvRONphJTHsLs';
-  static const String _model = 'gemini-2.0-flash';
   final TcmbService _tcmb = TcmbService();
-
-  Future<String> _generateContent(String prompt) async {
-    final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1/models/$_model:generateContent?key=$_geminiApiKey',
-    );
-
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'contents': [
-          {
-            'parts': [
-              {'text': prompt}
-            ]
-          }
-        ],
-        'generationConfig': {
-          'temperature': 0.3,
-          'maxOutputTokens': 4096,
-        },
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String? ?? '';
-      return text;
-    } else {
-      debugPrint('Gemini API hatası: ${response.statusCode} - ${response.body}');
-      throw Exception('Gemini API hatası: ${response.statusCode}');
-    }
-  }
 
   /// İnşaat süresini hesaplar
   int insaatSuresiHesapla(double toplamM2) {
     return TcmbService.insaatSuresiHesapla(toplamM2);
   }
 
-  /// TCMB verisiyle enflasyon projeksiyonu yapar
-  Future<Map<String, dynamic>> enflasyonProjeksiyonu({
+  /// Enflasyon projeksiyonu yapar (senkron, API yok)
+  Map<String, dynamic> enflasyonProjeksiyonu({
     required double guncelMaliyet,
     required double toplamM2,
-  }) async {
+  }) {
     final sure = insaatSuresiHesapla(toplamM2);
-    return await _tcmb.maliyetProjeksiyonu(
+    return _tcmb.maliyetProjeksiyonu(
       guncelMaliyet: guncelMaliyet,
       aySayisi: sure,
     );
   }
 
   /// Senaryo 1: Müteahhit daire almıyor
-  /// Enflasyon + kar dahil m² fiyatı hesaplar
-  Future<Map<String, dynamic>> senaryo1Hesapla({
+  Map<String, dynamic> senaryo1Hesapla({
     required double guncelM2Maliyet,
     required double toplamInsaatM2,
-    required double karOrani, // yüzde olarak: 20 = %20
-    required List<Map<String, dynamic>> daireler, // [{m2, kat, hibeVar, krediVar}]
+    required double karOrani,
+    required List<Map<String, dynamic>> daireler,
     required double hibeTutari,
     required double krediTutari,
-  }) async {
-    final projeksiyon = await enflasyonProjeksiyonu(
+  }) {
+    final projeksiyon = enflasyonProjeksiyonu(
       guncelMaliyet: guncelM2Maliyet,
       toplamM2: toplamInsaatM2,
     );
@@ -78,7 +40,6 @@ class AiTeklifService {
     final insaatSuresi = projeksiyon['aySayisi'] as int;
     final yillikEnflasyon = projeksiyon['yillikEnflasyon'] as double;
 
-    // Her daire için maliyet hesapla
     final daireDetaylari = <Map<String, dynamic>>[];
     for (final daire in daireler) {
       final m2 = (daire['m2'] as num).toDouble();
@@ -122,44 +83,50 @@ class AiTeklifService {
   }
 
   /// Senaryo 2: Müteahhit daire alıyor
-  Future<Map<String, dynamic>> senaryo2Hesapla({
+  Map<String, dynamic> senaryo2Hesapla({
     required double guncelM2Maliyet,
     required double toplamInsaatM2,
     required double karOrani,
-    required List<Map<String, dynamic>> daireler, // [{m2, kat, sahip: 'muteahhit'/'malSahibi', hibeVar, krediVar, tip}]
+    required List<Map<String, dynamic>> daireler,
     required double hibeTutari,
     required double krediTutari,
-    required String konum, // il/ilçe/mahalle
-    required Map<String, double> muteahhitDaireSatisFiyatlari, // daireIndex -> tahmini satış fiyatı
-  }) async {
-    final projeksiyon = await enflasyonProjeksiyonu(
+    required String il,
+    required int insaatSuresi,
+  }) {
+    final projeksiyon = enflasyonProjeksiyonu(
       guncelMaliyet: guncelM2Maliyet,
       toplamM2: toplamInsaatM2,
     );
 
     final enflasyonluMaliyet = projeksiyon['ortalamaMaliyet'] as double;
     final karliM2Fiyat = enflasyonluMaliyet * (1 + karOrani / 100);
-    final insaatSuresi = projeksiyon['aySayisi'] as int;
     final yillikEnflasyon = projeksiyon['yillikEnflasyon'] as double;
     final toplamMaliyet = toplamInsaatM2 * karliM2Fiyat;
 
-    // Müteahhit dairelerinin satış geliri
     double muteahhitSatisGeliri = 0;
     final muteahhitDaireleri = <Map<String, dynamic>>[];
     final malSahibiDaireleri = <Map<String, dynamic>>[];
     double malSahibiToplamM2 = 0;
 
-    for (int i = 0; i < daireler.length; i++) {
-      final daire = daireler[i];
+    for (final daire in daireler) {
       final sahip = daire['sahip'] as String? ?? 'malSahibi';
       final m2 = (daire['m2'] as num).toDouble();
+      final kat = daire['kat'] as int? ?? 1;
+      final tip = daire['tip'] as String? ?? 'Daire';
 
       if (sahip == 'muteahhit') {
-        final satisFiyati = muteahhitDaireSatisFiyatlari[i.toString()] ?? 0;
+        final satisFiyati = TcmbService.daireSatisFiyatiTahminEt(
+          il: il,
+          m2: m2,
+          kat: kat,
+          insaatSuresi: insaatSuresi,
+          tip: tip,
+        );
         muteahhitSatisGeliri += satisFiyati;
         muteahhitDaireleri.add({
           ...daire,
           'tahminiSatisFiyati': satisFiyati,
+          'tahminiM2Fiyat': (satisFiyati / m2).round(),
         });
       } else {
         malSahibiToplamM2 += m2;
@@ -167,11 +134,9 @@ class AiTeklifService {
       }
     }
 
-    // Kalan maliyet = toplam maliyet - müteahhit daire satış geliri
     final kalanMaliyet = toplamMaliyet - muteahhitSatisGeliri;
     final kalanMaliyetPozitif = kalanMaliyet < 0 ? 0.0 : kalanMaliyet;
 
-    // Her mal sahibi dairesi için paylaşım
     final daireDetaylari = <Map<String, dynamic>>[];
     for (final daire in malSahibiDaireleri) {
       final m2 = (daire['m2'] as num).toDouble();
@@ -219,96 +184,60 @@ class AiTeklifService {
     };
   }
 
-  /// Gemini ile daire satış fiyatı tahmini
-  Future<Map<String, dynamic>> daireSatisFiyatiTahminEt({
-    required String il,
-    required String ilce,
-    required String mahalle,
-    required List<Map<String, dynamic>> daireler, // [{m2, kat, tip}]
-    required int insaatSuresi, // ay
-  }) async {
-    final daireListesi = daireler.asMap().entries.map((e) {
-      final d = e.value;
-      return '${e.key + 1}. ${d['tip'] ?? 'Daire'} - ${d['m2']} m² - ${d['kat']}. kat';
-    }).join('\n');
+  /// Teklif özet raporu oluşturur (yerleşik — API yok)
+  String teklifOzetiOlustur(Map<String, dynamic> hesapSonucu) {
+    final f = NumberFormat('#,###', 'tr_TR');
+    final senaryo = hesapSonucu['senaryo'] as int;
+    final insaatSuresi = hesapSonucu['insaatSuresi'];
+    final yillikEnflasyon = (hesapSonucu['yillikEnflasyon'] as double).toStringAsFixed(1);
+    final guncelM2 = f.format((hesapSonucu['guncelM2Maliyet'] as double).round());
+    final enflasyonluM2 = f.format((hesapSonucu['enflasyonluM2Maliyet'] as double).round());
+    final karliM2 = f.format((hesapSonucu['karliM2Fiyat'] as double).round());
+    final karOrani = hesapSonucu['karOrani'];
+    final toplamM2 = f.format((hesapSonucu['toplamInsaatM2'] as double).round());
+    final toplamMaliyet = f.format((hesapSonucu['toplamMaliyet'] as double).round());
 
-    final prompt = '''
-Sen bir Türkiye emlak piyasası uzmanısın. Aşağıdaki bilgilere göre her dairenin 
-$insaatSuresi ay sonraki tahmini satış fiyatını TL olarak belirle.
+    final sb = StringBuffer();
 
-Konum: $il / $ilce / $mahalle
-İnşaat teslim süresi: $insaatSuresi ay
+    sb.writeln('İnşaat Teklif Analiz Raporu');
+    sb.writeln('══════════════════════════════════');
+    sb.writeln();
+    sb.writeln('Bu analiz, TÜİK/TCMB İnşaat Maliyet Endeksine dayalı yerleşik veriler '
+        'kullanılarak hazırlanmıştır. Toplam $toplamM2 m² inşaat alanı için tahmini '
+        'inşaat süresi $insaatSuresi ay olarak hesaplanmıştır.');
+    sb.writeln();
+    sb.writeln('Güncel m² imalat maliyeti $guncelM2 ₺ olup, yıllık %$yillikEnflasyon '
+        'inşaat enflasyonu dikkate alındığında, inşaat süresince ortalama m² maliyetin '
+        '$enflasyonluM2 ₺ seviyesine ulaşması öngörülmektedir. %$karOrani kar oranı '
+        'eklenmesiyle kar dahil m² fiyat $karliM2 ₺ olarak belirlenmiştir.');
+    sb.writeln();
 
-Daireler:
-$daireListesi
+    if (senaryo == 1) {
+      sb.writeln('Senaryo 1 (Müteahhit Daire Almıyor): Toplam inşaat maliyeti '
+          '$toplamMaliyet ₺ olarak hesaplanmış olup, bu tutar mal sahibi daireleri '
+          'arasında metrekare oranlarına göre paylaştırılmıştır. Hibe ve kredi '
+          'imkanları olan dairelerde bu tutarlar net ödemeden düşülmüştür.');
+    } else {
+      final mutSatis = f.format((hesapSonucu['muteahhitSatisGeliri'] as double).round());
+      final kalan = f.format((hesapSonucu['kalanMaliyet'] as double).round());
+      final mutDaireler = hesapSonucu['muteahhitDaireleri'] as List;
+      final malDaireler = hesapSonucu['malSahibiDaireleri'] as List;
 
-KURALLAR:
-- Türkiye'deki güncel emlak piyasa fiyatlarını baz al
-- Konum, m², kat faktörünü göz önüne al (üst katlar genelde daha değerli)
-- $insaatSuresi ay sonraki fiyat artışını tahmin et
-- Sadece JSON formatında yanıt ver, açıklama yazma
-
-YANIT FORMATI (kesinlikle sadece bu JSON):
-{
-  "tahminler": [
-    {"index": 0, "fiyat": 5000000, "m2Fiyat": 40000},
-    {"index": 1, "fiyat": 4500000, "m2Fiyat": 38000}
-  ],
-  "aciklama": "Bölge ortalaması ve kat faktörüne göre hesaplandı"
-}
-''';
-
-    try {
-      final text = await _generateContent(prompt);
-
-      // JSON'u çıkar
-      final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(text);
-      if (jsonMatch != null) {
-        final parsed = json.decode(jsonMatch.group(0)!);
-        return parsed as Map<String, dynamic>;
-      }
-    } catch (e) {
-      debugPrint('Gemini daire fiyat tahmini hatası: $e');
+      sb.writeln('Senaryo 2 (Müteahhit Daire Alıyor): Müteahhite ${mutDaireler.length} '
+          'daire tahsis edilmiş olup, bu dairelerin tahmini toplam satış geliri '
+          '$mutSatis ₺ olarak hesaplanmıştır. Toplam inşaat maliyeti $toplamMaliyet ₺\'den '
+          'müteahhit daire satış geliri düşüldüğünde, mal sahiplerine kalan maliyet '
+          '$kalan ₺\'dir. Bu tutar ${malDaireler.length} mal sahibi dairesi arasında '
+          'm² oranlarına göre paylaştırılmıştır.');
     }
 
-    // Fallback: basit tahmin
-    return {
-      'tahminler': daireler.asMap().entries.map((e) {
-        final m2 = (e.value['m2'] as num).toDouble();
-        final kat = e.value['kat'] as int? ?? 1;
-        final bazFiyat = 35000.0; // Varsayılan m² fiyat
-        final katFaktoru = 1.0 + (kat * 0.02);
-        final fiyat = m2 * bazFiyat * katFaktoru;
-        return {'index': e.key, 'fiyat': fiyat.round(), 'm2Fiyat': (bazFiyat * katFaktoru).round()};
-      }).toList(),
-      'aciklama': 'TCMB verisi alınamadı, varsayılan değerler kullanıldı. Lütfen kontrol edin.',
-    };
-  }
+    sb.writeln();
+    sb.writeln('⚠️ Not: Bu hesaplamalar tahmini değerlerdir. Gerçek maliyetler piyasa '
+        'koşullarına, malzeme fiyatlarına ve işçilik ücretlerine göre değişiklik '
+        'gösterebilir. Daire satış fiyat tahminleri il bazlı ortalama verilere '
+        'dayalı olup, gerçek fiyatlar konum, bina kalitesi ve piyasa koşullarına '
+        'göre farklılık gösterebilir.');
 
-  /// Tam AI teklif analizi - her iki senaryo için özet rapor
-  Future<String> teklifOzetiOlustur(Map<String, dynamic> hesapSonucu) async {
-    final senaryo = hesapSonucu['senaryo'];
-    final prompt = '''
-Aşağıdaki inşaat teklif hesaplama sonucunu Türkçe olarak özetleyecek kısa bir analiz yaz.
-Müteahhite sunulacak şekilde profesyonel bir dille yaz. 3-4 paragraf olsun.
-
-Hesap Sonucu:
-${json.encode(hesapSonucu)}
-
-Senaryo: ${senaryo == 1 ? 'Müteahhit daire almıyor, saf metrekare fiyatı' : 'Müteahhit daire alıyor'}
-
-Önemli noktalar:
-- Enflasyon projeksiyonunun TCMB İnşaat Maliyet Endeksine dayandığını belirt
-- İnşaat süresinin toplam alana göre hesaplandığını belirt
-- Verilerin tahmini olduğunu ve piyasa koşullarına göre değişebileceğini belirt
-''';
-
-    try {
-      final text = await _generateContent(prompt);
-      return text.isNotEmpty ? text : 'Özet oluşturulamadı.';
-    } catch (e) {
-      debugPrint('Gemini özet hatası: $e');
-      return 'AI özeti oluşturulurken hata oluştu: $e';
-    }
+    return sb.toString();
   }
 }

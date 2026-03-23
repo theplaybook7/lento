@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +8,38 @@ import '../models/payment_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/image_utils.dart';
 import '../theme/app_theme.dart';
+
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    // Sadece rakam ve virgül (ondalık) kabul et
+    final cleanText = newValue.text.replaceAll('.', '');
+    // Virgülden böl
+    final parts = cleanText.split(',');
+    final intPart = parts[0].replaceAll(RegExp(r'[^0-9]'), '');
+    if (intPart.isEmpty) return newValue;
+    // Binlik ayraç ekle
+    final formatted = NumberFormat('#,###', 'tr_TR').format(int.parse(intPart));
+    final result = parts.length > 1 ? '$formatted,${parts[1]}' : formatted;
+    return TextEditingValue(
+      text: result,
+      selection: TextSelection.collapsed(offset: result.length),
+    );
+  }
+}
+
+String _formatInitialAmount(double amount) {
+  if (amount == amount.roundToDouble()) {
+    return NumberFormat('#,###', 'tr_TR').format(amount.toInt());
+  }
+  return NumberFormat('#,##0.00', 'tr_TR').format(amount);
+}
+
+double _parseFormattedAmount(String text) {
+  // "1.000.000,50" -> 1000000.50
+  return double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+}
 
 class PaymentPlanDetailsScreen extends StatefulWidget {
   final String paymentPlanId;
@@ -361,7 +394,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
   }
 
   void _markAsPaid(PaymentInstallment installment, List<PaymentInstallment> allInstallments) async {
-    final paidAmountCtrl = TextEditingController(text: installment.amount.toString());
+    final paidAmountCtrl = TextEditingController(text: _formatInitialAmount(installment.amount));
     final List<XFile> selectedImages = [];
     DateTime selectedDate = DateTime.now();
     final tarihCtrl = TextEditingController(text: DateFormat('dd.MM.yyyy').format(selectedDate));
@@ -401,6 +434,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                   TextField(
                     controller: paidAmountCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [ThousandsSeparatorInputFormatter()],
                     decoration: InputDecoration(
                       labelText: 'Ödenen Tutar ($paraBirimi)',
                       prefixIcon: const Icon(Icons.monetization_on),
@@ -468,7 +502,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                   if (paraBirimi != 'TL') ...[
                     Builder(
                       builder: (context) {
-                        final tutar = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+                        final tutar = _parseFormattedAmount(paidAmountCtrl.text);
                         double kur = 0;
                         if (paraBirimi == 'USD') {
                           kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
@@ -614,7 +648,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
               TextButton(
                 onPressed: () {
                   // Dialog kapatmadan önce değerleri kaydet
-                  final paidAmount = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+                  final paidAmount = _parseFormattedAmount(paidAmountCtrl.text);
                   
                   if (paidAmount <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -661,7 +695,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
 
     if (result != true) return;
 
-    final paidAmount = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+    final paidAmount = _parseFormattedAmount(paidAmountCtrl.text);
     if (paidAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Geçerli bir tutar girin')),
@@ -899,7 +933,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
     final originalDate = record['createdAt'] as Timestamp?;
     final existingPhotos = List<String>.from(record['photoUrls'] ?? []);
 
-    final paidAmountCtrl = TextEditingController(text: originalPaidAmount.toString());
+    final paidAmountCtrl = TextEditingController(text: _formatInitialAmount(originalPaidAmount));
     DateTime selectedDate = originalDate?.toDate() ?? DateTime.now();
     final tarihCtrl = TextEditingController(text: DateFormat('dd.MM.yyyy').format(selectedDate));
     String paraBirimi = originalCurrency;
@@ -948,6 +982,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                   TextField(
                     controller: paidAmountCtrl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [ThousandsSeparatorInputFormatter()],
                     decoration: InputDecoration(
                       labelText: 'Ödenen Tutar ($paraBirimi)',
                       prefixIcon: const Icon(Icons.monetization_on),
@@ -963,7 +998,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                   if (paraBirimi == 'GBP') ...[TextField(controller: kurGBPCtrl, decoration: const InputDecoration(labelText: 'GBP Kuru (TL) *', border: OutlineInputBorder(), hintText: 'Örn: 43,50'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (val) => setState(() {})), const SizedBox(height: 12)],
                   if (paraBirimi == 'ALTIN') ...[TextField(controller: altinKurCtrl, decoration: const InputDecoration(labelText: 'Gram Fiyatı (TL) *', border: OutlineInputBorder(), hintText: 'Örn: 2.850,00'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (val) => setState(() {})), const SizedBox(height: 12)],
                   if (paraBirimi != 'TL') ...[Builder(builder: (context) {
-                    final tutar = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+                    final tutar = _parseFormattedAmount(paidAmountCtrl.text);
                     double kur = 0;
                     if (paraBirimi == 'USD') kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
                     else if (paraBirimi == 'EUR') kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
@@ -1007,7 +1042,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
               TextButton(onPressed: () => Navigator.pop(c), child: const Text('İptal')),
               TextButton(
                 onPressed: () {
-                  final paidAmount = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+                  final paidAmount = _parseFormattedAmount(paidAmountCtrl.text);
                   if (paidAmount <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Geçerli bir tutar girin')));
                     return;
@@ -1039,7 +1074,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
 
     if (result != true) return;
 
-    final paidAmount = double.tryParse(paidAmountCtrl.text.replaceAll(',', '.')) ?? 0;
+    final paidAmount = _parseFormattedAmount(paidAmountCtrl.text);
     if (paidAmount <= 0) return;
     final tlTutar = calculatedTlAmount;
     final finalCurrency = selectedCurrencyForSaving;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
 import '../theme/app_theme.dart';
@@ -118,20 +119,20 @@ class _CreatePaymentPlanScreenState extends State<CreatePaymentPlanScreen> {
   void _updateInstallmentPercentage(int index, String value) {
     final percentage = double.tryParse(value) ?? 0;
     if (index >= 0 && index < _installmentPercentages.length) {
-      final totalAmount = double.tryParse(_totalAmountCtrl.text) ?? 0;
+      final totalAmount = _parseFormatted(_totalAmountCtrl.text);
       final amount = (totalAmount * percentage) / 100;
       
       setState(() {
         _installmentPercentages[index] = percentage;
-        _amountControllers[index].text = amount.toStringAsFixed(2);
+        _amountControllers[index].text = _formatAmount(amount);
       });
     }
   }
 
   void _updateInstallmentAmount(int index, String value) {
-    final amount = double.tryParse(value) ?? 0;
+    final amount = _parseFormatted(value);
     if (index >= 0 && index < _amountControllers.length) {
-      final totalAmount = double.tryParse(_totalAmountCtrl.text) ?? 0;
+      final totalAmount = _parseFormatted(_totalAmountCtrl.text);
       if (totalAmount > 0) {
         final percentage = (amount / totalAmount) * 100;
         setState(() {
@@ -168,7 +169,7 @@ class _CreatePaymentPlanScreenState extends State<CreatePaymentPlanScreen> {
     try {
       final firstName = _firstNameCtrl.text.trim();
       final lastName = _lastNameCtrl.text.trim();
-      final totalAmount = double.parse(_totalAmountCtrl.text);
+      final totalAmount = _parseFormatted(_totalAmountCtrl.text);
 
       await _firebase.createPaymentPlan(
         projectId: widget.projectId,
@@ -262,6 +263,7 @@ class _CreatePaymentPlanScreenState extends State<CreatePaymentPlanScreen> {
               TextFormField(
                 controller: _totalAmountCtrl,
                 keyboardType: TextInputType.number,
+                inputFormatters: [_ThousandsSeparatorFormatter()],
                 decoration: const InputDecoration(
                   labelText: 'Toplam Ödenecek Tutar (₺)',
                   prefixIcon: Icon(Icons.monetization_on),
@@ -269,7 +271,7 @@ class _CreatePaymentPlanScreenState extends State<CreatePaymentPlanScreen> {
                 ),
                 validator: (v) {
                   if (v?.isEmpty ?? true) return 'Tutar gerekli';
-                  if (double.tryParse(v!) == null) return 'Geçerli tutar girin';
+                  if (_parseFormatted(v!) <= 0) return 'Geçerli tutar girin';
                   return null;
                 },
               ),
@@ -363,6 +365,7 @@ class _CreatePaymentPlanScreenState extends State<CreatePaymentPlanScreen> {
                                       child: TextField(
                                         controller: _amountControllers[index],
                                         keyboardType: TextInputType.number,
+                                        inputFormatters: [_ThousandsSeparatorFormatter()],
                                         decoration: const InputDecoration(
                                           labelText: 'Tutar (₺)',
                                           border: OutlineInputBorder(),
@@ -425,6 +428,34 @@ class _CreatePaymentPlanScreenState extends State<CreatePaymentPlanScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+double _parseFormatted(String text) {
+  return double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+}
+
+String _formatAmount(double amount) {
+  if (amount == amount.roundToDouble()) {
+    return NumberFormat('#,###', 'tr_TR').format(amount.toInt());
+  }
+  return NumberFormat('#,##0.00', 'tr_TR').format(amount);
+}
+
+class _ThousandsSeparatorFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    final cleanText = newValue.text.replaceAll('.', '');
+    final parts = cleanText.split(',');
+    final intPart = parts[0].replaceAll(RegExp(r'[^0-9]'), '');
+    if (intPart.isEmpty) return newValue;
+    final formatted = NumberFormat('#,###', 'tr_TR').format(int.parse(intPart));
+    final result = parts.length > 1 ? '$formatted,${parts[1]}' : formatted;
+    return TextEditingValue(
+      text: result,
+      selection: TextSelection.collapsed(offset: result.length),
     );
   }
 }

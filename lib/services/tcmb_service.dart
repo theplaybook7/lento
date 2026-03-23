@@ -57,12 +57,21 @@ class TcmbService {
   List<_EndeksVeri> _canliEndeks = [];
   String _veriKaynagi = 'yerleşik';
   DateTime? _sonGuncelleme;
+  String? _sonHataMesaji;
+
+  String? get sonHataMesaji => _sonHataMesaji;
 
   /// TCMB EVDS API'den güncel inşaat maliyet endeksi çeker
+  /// Dönen değer: true = başarılı, false = başarısız
+  /// Hata durumunda _sonHataMesaji set edilir
   Future<bool> verileriGuncelle() async {
+    _sonHataMesaji = null;
     try {
       final apiKey = await getApiKey();
-      if (apiKey == null || apiKey.isEmpty) return false;
+      if (apiKey == null || apiKey.isEmpty) {
+        _sonHataMesaji = 'API anahtarı girilmemiş. Ayarlardan TCMB EVDS API anahtarı girin.';
+        return false;
+      }
 
       // TCMB EVDS: İnşaat Maliyet Endeksi (TP.INSAAT.M1 = Genel)
       final now = DateTime.now();
@@ -77,11 +86,21 @@ class TcmbService {
       );
 
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) return false;
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        _sonHataMesaji = 'API anahtarı geçersiz veya yetkisiz (HTTP ${response.statusCode}).';
+        return false;
+      }
+      if (response.statusCode != 200) {
+        _sonHataMesaji = 'TCMB API\'ye ulaşılamadı (HTTP ${response.statusCode}).';
+        return false;
+      }
 
       final data = json.decode(response.body);
       final items = data['items'] as List?;
-      if (items == null || items.isEmpty) return false;
+      if (items == null || items.isEmpty) {
+        _sonHataMesaji = 'API yanıtında veri bulunamadı.';
+        return false;
+      }
 
       _canliEndeks = [];
       for (final item in items) {
@@ -106,7 +125,16 @@ class TcmbService {
         _sonGuncelleme = DateTime.now();
         return true;
       }
-    } catch (_) {}
+      _sonHataMesaji = 'API\'den veri işlenemedi.';
+    } on http.ClientException {
+      _sonHataMesaji = 'İnternet bağlantısı yok veya TCMB sunucusuna ulaşılamıyor.';
+    } catch (e) {
+      if (e.toString().contains('TimeoutException')) {
+        _sonHataMesaji = 'TCMB API yanıt vermedi (zaman aşımı).';
+      } else {
+        _sonHataMesaji = 'Bağlantı hatası: ${e.toString().length > 80 ? e.toString().substring(0, 80) : e}';
+      }
+    }
     return false;
   }
 

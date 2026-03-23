@@ -12,6 +12,8 @@ class AiTeklifService {
 
   String get veriKaynagi => _tcmb.veriKaynagi;
 
+  String? get tcmbHataMesaji => _tcmb.sonHataMesaji;
+
   int insaatSuresiHesapla(double toplamM2) =>
       TcmbService.insaatSuresiHesapla(toplamM2);
 

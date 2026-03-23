@@ -55,6 +55,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   // Step 2: İnşaat bilgileri
   final _toplamM2Ctrl = TextEditingController();
   final _katSayisiCtrl = TextEditingController();
+  final _katBasiDaireCtrl = TextEditingController(text: '2');
   final _guncelMaliyetCtrl = TextEditingController();
   final _karOraniCtrl = TextEditingController(text: '20');
 
@@ -82,36 +83,45 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     _mahalleCtrl.dispose();
     _toplamM2Ctrl.dispose();
     _katSayisiCtrl.dispose();
+    _katBasiDaireCtrl.dispose();
     _guncelMaliyetCtrl.dispose();
     _karOraniCtrl.dispose();
     _hibeTutariCtrl.dispose();
     _krediTutariCtrl.dispose();
     for (final d in _daireler) {
       (d['m2Ctrl'] as TextEditingController).dispose();
-      (d['katCtrl'] as TextEditingController).dispose();
     }
     super.dispose();
   }
 
-  void _daireBolumEkle() {
-    setState(() {
-      _daireler.add({
-        'tip': 'Daire',
-        'm2Ctrl': TextEditingController(),
-        'katCtrl': TextEditingController(text: '${_daireler.length + 1}'),
-        'sahip': 'malSahibi',
-        'hibeVar': false,
-        'krediVar': false,
-      });
-    });
-  }
+  void _daireleriOlustur() {
+    for (final d in _daireler) {
+      (d['m2Ctrl'] as TextEditingController).dispose();
+    }
+    _daireler.clear();
 
-  void _daireSil(int index) {
-    setState(() {
-      (_daireler[index]['m2Ctrl'] as TextEditingController).dispose();
-      (_daireler[index]['katCtrl'] as TextEditingController).dispose();
-      _daireler.removeAt(index);
-    });
+    final katSayisi = int.tryParse(_katSayisiCtrl.text) ?? 1;
+    final katBasiDaire = int.tryParse(_katBasiDaireCtrl.text) ?? 2;
+    final toplamM2 = _parseN(_toplamM2Ctrl.text);
+    final toplamDaire = katSayisi * katBasiDaire;
+    final daireM2 = toplamDaire > 0 ? toplamM2 / toplamDaire : 0.0;
+    final daireM2Str = daireM2 > 0 ? _formatN(daireM2) : '';
+
+    int no = 1;
+    for (int kat = 1; kat <= katSayisi; kat++) {
+      for (int i = 0; i < katBasiDaire; i++) {
+        _daireler.add({
+          'tip': 'Daire',
+          'm2Ctrl': TextEditingController(text: daireM2Str),
+          'kat': kat,
+          'no': no++,
+          'sahip': 'malSahibi',
+          'hibeVar': false,
+          'krediVar': false,
+        });
+      }
+    }
+    setState(() {});
   }
 
   int get _hesaplananSure => TcmbService.insaatSuresiHesapla(_parseN(_toplamM2Ctrl.text));
@@ -124,6 +134,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             _mahalleCtrl.text.trim().isNotEmpty;
       case 1:
         return _parseN(_toplamM2Ctrl.text) > 0 &&
+            (int.tryParse(_katSayisiCtrl.text) ?? 0) > 0 &&
+            (int.tryParse(_katBasiDaireCtrl.text) ?? 0) > 0 &&
             _parseN(_guncelMaliyetCtrl.text) > 0 &&
             _parseN(_karOraniCtrl.text) > 0;
       case 2:
@@ -164,7 +176,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       // 2. Daire listesini hazırla
       final daireListesi = _daireler.map((d) => {
         'm2': _parseN((d['m2Ctrl'] as TextEditingController).text),
-        'kat': int.tryParse((d['katCtrl'] as TextEditingController).text) ?? 1,
+        'kat': d['kat'] as int,
         'tip': d['tip'] as String,
         'sahip': d['sahip'] as String,
         'hibeVar': d['hibeVar'] as bool,
@@ -390,6 +402,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                     if (_currentStep == 3) {
                       _hesaplaVeAnaliz();
                     } else if (_validateStep(_currentStep)) {
+                      if (_currentStep == 1) {
+                        _daireleriOlustur();
+                      }
                       setState(() => _currentStep++);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -554,6 +569,17 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         ),
         const SizedBox(height: 12),
         TextField(
+          controller: _katBasiDaireCtrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Kat Başı Daire Sayısı',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.door_front_door),
+            hintText: 'Örn: 2',
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
           controller: _guncelMaliyetCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [_TBinlikFormatter()],
@@ -580,6 +606,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   }
 
   Widget _buildStep3() {
+    final katSayisi = int.tryParse(_katSayisiCtrl.text) ?? 1;
+    final katBasiDaire = int.tryParse(_katBasiDaireCtrl.text) ?? 2;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -612,10 +641,10 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
 
-        // Senaryo 2 uyarı kartı
+        // Senaryo 2 uyarı
         if (_senaryo == 2) ...[
+          const SizedBox(height: 8),
           Card(
             color: Colors.orange.shade100,
             shape: RoundedRectangleBorder(
@@ -626,216 +655,283 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 28),
-                  const SizedBox(width: 12),
+                  Icon(Icons.touch_app, color: Colors.orange.shade800, size: 24),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Müteahhit Dairelerini Seçin!',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900, fontSize: 15)),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Her dairenin altındaki butona tıklayarak müteahhitin alacağı daireleri belirleyin.',
-                          style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Müteahhit: ${_daireler.where((d) => d['sahip'] == 'muteahhit').length} daire   •   Mal Sahibi: ${_daireler.where((d) => d['sahip'] == 'malSahibi').length} daire',
-                          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.orange.shade900, fontSize: 13),
-                        ),
-                      ],
+                    child: Text(
+                      'Krokide dairelere tıklayarak müteahhitin alacağı daireleri seçin.\n'
+                      'Müteahhit: ${_daireler.where((d) => d['sahip'] == 'muteahhit').length}  •  '
+                      'Mal Sahibi: ${_daireler.where((d) => d['sahip'] == 'malSahibi').length}',
+                      style: TextStyle(color: Colors.orange.shade900, fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 8),
         ],
 
-        // Daire listesi
-        ..._daireler.asMap().entries.map((entry) {
-          final i = entry.key;
-          final d = entry.value;
-          final isMuteahhit = d['sahip'] == 'muteahhit';
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            color: _senaryo == 2 && isMuteahhit ? Colors.orange.shade50 : null,
-            shape: _senaryo == 2
-                ? RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: isMuteahhit ? Colors.orange.shade400 : Colors.grey.shade300,
-                      width: isMuteahhit ? 2 : 1,
-                    ),
-                  )
-                : null,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Text('Daire ${i + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      if (_senaryo == 2) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isMuteahhit ? Colors.orange : Colors.blue,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            isMuteahhit ? 'Müteahhit' : 'Mal Sahibi',
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                        onPressed: () => _daireSil(i),
-                      ),
-                    ],
-                  ),
-                  if (_senaryo == 2) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => d['sahip'] = 'malSahibi'),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: !isMuteahhit ? Colors.blue : Colors.grey.shade200,
-                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '🏠 Mal Sahibi',
-                                  style: TextStyle(
-                                    color: !isMuteahhit ? Colors.white : Colors.grey.shade600,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => d['sahip'] = 'muteahhit'),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isMuteahhit ? Colors.orange : Colors.grey.shade200,
-                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '🏗 Müteahhit',
-                                  style: TextStyle(
-                                    color: isMuteahhit ? Colors.white : Colors.grey.shade600,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+        const SizedBox(height: 12),
+
+        // Bina Krokisi
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade700, width: 2),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Column(
+            children: [
+              // Çatı
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.brown.shade400,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.roofing, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Bina Krokisi — $katSayisi Kat, ${katSayisi * katBasiDaire} Daire',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: DropdownButtonFormField<String>(
-                          value: d['tip'] as String,
-                          decoration: const InputDecoration(
-                            labelText: 'Tip',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: ['Daire', 'Dubleks', 'Dükkan', 'Ofis']
-                              .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                              .toList(),
-                          onChanged: (v) => setState(() => d['tip'] = v),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: d['m2Ctrl'] as TextEditingController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [_TBinlikFormatter()],
-                          decoration: const InputDecoration(
-                            labelText: 'm²',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: d['katCtrl'] as TextEditingController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Kat',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: CheckboxListTile(
-                          title: const Text('Hibe', style: TextStyle(fontSize: 13)),
-                          value: d['hibeVar'] as bool,
-                          onChanged: (v) => setState(() => d['hibeVar'] = v),
-                          dense: true,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                      Expanded(
-                        child: CheckboxListTile(
-                          title: const Text('Kredi', style: TextStyle(fontSize: 13)),
-                          value: d['krediVar'] as bool,
-                          onChanged: (v) => setState(() => d['krediVar'] = v),
-                          dense: true,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-          );
-        }),
+              // Katlar (üstten alta)
+              for (int kat = katSayisi; kat >= 1; kat--)
+                _buildKatSatiri(kat, katBasiDaire),
+            ],
+          ),
+        ),
 
+        if (_senaryo == 2) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(width: 16, height: 16, decoration: BoxDecoration(color: Colors.orange.shade200, border: Border.all(color: Colors.orange.shade400))),
+              const SizedBox(width: 4),
+              const Text('Müteahhit', style: TextStyle(fontSize: 11)),
+              const SizedBox(width: 16),
+              Container(width: 16, height: 16, decoration: BoxDecoration(color: Colors.blue.shade50, border: Border.all(color: Colors.blue.shade200))),
+              const SizedBox(width: 4),
+              const Text('Mal Sahibi', style: TextStyle(fontSize: 11)),
+            ],
+          ),
+        ],
+
+        const SizedBox(height: 8),
         Center(
-          child: ElevatedButton.icon(
-            onPressed: _daireBolumEkle,
-            icon: const Icon(Icons.add),
-            label: const Text('Daire Ekle'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade600, foregroundColor: Colors.white),
+          child: Text(
+            '📝 Dairenin detaylarını düzenlemek için üzerine uzun basın',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildKatSatiri(int kat, int daireSayisi) {
+    final katDaireleri = _daireler.where((d) => d['kat'] == kat).toList();
+    if (katDaireleri.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey.shade500)),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Kat numarası
+            Container(
+              width: 30,
+              color: Colors.grey.shade200,
+              child: Center(
+                child: Text(
+                  '$kat',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade700, fontSize: 13),
+                ),
+              ),
+            ),
+            Container(width: 1, color: Colors.grey.shade500),
+            // Daireler
+            ...katDaireleri.asMap().entries.map((entry) {
+              final isLast = entry.key == katDaireleri.length - 1;
+              return Expanded(
+                child: Container(
+                  decoration: isLast
+                      ? null
+                      : BoxDecoration(border: Border(right: BorderSide(color: Colors.grey.shade400))),
+                  child: _buildDaireHucre(entry.value),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDaireHucre(Map<String, dynamic> daire) {
+    final isMuteahhit = daire['sahip'] == 'muteahhit';
+    final no = daire['no'] as int;
+    final m2Ctrl = daire['m2Ctrl'] as TextEditingController;
+    final tip = daire['tip'] as String;
+    final hibeVar = daire['hibeVar'] as bool;
+    final krediVar = daire['krediVar'] as bool;
+
+    Color bgColor;
+    if (_senaryo == 2) {
+      bgColor = isMuteahhit ? Colors.orange.shade100 : Colors.blue.shade50;
+    } else {
+      bgColor = Colors.white;
+    }
+
+    return GestureDetector(
+      onTap: _senaryo == 2
+          ? () => setState(() {
+                daire['sahip'] = isMuteahhit ? 'malSahibi' : 'muteahhit';
+              })
+          : () => _daireDuzenleDialog(daire),
+      onLongPress: () => _daireDuzenleDialog(daire),
+      child: Container(
+        color: bgColor,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('D$no', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                if (_senaryo == 2) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    isMuteahhit ? Icons.construction : Icons.home,
+                    size: 14,
+                    color: isMuteahhit ? Colors.orange.shade700 : Colors.blue.shade700,
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '${m2Ctrl.text} m²',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
+            ),
+            Text(tip, style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+            if (hibeVar || krediVar)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hibeVar) Text('H', style: TextStyle(fontSize: 9, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+                  if (hibeVar && krediVar) const Text(' ', style: TextStyle(fontSize: 9)),
+                  if (krediVar) Text('K', style: TextStyle(fontSize: 9, color: Colors.purple.shade700, fontWeight: FontWeight.bold)),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _daireDuzenleDialog(Map<String, dynamic> daire) {
+    final m2Ctrl = daire['m2Ctrl'] as TextEditingController;
+    final tempM2Ctrl = TextEditingController(text: m2Ctrl.text);
+    String tempTip = daire['tip'] as String;
+    bool tempHibe = daire['hibeVar'] as bool;
+    bool tempKredi = daire['krediVar'] as bool;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Daire ${daire['no']} — ${daire['kat']}. Kat'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: tempM2Ctrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [_TBinlikFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Metrekare (m²)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.square_foot),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: tempTip,
+                decoration: const InputDecoration(
+                  labelText: 'Tip',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.category),
+                ),
+                items: ['Daire', 'Dubleks', 'Dükkan', 'Ofis']
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                    .toList(),
+                onChanged: (v) => setDialogState(() => tempTip = v!),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: CheckboxListTile(
+                      title: const Text('Hibe', style: TextStyle(fontSize: 13)),
+                      value: tempHibe,
+                      onChanged: (v) => setDialogState(() => tempHibe = v!),
+                      dense: true,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  Expanded(
+                    child: CheckboxListTile(
+                      title: const Text('Kredi', style: TextStyle(fontSize: 13)),
+                      value: tempKredi,
+                      onChanged: (v) => setDialogState(() => tempKredi = v!),
+                      dense: true,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                tempM2Ctrl.dispose();
+                Navigator.pop(ctx);
+              },
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  m2Ctrl.text = tempM2Ctrl.text;
+                  daire['tip'] = tempTip;
+                  daire['hibeVar'] = tempHibe;
+                  daire['krediVar'] = tempKredi;
+                });
+                tempM2Ctrl.dispose();
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

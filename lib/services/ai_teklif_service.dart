@@ -1,22 +1,44 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import 'tcmb_service.dart';
 
 class AiTeklifService {
   static const String _geminiApiKey = 'AIzaSyCKiWnxhgb2xzby3RD7ZEGvRONphJTHsLs';
-  late final GenerativeModel _model;
+  static const String _model = 'gemini-2.0-flash';
   final TcmbService _tcmb = TcmbService();
 
-  AiTeklifService() {
-    _model = GenerativeModel(
-      model: 'gemini-1.5-flash',
-      apiKey: _geminiApiKey,
-      generationConfig: GenerationConfig(
-        temperature: 0.3,
-        maxOutputTokens: 4096,
-      ),
+  Future<String> _generateContent(String prompt) async {
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1/models/$_model:generateContent?key=$_geminiApiKey',
     );
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'contents': [
+          {
+            'parts': [
+              {'text': prompt}
+            ]
+          }
+        ],
+        'generationConfig': {
+          'temperature': 0.3,
+          'maxOutputTokens': 4096,
+        },
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String? ?? '';
+      return text;
+    } else {
+      debugPrint('Gemini API hatası: ${response.statusCode} - ${response.body}');
+      throw Exception('Gemini API hatası: ${response.statusCode}');
+    }
   }
 
   /// İnşaat süresini hesaplar
@@ -237,8 +259,7 @@ YANIT FORMATI (kesinlikle sadece bu JSON):
 ''';
 
     try {
-      final response = await _model.generateContent([Content.text(prompt)]);
-      final text = response.text ?? '';
+      final text = await _generateContent(prompt);
 
       // JSON'u çıkar
       final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(text);
@@ -283,8 +304,8 @@ Senaryo: ${senaryo == 1 ? 'Müteahhit daire almıyor, saf metrekare fiyatı' : '
 ''';
 
     try {
-      final response = await _model.generateContent([Content.text(prompt)]);
-      return response.text ?? 'Özet oluşturulamadı.';
+      final text = await _generateContent(prompt);
+      return text.isNotEmpty ? text : 'Özet oluşturulamadı.';
     } catch (e) {
       debugPrint('Gemini özet hatası: $e');
       return 'AI özeti oluşturulurken hata oluştu: $e';

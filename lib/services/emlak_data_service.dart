@@ -122,10 +122,8 @@ class EmlakDataService {
     sb.writeln('Pazar Analizi: $il / $ilce / $mahalle');
     sb.writeln('─' * 40);
     sb.writeln();
-    sb.writeln('Bölge Sıfır Bina m² Satış Fiyatları:');
-    sb.writeln('  En Düşük: ${_fmtN(fiyat['min']!)} ₺/m²');
-    sb.writeln('  Ortalama: ${_fmtN(fiyat['avg']!)} ₺/m²');
-    sb.writeln('  En Yüksek: ${_fmtN(fiyat['max']!)} ₺/m²');
+    sb.writeln('Bölge Sıfır Bina m² Satış Fiyatı:');
+    sb.writeln('  Ortalama: yaklaşık ${_fmtN(fiyat['avg']!)} ₺/m²');
     sb.writeln();
 
     sb.writeln('Daire Bazlı Satış Tahminleri ($insaatSuresi ay sonrası):');
@@ -145,7 +143,7 @@ class EmlakDataService {
         mahalle: mahalle,
       );
 
-      sb.writeln('  $tip ${m2.round()} m² (${_katAdi(kat)}): ${_fmtN(tahmin['minToplam']!)} ₺ - ${_fmtN(tahmin['maxToplam']!)} ₺');
+      sb.writeln('  $tip ${m2.round()} m² (${_katAdi(kat)}): yaklaşık ${_fmtN(tahmin['avgToplam']!)} ₺');
     }
 
     sb.writeln();

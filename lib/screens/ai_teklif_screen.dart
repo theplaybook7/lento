@@ -69,9 +69,11 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   final List<Map<String, dynamic>> _katlar = [];
   int _senaryo = 1;
 
-  // Step 4: Hibe/Kredi
-  final _hibeTutariCtrl = TextEditingController(text: '0');
-  final _krediTutariCtrl = TextEditingController(text: '0');
+  // Step 4: Hibe/Kredi (tip bazlı)
+  final _daireHibeTutariCtrl = TextEditingController(text: '0');
+  final _dukkanHibeTutariCtrl = TextEditingController(text: '0');
+  final _daireKrediTutariCtrl = TextEditingController(text: '0');
+  final _dukkanKrediTutariCtrl = TextEditingController(text: '0');
 
   // Step 5: AI tahminleri
   Map<String, dynamic>? _enflasyonProjeksiyonu;
@@ -111,8 +113,10 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     _normalKatSayisiCtrl.dispose();
     _guncelMaliyetCtrl.dispose();
     _karOraniCtrl.dispose();
-    _hibeTutariCtrl.dispose();
-    _krediTutariCtrl.dispose();
+    _daireHibeTutariCtrl.dispose();
+    _dukkanHibeTutariCtrl.dispose();
+    _daireKrediTutariCtrl.dispose();
+    _dukkanKrediTutariCtrl.dispose();
     for (final k in _katlar) {
       (k['katAlaniCtrl'] as TextEditingController).dispose();
       for (final d in (k['daireler'] as List)) {
@@ -175,13 +179,22 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       });
     }
 
-    // Her kata 2 daire
-    int no = 1;
-    for (final k in _katlar) {
-      final daireList = k['daireler'] as List<Map<String, dynamic>>;
-      for (int i = 0; i < 2; i++) {
-        daireList.add(_yeniDaire(no: no++, kat: k['kat'] as int));
-      }
+    // Sığınak kontrolü — gerekiyorsa en alt kata otomatik ekle
+    if (_toplamM2 >= 1500 && _katlar.isNotEmpty) {
+      final enAltKat = _katlar.first;
+      final tahminiKonut = _katlar.length * 2;
+      final siginakM2 = (tahminiKonut * 4.0).clamp(30.0, 120.0);
+      (enAltKat['daireler'] as List<Map<String, dynamic>>).add({
+        'tip': 'Sığınak',
+        'm2Ctrl': TextEditingController(text: _formatN(siginakM2)),
+        'ustM2Ctrl': TextEditingController(),
+        'altM2Ctrl': TextEditingController(),
+        'kat': enAltKat['kat'] as int,
+        'no': 0,
+        'sahip': 'ortak',
+        'hibeVar': false,
+        'krediVar': false,
+      });
     }
 
     setState(() {});
@@ -309,12 +322,22 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       gerekenSiginakM2 = (konutSayisi * 4.0) + (toplamTicariM2 / 20.0);
     }
 
+    // Mevcut sığınak alanını hesapla
+    double mevcutSiginakM2 = 0;
+    for (final k in _katlar) {
+      for (final d in (k['daireler'] as List)) {
+        if (d['tip'] == 'Sığınak') {
+          mevcutSiginakM2 += _parseN((d['m2Ctrl'] as TextEditingController).text);
+        }
+      }
+    }
+
     return {
       'gerekli': siginakSart,
       'gerekenM2': gerekenSiginakM2,
-      'mevcutM2': 0.0,
+      'mevcutM2': mevcutSiginakM2,
       'konutSayisi': konutSayisi,
-      'yeterli': !siginakSart,
+      'yeterli': !siginakSart || mevcutSiginakM2 >= gerekenSiginakM2,
     };
   }
 
@@ -329,9 +352,10 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             _parseN(_karOraniCtrl.text) > 0;
       case 2:
         if (_katlar.isEmpty) return false;
+        int toplamBolum = 0;
         for (final k in _katlar) {
           final daireler = k['daireler'] as List;
-          if (daireler.isEmpty) return false;
+          toplamBolum += daireler.length;
           for (final d in daireler) {
             if (_parseN((d['m2Ctrl'] as TextEditingController).text) <= 0) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -340,6 +364,12 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               return false;
             }
           }
+        }
+        if (toplamBolum == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('En az bir bölüm ekleyin'), backgroundColor: Colors.red),
+          );
+          return false;
         }
         // Cross-floor alan kontrolü
         for (int i = 0; i < _katlar.length; i++) {
@@ -391,6 +421,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         } else if (tip == 'Ters Dubleks' || tip == 'Depolu Dükkan') {
           m2 += _parseN((d['altM2Ctrl'] as TextEditingController).text);
         }
+        if (tip == 'Sığınak') continue;
+        final isDukkan = tip.contains('Dükkan') || tip == 'Ofis';
         list.add({
           'm2': m2,
           'kat': d['kat'] as int,
@@ -398,6 +430,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           'sahip': d['sahip'] as String,
           'hibeVar': d['hibeVar'] as bool,
           'krediVar': d['krediVar'] as bool,
+          'hibeTutari': isDukkan ? _parseN(_dukkanHibeTutariCtrl.text) : _parseN(_daireHibeTutariCtrl.text),
+          'krediTutari': isDukkan ? _parseN(_dukkanKrediTutariCtrl.text) : _parseN(_daireKrediTutariCtrl.text),
         });
       }
     }
@@ -461,8 +495,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           toplamInsaatM2: toplamM2,
           karOrani: _parseN(_karOraniCtrl.text),
           daireler: daireListesi,
-          hibeTutari: _parseN(_hibeTutariCtrl.text),
-          krediTutari: _parseN(_krediTutariCtrl.text),
+          hibeTutari: 0,
+          krediTutari: 0,
           il: il,
           ilce: ilce,
           insaatSuresi: _hesaplananSure,
@@ -474,8 +508,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           toplamInsaatM2: toplamM2,
           karOrani: _parseN(_karOraniCtrl.text),
           daireler: daireListesi,
-          hibeTutari: _parseN(_hibeTutariCtrl.text),
-          krediTutari: _parseN(_krediTutariCtrl.text),
+          hibeTutari: 0,
+          krediTutari: 0,
         );
       }
 
@@ -632,6 +666,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       currentStep: _currentStep,
       type: StepperType.vertical,
       physics: const ClampingScrollPhysics(),
+      onStepTapped: (step) {
+        if (step <= _currentStep) setState(() => _currentStep = step);
+      },
       onStepContinue: () {
         if (_currentStep == 3) {
           _hesaplaVeAnaliz();
@@ -675,6 +712,12 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               ],
               if (_currentStep == 4) ...[
                 const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () => setState(() => _currentStep = 3),
+                  icon: const Icon(Icons.arrow_back, size: 16),
+                  label: const Text('Geri'),
+                ),
+                const SizedBox(width: 8),
                 TextButton(
                   onPressed: () => setState(() {
                     _currentStep = 0;
@@ -713,7 +756,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         Step(
           title: const Text('Bina Krokisi & Daireler'),
           subtitle: _currentStep > 2
-              ? Text('${_toplamDaireSayisi} daire • Senaryo $_senaryo')
+              ? Text('${_toplamDaireSayisi} bölüm • Senaryo $_senaryo')
               : null,
           isActive: _currentStep >= 2,
           state: _currentStep > 2 ? StepState.complete : StepState.indexed,
@@ -830,7 +873,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'En Düşük: ${_formatN(fiyat['min']!)} ₺  •  Ortalama: ${_formatN(fiyat['avg']!)} ₺  •  En Yüksek: ${_formatN(fiyat['max']!)} ₺',
+                    'Ortalama m² Fiyat: yaklaşık ${_formatN(fiyat['avg']!)} ₺',
                     style: const TextStyle(fontSize: 12),
                   ),
                 ],
@@ -1238,6 +1281,17 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             ),
           ),
           // Daireler + phantom hücreler
+          if (daireler.isEmpty && phantoms.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  'Boş — + ile bölüm ekleyin',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                ),
+              ),
+            )
+          else
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1281,7 +1335,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     final daireler = _katlar[katIndex]['daireler'] as List;
 
     Color bgColor;
-    if (_senaryo == 2) {
+    if (tip == 'Sığınak') {
+      bgColor = Colors.green.shade50;
+    } else if (_senaryo == 2) {
       bgColor = isMuteahhit ? Colors.orange.shade100 : Colors.blue.shade50;
     } else {
       bgColor = Colors.transparent;
@@ -1293,6 +1349,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     else if (tip == 'Depolu Dükkan') tipGosterge = 'DD';
     else if (tip == 'Dükkan') tipGosterge = 'Dk';
     else if (tip == 'Ofis') tipGosterge = 'Of';
+    else if (tip == 'Sığınak') tipGosterge = 'S';
 
     return GestureDetector(
       onTap: _senaryo == 2
@@ -1313,8 +1370,13 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('D$no', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    if (_senaryo == 2) ...[
+                    if (tip == 'Sığınak') ...
+                      [const Icon(Icons.shield, size: 16, color: Colors.green),
+                       const SizedBox(width: 2),
+                       const Text('Sığınak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.green))]
+                    else ...
+                      [Text('D$no', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))],
+                    if (_senaryo == 2 && tip != 'Sığınak') ...[
                       const SizedBox(width: 3),
                       Icon(
                         isMuteahhit ? Icons.construction : Icons.home,
@@ -1369,9 +1431,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               ],
             ),
           ),
-          // Bölüm çıkarma butonu (Task 1)
-          if (daireler.length > 1)
-            Positioned(
+          // Bölüm çıkarma butonu
+          Positioned(
               top: 0,
               right: 0,
               child: GestureDetector(
@@ -1472,6 +1533,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (tempTip != 'Sığınak')
                 DropdownButtonFormField<String>(
                   value: tempTip,
                   decoration: const InputDecoration(
@@ -1602,28 +1664,74 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   Widget _buildStep4() {
     return Column(
       children: [
-        TextField(
-          controller: _hibeTutariCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [_TBinlikFormatter()],
-          decoration: const InputDecoration(
-            labelText: 'Daire Başı Hibe Tutarı (₺)',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.card_giftcard),
-            hintText: 'Yoksa 0',
-          ),
+        // Hibe
+        const Text('Hibe Tutarları', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _daireHibeTutariCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [_TBinlikFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Daire Hibe (₺)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.card_giftcard),
+                  hintText: '0',
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _dukkanHibeTutariCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [_TBinlikFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Dükkan/Ofis Hibe (₺)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.card_giftcard),
+                  hintText: '0',
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _krediTutariCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [_TBinlikFormatter()],
-          decoration: const InputDecoration(
-            labelText: 'Daire Başı Kredi Tutarı (₺)',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.account_balance),
-            hintText: 'Yoksa 0',
-          ),
+        // Kredi
+        const Text('Kredi Tutarları', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _daireKrediTutariCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [_TBinlikFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Daire Kredi (₺)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.account_balance),
+                  hintText: '0',
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _dukkanKrediTutariCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [_TBinlikFormatter()],
+                decoration: const InputDecoration(
+                  labelText: 'Dükkan/Ofis Kredi (₺)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.account_balance),
+                  hintText: '0',
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         // Sığınak bilgisi
@@ -1713,12 +1821,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                 _buildAnalysisRow('İnşaat Süresi', '${sonuc['insaatSuresi']} ay'),
                 const Divider(color: Colors.white24),
                 _buildAnalysisRow('Güncel m² Maliyet', '${_formatN(sonuc['guncelM2Maliyet'])} ₺'),
-                _buildTripleRow(
-                  'Tahmini m² Maliyet',
-                  _formatN((sonuc['minM2Maliyet'] as num).toDouble()),
-                  _formatN(sonuc['enflasyonluM2Maliyet']),
-                  _formatN((sonuc['maxM2Maliyet'] as num).toDouble()),
-                ),
+                _buildAnalysisRow('Tahmini m² Maliyet', 'yaklaşık ${_formatN(sonuc['enflasyonluM2Maliyet'])} ₺'),
               ],
             ),
           ),
@@ -1732,12 +1835,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               gradient: [Colors.teal.shade600, Colors.teal.shade400],
               child: Column(
                 children: [
-                  _buildTripleRow(
-                    '%${_karOraniCtrl.text} kar ile',
-                    _formatN(_minMaxFiyat!['minM2Fiyat']!),
-                    _formatN(_minMaxFiyat!['ortM2Fiyat']!),
-                    _formatN(_minMaxFiyat!['maxM2Fiyat']!),
-                  ),
+                  _buildAnalysisRow('%${_karOraniCtrl.text} kar ile', 'yaklaşık ${_formatN(_minMaxFiyat!['ortM2Fiyat']!)} ₺'),
                   const SizedBox(height: 4),
                   Text(
                     'Toplam: ${_formatN((sonuc['toplamInsaatM2'] as double) * _minMaxFiyat!['ortM2Fiyat']!)} ₺',
@@ -1801,25 +1899,16 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                             '${d['tip']} ${d['m2']} m² (${_katAdiFromInt(d['kat'] as int)})',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                           ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _miniLabel('Min', _formatN((d['minSatisFiyati'] as num).toDouble())),
-                              _miniLabel('Ort', _formatN((d['tahminiSatisFiyati'] as num).toDouble())),
-                              _miniLabel('Max', _formatN((d['maxSatisFiyati'] as num).toDouble())),
-                            ],
+                          Text(
+                            'yakla\u015f\u0131k ${_formatN((d['tahminiSatisFiyati'] as num).toDouble())} \u20ba',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
                           ),
                         ],
                       ),
                     );
                   })),
                   const Divider(color: Colors.white24),
-                  _buildTripleRow(
-                    'Toplam Satış',
-                    _formatN((sonuc['muteahhitSatisMin'] as num).toDouble()),
-                    _formatN((sonuc['muteahhitSatisGeliri'] as num).toDouble()),
-                    _formatN((sonuc['muteahhitSatisMax'] as num).toDouble()),
-                  ),
+                  _buildAnalysisRow('Toplam Satış', 'yaklaşık ${_formatN((sonuc['muteahhitSatisGeliri'] as num).toDouble())} ₺'),
                   _buildAnalysisRow('Kalan Maliyet', '${_formatN((sonuc['kalanMaliyet'] as num).toDouble())} ₺'),
                 ],
               ),

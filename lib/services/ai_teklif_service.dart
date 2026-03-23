@@ -91,8 +91,10 @@ class AiTeklifService {
       final tip = daire['tip'] as String? ?? 'Daire';
 
       final daireMaliyeti = m2 * karliM2Fiyat;
-      final hibeDusulmus = hibeVar ? (daireMaliyeti - hibeTutari) : daireMaliyeti;
-      final krediDusulmus = krediVar ? (hibeDusulmus - krediTutari) : hibeDusulmus;
+      final daireHibeTutari = (daire['hibeTutari'] as num?)?.toDouble() ?? hibeTutari;
+      final daireKrediTutari = (daire['krediTutari'] as num?)?.toDouble() ?? krediTutari;
+      final hibeDusulmus = hibeVar ? (daireMaliyeti - daireHibeTutari) : daireMaliyeti;
+      final krediDusulmus = krediVar ? (hibeDusulmus - daireKrediTutari) : hibeDusulmus;
       final netOdeme = krediDusulmus < 0 ? 0.0 : krediDusulmus;
 
       daireDetaylari.add({
@@ -102,8 +104,8 @@ class AiTeklifService {
         'brutMaliyet': daireMaliyeti,
         'hibeVar': hibeVar,
         'krediVar': krediVar,
-        'hibeTutari': hibeVar ? hibeTutari : 0,
-        'krediTutari': krediVar ? krediTutari : 0,
+        'hibeTutari': hibeVar ? daireHibeTutari : 0,
+        'krediTutari': krediVar ? daireKrediTutari : 0,
         'netOdeme': netOdeme,
       });
     }
@@ -217,8 +219,10 @@ class AiTeklifService {
 
       final oran = malSahibiToplamM2 > 0 ? m2 / malSahibiToplamM2 : 0.0;
       final dairePayi = kalanMaliyetPozitif * oran;
-      final hibeDusulmus = hibeVar ? (dairePayi - hibeTutari) : dairePayi;
-      final krediDusulmus = krediVar ? (hibeDusulmus - krediTutari) : hibeDusulmus;
+      final daireHibeTutari = (daire['hibeTutari'] as num?)?.toDouble() ?? hibeTutari;
+      final daireKrediTutari = (daire['krediTutari'] as num?)?.toDouble() ?? krediTutari;
+      final hibeDusulmus = hibeVar ? (dairePayi - daireHibeTutari) : dairePayi;
+      final krediDusulmus = krediVar ? (hibeDusulmus - daireKrediTutari) : hibeDusulmus;
       final netOdeme = krediDusulmus < 0 ? 0.0 : krediDusulmus;
 
       daireDetaylari.add({
@@ -228,8 +232,8 @@ class AiTeklifService {
         'brutMaliyet': dairePayi,
         'hibeVar': hibeVar,
         'krediVar': krediVar,
-        'hibeTutari': hibeVar ? hibeTutari : 0,
-        'krediTutari': krediVar ? krediTutari : 0,
+        'hibeTutari': hibeVar ? daireHibeTutari : 0,
+        'krediTutari': krediVar ? daireKrediTutari : 0,
         'netOdeme': netOdeme,
         'oran': oran * 100,
       });
@@ -291,8 +295,7 @@ class AiTeklifService {
     sb.writeln('• Güncel m² imalat maliyeti: $guncelM2 ₺');
     sb.writeln('• Yıllık inşaat enflasyonu: %$yillikEnflasyon');
     sb.writeln('• İnşaat sonrası tahmini m² maliyet: $enflasyonluM2 ₺');
-    sb.writeln('• %$karOrani kar oranıyla m² fiyat: $karliM2 ₺');
-    sb.writeln('  (Aralık: $minKarliM2 ₺ — $maxKarliM2 ₺)');
+    sb.writeln('• %$karOrani kar oranıyla m² fiyat: $karliM2 ₺ (yaklaşık)');
     sb.writeln();
 
     if (senaryo == 1) {
@@ -309,8 +312,7 @@ class AiTeklifService {
 
       sb.writeln('Senaryo 2 (Müteahhit Daire Alıyor):');
       sb.writeln('• Müteahhite ${mutDaireler.length} daire tahsis edilmiştir.');
-      sb.writeln('• Tahmini toplam satış geliri: $mutSatis ₺');
-      sb.writeln('  (Aralık: $mutMin ₺ — $mutMax ₺)');
+      sb.writeln('• Tahmini toplam satış geliri: $mutSatis ₺ (yaklaşık)');
       sb.writeln('• Toplam inşaat maliyeti: $toplamMaliyet ₺');
       sb.writeln('• Müteahhit geliri düşüldükten sonra kalan: $kalan ₺');
       sb.writeln('• Bu tutar ${malDaireler.length} mal sahibi dairesine paylaştırılmıştır.');
@@ -324,8 +326,7 @@ class AiTeklifService {
         final dMin = f.format((d['minSatisFiyati'] as num).round());
         final dAvg = f.format((d['tahminiSatisFiyati'] as num).round());
         final dMax = f.format((d['maxSatisFiyati'] as num).round());
-        sb.writeln('  $dTip ${dM2} m² (${dKat}. kat):');
-        sb.writeln('    Min: $dMin ₺  |  Ort: $dAvg ₺  |  Max: $dMax ₺');
+        sb.writeln('  $dTip ${dM2} m² (${dKat}. kat): yaklaşık $dAvg ₺');
       }
     }
 

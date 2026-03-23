@@ -183,7 +183,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                           : PopupMenuButton<String>(
                               onSelected: (value) {
                                 if (value == 'mark_paid') {
-                                  _markAsPaid(inst);
+                                  _markAsPaid(inst, installments);
                                 }
                               },
                               itemBuilder: (BuildContext context) {
@@ -360,7 +360,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
     );
   }
 
-  void _markAsPaid(PaymentInstallment installment) async {
+  void _markAsPaid(PaymentInstallment installment, List<PaymentInstallment> allInstallments) async {
     final paidAmountCtrl = TextEditingController(text: installment.amount.toString());
     final List<XFile> selectedImages = [];
     DateTime selectedDate = DateTime.now();
@@ -731,7 +731,63 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
         );
 
         if (mounted) {
-          Navigator.pop(context);
+          Navigator.pop(context); // Loading dialog kapat
+        }
+
+        // Mevcut taksit için toplam ödenen hesapla
+        final existingRecords = await FirebaseFirestore.instance
+            .collection('payment_installments')
+            .doc(installment.id)
+            .collection('payment_records')
+            .get();
+        double totalPaidForInstallment = 0;
+        for (var r in existingRecords.docs) {
+          final d = r.data();
+          totalPaidForInstallment += ((d['tlAmount'] ?? d['paidAmount'] ?? 0) as num).toDouble();
+        }
+
+        final fazlaTutar = totalPaidForInstallment - installment.amount;
+
+        if (fazlaTutar > 0 && mounted) {
+          // Sonraki ödenmemiş taksitleri bul
+          final sonrakiTaksitler = allInstallments
+              .where((t) => t.installmentNumber > installment.installmentNumber && !t.isPaid)
+              .toList()
+            ..sort((a, b) => a.installmentNumber.compareTo(b.installmentNumber));
+
+          if (sonrakiTaksitler.isNotEmpty) {
+            final transferResult = await showDialog<bool>(
+              context: context,
+              builder: (c) => AlertDialog(
+                title: const Text('Fazla Ödeme'),
+                content: Text(
+                  'Bu taksit için ₺${NumberFormat('#,##0.00', 'tr_TR').format(fazlaTutar)} fazla ödeme yapıldı.\n\n'
+                  'Fazla tutar sonraki taksit(ler)e aktarılsın mı?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(c, false),
+                    child: const Text('Hayır'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(c, true),
+                    child: const Text('Evet, Aktar'),
+                  ),
+                ],
+              ),
+            );
+
+            if (transferResult == true && mounted) {
+              await _transferExcessToNextInstallments(
+                fazlaTutar: fazlaTutar,
+                sonrakiTaksitler: sonrakiTaksitler,
+                selectedDate: selectedDate,
+              );
+            }
+          }
+        }
+
+        if (mounted) {
           setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${tlTutar.toStringAsFixed(2)} ₺ ödeme kaydedildi')),
@@ -739,7 +795,8 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
         }
       } catch (e) {
         if (mounted) {
-          Navigator.pop(context);
+          // Loading dialog açıksa kapat
+          try { Navigator.pop(context); } catch (_) {}
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Firebase hatası: $e')),
           );
@@ -749,6 +806,60 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Dosya yükleme hatası: $e')),
       );
+    }
+  }
+
+  Future<void> _transferExcessToNextInstallments({
+    required double fazlaTutar,
+    required List<PaymentInstallment> sonrakiTaksitler,
+    required DateTime selectedDate,
+  }) async {
+    double kalan = fazlaTutar;
+
+    for (final nextInst in sonrakiTaksitler) {
+      if (kalan <= 0) break;
+
+      // Bu taksitin mevcut ödemelerini hesapla
+      final records = await FirebaseFirestore.instance
+          .collection('payment_installments')
+          .doc(nextInst.id)
+          .collection('payment_records')
+          .get();
+      double alreadyPaid = 0;
+      for (var r in records.docs) {
+        final d = r.data();
+        alreadyPaid += ((d['tlAmount'] ?? d['paidAmount'] ?? 0) as num).toDouble();
+      }
+
+      final remaining = nextInst.amount - alreadyPaid;
+      if (remaining <= 0) continue;
+
+      final transferAmount = kalan > remaining ? remaining : kalan;
+
+      // Ödeme kaydı oluştur
+      await FirebaseFirestore.instance
+          .collection('payment_installments')
+          .doc(nextInst.id)
+          .collection('payment_records')
+          .add({
+        'paidAmount': transferAmount,
+        'currency': 'TL',
+        'tlAmount': transferAmount,
+        'createdAt': selectedDate,
+        'photoUrls': [],
+        'notes': 'Önceki taksitten aktarılan fazla ödeme',
+      });
+
+      // Taksit durumunu güncelle
+      await _firebase.markInstallmentAsPaid(
+        installmentId: nextInst.id,
+        paymentPlanId: widget.paymentPlanId,
+        projectId: nextInst.projectId,
+        paidAmount: transferAmount,
+        photoUrls: [],
+      );
+
+      kalan -= transferAmount;
     }
   }
 

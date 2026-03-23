@@ -127,8 +127,18 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             _parseN(_guncelMaliyetCtrl.text) > 0 &&
             _parseN(_karOraniCtrl.text) > 0;
       case 2:
-        return _daireler.isNotEmpty &&
-            _daireler.every((d) => _parseN((d['m2Ctrl'] as TextEditingController).text) > 0);
+        if (_daireler.isEmpty) return false;
+        if (!_daireler.every((d) => _parseN((d['m2Ctrl'] as TextEditingController).text) > 0)) return false;
+        if (_senaryo == 2 && !_daireler.any((d) => d['sahip'] == 'muteahhit')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Senaryo 2 için en az bir daireyi müteahhite atamalısınız!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return false;
+        }
+        return true;
       default:
         return true;
     }
@@ -604,12 +614,63 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         ),
         const SizedBox(height: 12),
 
+        // Senaryo 2 uyarı kartı
+        if (_senaryo == 2) ...[
+          Card(
+            color: Colors.orange.shade100,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(color: Colors.orange.shade400, width: 2),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Müteahhit Dairelerini Seçin!',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900, fontSize: 15)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Her dairenin altındaki butona tıklayarak müteahhitin alacağı daireleri belirleyin.',
+                          style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Müteahhit: ${_daireler.where((d) => d['sahip'] == 'muteahhit').length} daire   •   Mal Sahibi: ${_daireler.where((d) => d['sahip'] == 'malSahibi').length} daire',
+                          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.orange.shade900, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+
         // Daire listesi
         ..._daireler.asMap().entries.map((entry) {
           final i = entry.key;
           final d = entry.value;
+          final isMuteahhit = d['sahip'] == 'muteahhit';
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
+            color: _senaryo == 2 && isMuteahhit ? Colors.orange.shade50 : null,
+            shape: _senaryo == 2
+                ? RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: isMuteahhit ? Colors.orange.shade400 : Colors.grey.shade300,
+                      width: isMuteahhit ? 2 : 1,
+                    ),
+                  )
+                : null,
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -617,23 +678,78 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                   Row(
                     children: [
                       Text('Daire ${i + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const Spacer(),
-                      if (_senaryo == 2)
-                        DropdownButton<String>(
-                          value: d['sahip'] as String,
-                          items: const [
-                            DropdownMenuItem(value: 'malSahibi', child: Text('Mal Sahibi')),
-                            DropdownMenuItem(value: 'muteahhit', child: Text('Müteahhit')),
-                          ],
-                          onChanged: (v) => setState(() => d['sahip'] = v),
-                          underline: const SizedBox.shrink(),
+                      if (_senaryo == 2) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isMuteahhit ? Colors.orange : Colors.blue,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isMuteahhit ? 'Müteahhit' : 'Mal Sahibi',
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
                         ),
+                      ],
+                      const Spacer(),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red, size: 20),
                         onPressed: () => _daireSil(i),
                       ),
                     ],
                   ),
+                  if (_senaryo == 2) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => d['sahip'] = 'malSahibi'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: !isMuteahhit ? Colors.blue : Colors.grey.shade200,
+                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '🏠 Mal Sahibi',
+                                  style: TextStyle(
+                                    color: !isMuteahhit ? Colors.white : Colors.grey.shade600,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => d['sahip'] = 'muteahhit'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isMuteahhit ? Colors.orange : Colors.grey.shade200,
+                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '🏗 Müteahhit',
+                                  style: TextStyle(
+                                    color: isMuteahhit ? Colors.white : Colors.grey.shade600,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Row(
                     children: [

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'tcmb_service.dart';
 
@@ -9,7 +10,7 @@ class AiTeklifService {
 
   AiTeklifService() {
     _model = GenerativeModel(
-      model: 'gemini-2.0-flash',
+      model: 'gemini-1.5-flash',
       apiKey: _geminiApiKey,
       generationConfig: GenerationConfig(
         temperature: 0.3,
@@ -246,7 +247,7 @@ YANIT FORMATI (kesinlikle sadece bu JSON):
         return parsed as Map<String, dynamic>;
       }
     } catch (e) {
-      // Gemini hatası
+      debugPrint('Gemini daire fiyat tahmini hatası: $e');
     }
 
     // Fallback: basit tahmin
@@ -285,7 +286,8 @@ Senaryo: ${senaryo == 1 ? 'Müteahhit daire almıyor, saf metrekare fiyatı' : '
       final response = await _model.generateContent([Content.text(prompt)]);
       return response.text ?? 'Özet oluşturulamadı.';
     } catch (e) {
-      return 'AI özeti oluşturulurken hata oluştu. Hesap sonuçları tabloda mevcuttur.';
+      debugPrint('Gemini özet hatası: $e');
+      return 'AI özeti oluşturulurken hata oluştu: $e';
     }
   }
 }

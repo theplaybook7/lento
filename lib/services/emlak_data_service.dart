@@ -156,14 +156,15 @@ class EmlakDataService {
   }
 
   static String _normalize(String s) =>
-      s.toLowerCase().trim()
+      s.trim()
           .replaceAll('İ', 'i')
           .replaceAll('I', 'ı')
           .replaceAll('Ü', 'ü')
           .replaceAll('Ö', 'ö')
           .replaceAll('Ç', 'ç')
           .replaceAll('Ş', 'ş')
-          .replaceAll('Ğ', 'ğ');
+          .replaceAll('Ğ', 'ğ')
+          .toLowerCase();
 
   static String _capitalize(String s) {
     if (s.isEmpty) return s;
@@ -260,6 +261,8 @@ class EmlakDataService {
     'bayburt': {'min': 14000, 'avg': 22000, 'max': 34000},
     'gümüşhane': {'min': 16000, 'avg': 25000, 'max': 38000},
     'kilis': {'min': 16000, 'avg': 25000, 'max': 38000},
+    'erzincan': {'min': 18000, 'avg': 28000, 'max': 42000},
+    'kırklareli': {'min': 24000, 'avg': 35000, 'max': 55000},
   };
 
   // ── İlçe bazında SIFIR BİNA detaylı fiyatlar {min, avg, max} TL/m² (2025-2026) ──

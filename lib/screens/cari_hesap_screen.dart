@@ -395,8 +395,9 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
 class CariDetayScreen extends StatefulWidget {
   final String cariId;
   final String cariAd;
+  final String? projectId;
 
-  const CariDetayScreen({super.key, required this.cariId, required this.cariAd});
+  const CariDetayScreen({super.key, required this.cariId, required this.cariAd, this.projectId});
 
   @override
   State<CariDetayScreen> createState() => _CariDetayScreenState();
@@ -567,11 +568,19 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    final docsWithTarih = snapshot.data!.docs
+                    var docsWithTarih = snapshot.data!.docs
                         .where((doc) => doc.data() is Map<String, dynamic> && 
                                (doc.data() as Map<String, dynamic>).containsKey('tarih') && 
                                (doc.data() as Map<String, dynamic>)['tarih'] != null)
                         .toList();
+                    
+                    // Proje içinden açıldıysa sadece o projenin hareketlerini göster
+                    if (widget.projectId != null) {
+                      docsWithTarih = docsWithTarih.where((doc) {
+                        final d = doc.data() as Map<String, dynamic>;
+                        return d['projeId'] == widget.projectId;
+                      }).toList();
+                    }
                     
                     docsWithTarih.sort((a, b) {
                       final ta = (a.data() as Map<String, dynamic>)['tarih'] as Timestamp;
@@ -1294,47 +1303,57 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                   
                   // Eğer ödeme veya tahsilat ise giderlere kaydet
                   if (tip == 'borc' || tip == 'alacak') {
-                    // Şirketin tüm projelerini al
-                    if (!mounted) return;
-                    final projects = await FirebaseFirestore.instance
-                        .collection('projects')
-                        .where('companyId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
-                        .get();
-                    
                     var projectId = '';
                     
-                    if (projects.docs.length == 1) {
-                      // Tek proje varsa otomatik seç
-                      projectId = projects.docs.first.id;
+                    // Proje içinden açıldıysa o projeyi kullan
+                    if (widget.projectId != null && widget.projectId!.isNotEmpty) {
+                      projectId = widget.projectId!;
                       projeId = projectId;
-                      projeAd = projects.docs.first.data()['name'] ?? 'Proje';
-                    } else if (projects.docs.isNotEmpty && mounted) {
-                      // Birden fazla proje varsa her zaman sor
-                      final selected = await showDialog<Map<String, String>>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Proje Seç'),
-                          content: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: projects.docs.map((doc) {
-                                final pAd = doc.data()['name'] ?? 'İsimsiz';
-                                return ListTile(
-                                  title: Text(pAd),
-                                  onTap: () => Navigator.pop(ctx, {'id': doc.id, 'ad': pAd}),
-                                );
-                              }).toList(),
+                      try {
+                        final projeDoc = await FirebaseFirestore.instance.collection('projects').doc(projectId).get();
+                        projeAd = projeDoc.data()?['name'] ?? 'Proje';
+                      } catch (_) {
+                        projeAd = 'Proje';
+                      }
+                    } else {
+                      // Cariler sekmesinden açıldıysa proje seçtir
+                      if (!mounted) return;
+                      final projects = await FirebaseFirestore.instance
+                          .collection('projects')
+                          .where('companyId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
+                          .get();
+                    
+                      if (projects.docs.length == 1) {
+                        projectId = projects.docs.first.id;
+                        projeId = projectId;
+                        projeAd = projects.docs.first.data()['name'] ?? 'Proje';
+                      } else if (projects.docs.isNotEmpty && mounted) {
+                        final selected = await showDialog<Map<String, String>>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Proje Seç'),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: projects.docs.map((doc) {
+                                  final pAd = doc.data()['name'] ?? 'İsimsiz';
+                                  return ListTile(
+                                    title: Text(pAd),
+                                    onTap: () => Navigator.pop(ctx, {'id': doc.id, 'ad': pAd}),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                      
-                      if (selected != null) {
-                        projectId = selected['id']!;
-                        projeId = projectId;
-                        projeAd = selected['ad']!;
+                        );
+                        
+                        if (selected != null) {
+                          projectId = selected['id']!;
+                          projeId = projectId;
+                          projeAd = selected['ad']!;
+                        }
                       }
-                    }
+                    } // else bloğunun sonu
                     
                     // Seçilen projeyi cari'nin projectIds listesine ekle
                     if (projectId.isNotEmpty) {

@@ -659,6 +659,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                   builder: (c) => CariDetayScreen(
                                     cariId: cariDoc.id,
                                     cariAd: ad,
+                                    projectId: widget.projectId,
                                   ),
                                 ),
                               ),

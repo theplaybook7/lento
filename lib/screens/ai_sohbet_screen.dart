@@ -29,24 +29,17 @@ class _AiSohbetScreenState extends State<AiSohbetScreen> {
 
     if (!ok) {
       _mesajlar.add(_ChatMesaj(
-        metin: 'Gemini API anahtarı bulunamadı.\n\n'
-            'Ayarlar → AI Sohbet bölümünden API anahtarınızı girin,\n'
-            'veya uygulamayı --dart-define=GEMINI_API_KEY=... ile derleyin.',
+        metin: 'AI servisi başlatılamadı.',
         benMi: false,
         hata: true,
       ));
     } else {
       // Karşılama mesajı
       setState(() => _yukleniyor = true);
-      final cevap = await _gemini.mesajGonder(
-        'Kullanıcıya kısa bir karşılama yap. İnşaat teklif analizi, '
-        'maliyet hesabı, senaryo karşılaştırması gibi konularda '
-        'yardımcı olabileceğini belirt. 2-3 cümle yeter.',
-      );
-      final kotaHatasi = cevap.contains('kotası doldu') || cevap.contains('quota');
+      final cevap = await _gemini.mesajGonder('merhaba');
       setState(() {
         _yukleniyor = false;
-        _mesajlar.add(_ChatMesaj(metin: cevap, benMi: false, hata: kotaHatasi));
+        _mesajlar.add(_ChatMesaj(metin: cevap, benMi: false));
       });
     }
   }
@@ -65,10 +58,8 @@ class _AiSohbetScreenState extends State<AiSohbetScreen> {
     final cevap = await _gemini.mesajGonder(metin);
 
     if (mounted) {
-      final hata = cevap.contains('kotası doldu') || cevap.contains('hatası') ||
-          cevap.contains('geçersiz') || cevap.contains('Bağlantı hatası');
       setState(() {
-        _mesajlar.add(_ChatMesaj(metin: cevap, benMi: false, hata: hata));
+        _mesajlar.add(_ChatMesaj(metin: cevap, benMi: false));
         _yukleniyor = false;
       });
       _scrollAlt();
@@ -164,12 +155,12 @@ class _AiSohbetScreenState extends State<AiSohbetScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.smart_toy, size: 22),
-            SizedBox(width: 8),
-            Text('AI Asistan'),
+            const Icon(Icons.smart_toy, size: 22),
+            const SizedBox(width: 8),
+            Text(_gemini.yerelModAktif ? 'AI Asistan (Yerleşik)' : 'AI Asistan'),
           ],
         ),
         actions: [

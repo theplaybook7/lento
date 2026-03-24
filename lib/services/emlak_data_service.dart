@@ -182,6 +182,16 @@ class EmlakDataService {
           .replaceAll('Ğ', 'ğ')
           .toLowerCase();
 
+  /// Public normalize — dışarıdan erişim için
+  static String normalize(String s) => _normalize(s);
+
+  /// İlçe bazında fiyat bilgisi döner (null: bulunamadı)
+  static Map<String, double>? ilceFiyatBilgisi(String il, String ilce) {
+    final key = '${_normalize(il)}/${_normalize(ilce)}';
+    if (_ilceVerileri.containsKey(key)) return _ilceVerileri[key]!;
+    return null;
+  }
+
   static String _capitalize(String s) {
     if (s.isEmpty) return s;
     final first = s[0];

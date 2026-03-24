@@ -43,9 +43,10 @@ class _AiSohbetScreenState extends State<AiSohbetScreen> {
         'maliyet hesabı, senaryo karşılaştırması gibi konularda '
         'yardımcı olabileceğini belirt. 2-3 cümle yeter.',
       );
+      final kotaHatasi = cevap.contains('kotası doldu') || cevap.contains('quota');
       setState(() {
         _yukleniyor = false;
-        _mesajlar.add(_ChatMesaj(metin: cevap, benMi: false));
+        _mesajlar.add(_ChatMesaj(metin: cevap, benMi: false, hata: kotaHatasi));
       });
     }
   }
@@ -64,8 +65,10 @@ class _AiSohbetScreenState extends State<AiSohbetScreen> {
     final cevap = await _gemini.mesajGonder(metin);
 
     if (mounted) {
+      final hata = cevap.contains('kotası doldu') || cevap.contains('hatası') ||
+          cevap.contains('geçersiz') || cevap.contains('Bağlantı hatası');
       setState(() {
-        _mesajlar.add(_ChatMesaj(metin: cevap, benMi: false));
+        _mesajlar.add(_ChatMesaj(metin: cevap, benMi: false, hata: hata));
         _yukleniyor = false;
       });
       _scrollAlt();

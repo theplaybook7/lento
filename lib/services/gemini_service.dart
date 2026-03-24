@@ -55,8 +55,34 @@ class GeminiService {
     try {
       final response = await _chat!.sendMessage(Content.text(mesaj));
       return response.text ?? 'Yanıt alınamadı.';
+    } on GenerativeAIException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('quota') || msg.contains('rate') || msg.contains('limit') || msg.contains('429')) {
+        // Retry-after süresi varsa çıkar
+        final retryMatch = RegExp(r'retry in (\d+\.?\d*)').firstMatch(msg);
+        final sure = retryMatch != null
+            ? '${(double.tryParse(retryMatch.group(1)!) ?? 60).ceil()} saniye'
+            : 'birkaç dakika';
+        return 'Gemini API ücretsiz kullanım kotası doldu.\n\n'
+            'Çözüm seçenekleri:\n'
+            '• $sure sonra tekrar deneyin\n'
+            '• Google AI Studio → aistudio.google.com/apikey adresinden '
+            'ücretli plana geçin\n'
+            '• Farklı bir API anahtarı girin (⚙️ sağ üstteki anahtar simgesi)';
+      }
+      if (msg.contains('api key') || msg.contains('invalid') || msg.contains('permission')) {
+        return 'API anahtarı geçersiz veya yetkisiz.\n\n'
+            'Sağ üstteki 🔑 simgesinden yeni anahtar girin.';
+      }
+      return 'AI hatası: ${e.message}';
     } catch (e) {
-      return 'AI hatası: $e';
+      final eStr = e.toString().toLowerCase();
+      if (eStr.contains('quota') || eStr.contains('rate') || eStr.contains('limit') || eStr.contains('429')) {
+        return 'Gemini API ücretsiz kullanım kotası doldu.\n\n'
+            'Birkaç dakika sonra tekrar deneyin veya '
+            'sağ üstteki 🔑 simgesinden ücretli plan anahtarı girin.';
+      }
+      return 'Bağlantı hatası: lütfen internet bağlantınızı kontrol edin.';
     }
   }
 

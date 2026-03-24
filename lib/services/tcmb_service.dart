@@ -8,10 +8,17 @@ class TcmbService {
   static const String _evdsBaseUrl = 'https://evds2.tcmb.gov.tr/service/evds';
   static const String _apiKeyPrefKey = 'tcmb_evds_api_key';
 
+  /// Build-time ile gömülen varsayılan anahtar (--dart-define ile geçilir, GitHub'ta gözükmez)
+  static const String _buildTimeKey = String.fromEnvironment('TCMB_API_KEY');
+
   // ── TCMB EVDS API Key yönetimi ──
   static Future<String?> getApiKey() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_apiKeyPrefKey);
+    final saved = prefs.getString(_apiKeyPrefKey);
+    if (saved != null && saved.isNotEmpty) return saved;
+    // Kullanıcı giremezse build-time key'i kullan
+    if (_buildTimeKey.isNotEmpty) return _buildTimeKey;
+    return null;
   }
 
   static Future<void> setApiKey(String key) async {

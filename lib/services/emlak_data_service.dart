@@ -237,6 +237,7 @@ class EmlakDataService {
     'istanbul/sultangazi': {'min': 42000, 'avg': 60000, 'max': 88000},
     'istanbul/arnavutköy': {'min': 30000, 'avg': 48000, 'max': 72000},
     'istanbul/silivri': {'min': 30000, 'avg': 42000, 'max': 65000},
+    'istanbul/şile': {'min': 28000, 'avg': 40000, 'max': 60000},
     'istanbul/çatalca': {'min': 25000, 'avg': 35000, 'max': 52000},
     'istanbul/büyükçekmece': {'min': 42000, 'avg': 65000, 'max': 100000},
     'istanbul/adalar': {'min': 75000, 'avg': 120000, 'max': 220000},
@@ -503,6 +504,12 @@ class EmlakDataService {
     'istanbul/silivri/gümüşyaka': {'min': 30000, 'avg': 42000, 'max': 65000},
     'istanbul/silivri/kavaklı': {'min': 28000, 'avg': 38000, 'max': 60000},
     'istanbul/silivri/değirmenköy': {'min': 25000, 'avg': 35000, 'max': 55000},
+    // ŞİLE
+    'istanbul/şile/merkez': {'min': 30000, 'avg': 42000, 'max': 65000},
+    'istanbul/şile/ağva': {'min': 35000, 'avg': 50000, 'max': 78000},
+    'istanbul/şile/kumbaba': {'min': 25000, 'avg': 36000, 'max': 55000},
+    'istanbul/şile/doğancalı': {'min': 22000, 'avg': 32000, 'max': 48000},
+    'istanbul/şile/balıbey': {'min': 28000, 'avg': 40000, 'max': 60000},
     // ÇATALCA
     'istanbul/çatalca/merkez': {'min': 27000, 'avg': 38000, 'max': 58000},
     'istanbul/çatalca/ferhatpaşa': {'min': 22000, 'avg': 32000, 'max': 50000},

@@ -98,6 +98,16 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
         foregroundColor: Colors.white,
         elevation: 1,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.smart_toy),
+            tooltip: 'AI Sohbet',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (c) => const AiSohbetScreen()),
+              );
+            },
+          ),
           StreamBuilder<QuerySnapshot>(
             stream: BildirimServisi.bildirimleriDinle(),
             builder: (context, snapshot) {

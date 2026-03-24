@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// TCMB EVDS API + İstatistiksel Tahmin Motoru
 /// Gerçek TCMB verisi çeker, istatistiksel yöntemlerle maliyet tahmini yapar.
 class TcmbService {
+  // EVDS2 → EVDS3'e yönlendirildi; her iki endpoint denenir
   static const String _evdsBaseUrl = 'https://evds2.tcmb.gov.tr/service/evds';
   static const String _apiKeyPrefKey = 'tcmb_evds_api_key';
 
@@ -69,14 +70,15 @@ class TcmbService {
   String? get sonHataMesaji => _sonHataMesaji;
 
   /// TCMB EVDS API'den güncel inşaat maliyet endeksi çeker
-  /// Dönen değer: true = başarılı, false = başarısız
+  /// Dönen değer: true = başarılı, false = başarısız (yerleşik veri kullanılır)
   /// Hata durumunda _sonHataMesaji set edilir
   Future<bool> verileriGuncelle() async {
     _sonHataMesaji = null;
     try {
       final apiKey = await getApiKey();
       if (apiKey == null || apiKey.isEmpty) {
-        _sonHataMesaji = 'API anahtarı girilmemiş. Ayarlardan TCMB EVDS API anahtarı girin.';
+        _sonHataMesaji = 'API anahtarı yok — TÜİK yerleşik verisi kullanılıyor.';
+        _veriKaynagi = 'TÜİK yerleşik veri';
         return false;
       }
 
@@ -86,26 +88,59 @@ class TcmbService {
       final endDate = '${now.day.toString().padLeft(2, '0')}-'
           '${now.month.toString().padLeft(2, '0')}-${now.year}';
 
-      final uri = Uri.parse(
-        '$_evdsBaseUrl?series=TP.INSAAT.M1'
-        '&startDate=$startDate&endDate=$endDate'
-        '&type=json&key=$apiKey',
-      );
+      final queryParams = 'series=TP.INSAAT.M1'
+          '&startDate=$startDate&endDate=$endDate'
+          '&type=json&key=$apiKey';
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        _sonHataMesaji = 'API anahtarı geçersiz veya yetkisiz (HTTP ${response.statusCode}).';
+      // EVDS2 ve EVDS3 endpoint'lerini sırayla dene
+      final endpoints = [
+        '$_evdsBaseUrl?$queryParams',
+      ];
+
+      String? responseBody;
+      for (final endpoint in endpoints) {
+        try {
+          final uri = Uri.parse(endpoint);
+          final response = await http.get(uri).timeout(const Duration(seconds: 12));
+
+          if (response.statusCode == 301 || response.statusCode == 302) {
+            // Yönlendirme → bu endpoint çalışmıyor
+            continue;
+          }
+          if (response.statusCode == 401 || response.statusCode == 403) {
+            _sonHataMesaji = 'API anahtarı geçersiz veya yetkisiz (HTTP ${response.statusCode}).';
+            continue;
+          }
+          if (response.statusCode != 200) {
+            continue;
+          }
+
+          // HTML mı JSON mı kontrol et (SPA yönlendirmesi)
+          final body = response.body.trim();
+          if (body.startsWith('<') || body.startsWith('<!')) {
+            // SPA HTML döndü, API endpoint aktif değil
+            continue;
+          }
+
+          responseBody = body;
+          break;
+        } catch (_) {
+          continue;
+        }
+      }
+
+      if (responseBody == null) {
+        _sonHataMesaji =
+            'TCMB EVDS API geçici olarak kullanılamıyor — TÜİK yerleşik verisi kullanılıyor.';
+        _veriKaynagi = 'TÜİK yerleşik veri';
         return false;
       }
-      if (response.statusCode != 200) {
-        _sonHataMesaji = 'TCMB API\'ye ulaşılamadı (HTTP ${response.statusCode}).';
-        return false;
-      }
 
-      final data = json.decode(response.body);
+      final data = json.decode(responseBody);
       final items = data['items'] as List?;
       if (items == null || items.isEmpty) {
-        _sonHataMesaji = 'API yanıtında veri bulunamadı.';
+        _sonHataMesaji = 'API yanıtında veri bulunamadı — yerleşik veri kullanılıyor.';
+        _veriKaynagi = 'TÜİK yerleşik veri';
         return false;
       }
 
@@ -132,15 +167,18 @@ class TcmbService {
         _sonGuncelleme = DateTime.now();
         return true;
       }
-      _sonHataMesaji = 'API\'den veri işlenemedi.';
+      _sonHataMesaji = 'API verisi işlenemedi — yerleşik veri kullanılıyor.';
+      _veriKaynagi = 'TÜİK yerleşik veri';
     } on http.ClientException {
-      _sonHataMesaji = 'İnternet bağlantısı yok veya TCMB sunucusuna ulaşılamıyor.';
+      _sonHataMesaji = 'İnternet bağlantısı yok — TÜİK yerleşik verisi kullanılıyor.';
+      _veriKaynagi = 'TÜİK yerleşik veri';
     } catch (e) {
       if (e.toString().contains('TimeoutException')) {
-        _sonHataMesaji = 'TCMB API yanıt vermedi (zaman aşımı).';
+        _sonHataMesaji = 'TCMB API yanıt vermedi — yerleşik veri kullanılıyor.';
       } else {
-        _sonHataMesaji = 'Bağlantı hatası: ${e.toString().length > 80 ? e.toString().substring(0, 80) : e}';
+        _sonHataMesaji = 'Bağlantı hatası — yerleşik veri kullanılıyor.';
       }
+      _veriKaynagi = 'TÜİK yerleşik veri';
     }
     return false;
   }

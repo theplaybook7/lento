@@ -8,7 +8,6 @@ import '../models/project_model.dart';
 import '../theme/app_theme.dart';
 import 'teklif_screen.dart';
 import 'ai_teklif_screen.dart';
-import 'ai_sohbet_screen.dart';
 import 'arsiv_screen.dart';
 import 'new_project_screen.dart';
 import 'project_details_screen.dart';
@@ -98,16 +97,6 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
         foregroundColor: Colors.white,
         elevation: 1,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.smart_toy),
-            tooltip: 'AI Sohbet',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (c) => const AiSohbetScreen()),
-              );
-            },
-          ),
           StreamBuilder<QuerySnapshot>(
             stream: BildirimServisi.bildirimleriDinle(),
             builder: (context, snapshot) {
@@ -265,17 +254,6 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         );
                       },
                     ),
-                    ListTile(
-                      leading: const Icon(Icons.smart_toy_outlined),
-                      title: const Text('AI Sohbet'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (c) => const AiSohbetScreen()),
-                        );
-                      },
-                    ),
                     const Divider(),
                     ListTile(
                       leading: const Icon(Icons.settings_outlined),
@@ -375,18 +353,6 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (c) => const ArsivSayfasi()),
-                            );
-                          },
-                        ),
-                      ),
-                      Tooltip(
-                        message: 'AI Sohbet',
-                        child: IconButton(
-                          icon: const Icon(Icons.smart_toy_outlined),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (c) => const AiSohbetScreen()),
                             );
                           },
                         ),

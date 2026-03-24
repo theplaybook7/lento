@@ -49,9 +49,6 @@ dependencies:
   path_provider: ^2.1.1
   in_app_purchase: ^3.2.3
   image: ^4.0.17
-  http: ^1.2.1
-  shared_preferences: ^2.2.2
-  google_generative_ai: ^0.4.6
 
 dependency_overrides:
   in_app_purchase_storekit: ^0.4.8+1

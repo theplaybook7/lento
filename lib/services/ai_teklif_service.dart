@@ -274,8 +274,6 @@ class AiTeklifService {
     final guncelM2 = f.format((hesapSonucu['guncelM2Maliyet'] as double).round());
     final enflasyonluM2 = f.format((hesapSonucu['enflasyonluM2Maliyet'] as double).round());
     final karliM2 = f.format((hesapSonucu['karliM2Fiyat'] as double).round());
-    final minKarliM2 = f.format((hesapSonucu['minKarliM2'] as double).round());
-    final maxKarliM2 = f.format((hesapSonucu['maxKarliM2'] as double).round());
     final karOrani = hesapSonucu['karOrani'];
     final toplamM2 = f.format((hesapSonucu['toplamInsaatM2'] as double).round());
     final toplamMaliyet = f.format((hesapSonucu['toplamMaliyet'] as double).round());
@@ -304,8 +302,6 @@ class AiTeklifService {
           'Bu tutar mal sahibi daireleri arasında m² oranlarına göre paylaştırılmıştır.');
     } else {
       final mutSatis = f.format((hesapSonucu['muteahhitSatisGeliri'] as double).round());
-      final mutMin = f.format((hesapSonucu['muteahhitSatisMin'] as double).round());
-      final mutMax = f.format((hesapSonucu['muteahhitSatisMax'] as double).round());
       final kalan = f.format((hesapSonucu['kalanMaliyet'] as double).round());
       final mutDaireler = hesapSonucu['muteahhitDaireleri'] as List;
       final malDaireler = hesapSonucu['malSahibiDaireleri'] as List;
@@ -323,9 +319,7 @@ class AiTeklifService {
         final dTip = d['tip'] ?? 'Daire';
         final dM2 = d['m2'];
         final dKat = d['kat'];
-        final dMin = f.format((d['minSatisFiyati'] as num).round());
         final dAvg = f.format((d['tahminiSatisFiyati'] as num).round());
-        final dMax = f.format((d['maxSatisFiyati'] as num).round());
         sb.writeln('  $dTip ${dM2} m² (${dKat}. kat): yaklaşık $dAvg ₺');
       }
     }

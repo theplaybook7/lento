@@ -75,7 +75,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   final _dukkanKrediTutariCtrl = TextEditingController(text: '0');
 
   // Step 5: AI tahminleri
-  Map<String, dynamic>? _enflasyonProjeksiyonu;
   Map<String, double>? _minMaxFiyat;
   String? _pazarAnaliziMetni;
   Map<String, dynamic>? _hesapSonucu;
@@ -125,12 +124,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       }
     }
     super.dispose();
-  }
-
-  int get _toplamKatSayisi {
-    final bodrum = int.tryParse(_bodrumKatSayisiCtrl.text) ?? 0;
-    final normal = int.tryParse(_normalKatSayisiCtrl.text) ?? 0;
-    return bodrum + (normal > 0 ? 1 : 0) + (normal > 1 ? normal - 1 : 0);
   }
 
   void _krokiOlustur() {
@@ -455,7 +448,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       final toplamM2 = _toplamM2;
       final daireListesi = _daireListesiHazirla();
 
-      final projeksiyon = _aiService.enflasyonProjeksiyonu(
+      _aiService.enflasyonProjeksiyonu(
         guncelMaliyet: _parseN(_guncelMaliyetCtrl.text),
         toplamM2: toplamM2,
       );
@@ -507,7 +500,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
 
       final ozet = _aiService.teklifOzetiOlustur(sonuc);
       setState(() {
-        _enflasyonProjeksiyonu = projeksiyon;
         _minMaxFiyat = minMax;
         _pazarAnaliziMetni = pazarMetni;
         _hesapSonucu = sonuc;
@@ -713,7 +705,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                     _currentStep = 0;
                     _hesapSonucu = null;
                     _aiOzet = null;
-                    _enflasyonProjeksiyonu = null;
                     _minMaxFiyat = null;
                     _pazarAnaliziMetni = null;
                   }),
@@ -2039,35 +2030,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     );
   }
 
-  Widget _buildTripleRow(String label, String min, String ort, String max) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-          const SizedBox(height: 2),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _miniLabel('Min', '$min ₺'),
-              _miniLabel('Ort', '$ort ₺'),
-              _miniLabel('Max', '$max ₺'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _miniLabel(String label, String value) {
-    return Column(
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
-        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-      ],
-    );
-  }
 
   String _katAdiFromInt(int kat) {
     if (kat < 0) return '${kat.abs()}. Bodrum';

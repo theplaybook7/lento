@@ -596,26 +596,6 @@ class FirebaseService {
     }
   }
 
-  /// Proje gelirini güncelle
-  Future<void> _updateProjectIncome(String projectId, double amount) async {
-    try {
-      final financeRef = _db.collection('project_finance').doc(projectId);
-      final doc = await financeRef.get();
-      
-      if (doc.exists) {
-        final currentIncome = (doc.data()?['totalIncome'] as num?)?.toDouble() ?? 0;
-        await financeRef.update({
-          'totalIncome': currentIncome + amount,
-        });
-      }
-
-      developer.log('Proje geliri güncellendi: $projectId, Tutar: $amount');
-    } catch (e) {
-      developer.log('Proje geliri güncelleme hatası: $e');
-      // Hata olsa da devam et, ana işlem yapıldı
-    }
-  }
-
   /// Yaklaşan taksitleri getir (bildirim için)
   Future<List<PaymentInstallment>> getUpcomingInstallments(String projectId, {int daysAhead = 7}) async {
     try {

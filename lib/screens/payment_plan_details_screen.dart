@@ -865,10 +865,6 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           SnackBar(content: Text('Hata: $e')),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Dosya yükleme hatası: $e')),
-      );
     }
   }
 

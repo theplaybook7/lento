@@ -95,7 +95,7 @@ class TcmbService {
     }
 
     // x = çeyrek index (0, 1, 2, ...), y = endeks
-    double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+    double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
     for (int i = 0; i < n; i++) {
       final x = i.toDouble();
       final y = veriler[i].endeks;
@@ -103,7 +103,6 @@ class TcmbService {
       sumY += y;
       sumXY += x * y;
       sumX2 += x * x;
-      sumY2 += y * y;
     }
 
     final egim = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
@@ -165,15 +164,11 @@ class TcmbService {
 
     // Çeyreklik büyüme oranları
     final buyumeOranlari = _ceyreklikBuyumeOranlari(veriler);
-    final sonCeyrekBuyume = buyumeOranlari.isNotEmpty ? buyumeOranlari.last : 0.06;
 
     // Üstel düzeltme ile tahmin (sonraki çeyrek büyüme oranı)
     final ustelTahmin = buyumeOranlari.isNotEmpty
         ? _ustelDuzeltme(buyumeOranlari, alfa: 0.3)
         : 0.06;
-
-    // Lineer regresyon ile endeks tahmini
-    final basIndex = veriler.length.toDouble();
     final ceyrekSayisi = (aySayisi / 3).ceil();
     final sonEndeks = veriler.isNotEmpty ? veriler.last.endeks : 100.0;
 

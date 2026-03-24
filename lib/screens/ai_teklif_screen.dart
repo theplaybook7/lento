@@ -8,7 +8,6 @@ import '../project_core.dart';
 import '../theme/app_theme.dart';
 import '../services/ai_teklif_service.dart';
 import '../services/emlak_data_service.dart';
-import '../services/gemini_service.dart';
 import '../services/ai_teklif_pdf_service.dart' as ai_pdf;
 
 String _formatN(double n) {
@@ -85,14 +84,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   // Kayıtlı AI teklifler
   bool _showSavedList = false;
 
-  // ── AI Sohbet ──
-  final GeminiService _gemini = GeminiService();
-  final TextEditingController _chatCtrl = TextEditingController();
-  final ScrollController _chatScrollCtrl = ScrollController();
-  final List<_ChatMesaj> _chatMesajlar = [];
-  bool _chatYukleniyor = false;
-  bool _chatAcik = false;
-
   /// Hesaplanmış toplam m²
   double get _toplamM2 {
     final bodrum = int.tryParse(_bodrumKatSayisiCtrl.text) ?? 0;
@@ -110,7 +101,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   void initState() {
     super.initState();
     _ilListesi = EmlakDataService.ilListesi();
-    _gemini.baslat();
   }
 
   @override
@@ -126,8 +116,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     _dukkanHibeTutariCtrl.dispose();
     _daireKrediTutariCtrl.dispose();
     _dukkanKrediTutariCtrl.dispose();
-    _chatCtrl.dispose();
-    _chatScrollCtrl.dispose();
     for (final k in _katlar) {
       (k['katAlaniCtrl'] as TextEditingController).dispose();
       for (final d in (k['daireler'] as List)) {
@@ -601,11 +589,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         title: const Text('AI Teklif Analizi'),
         actions: [
           IconButton(
-            icon: Icon(_chatAcik ? Icons.close : Icons.smart_toy),
-            tooltip: _chatAcik ? 'Sohbeti Kapat' : 'AI Asistan',
-            onPressed: () => setState(() => _chatAcik = !_chatAcik),
-          ),
-          IconButton(
             icon: const Icon(Icons.list_alt),
             tooltip: 'Kayıtlı Teklifler',
             onPressed: () => setState(() => _showSavedList = !_showSavedList),
@@ -623,16 +606,9 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                 ],
               ),
             )
-          : Column(
-              children: [
-                Expanded(
-                  child: _showSavedList
-                      ? _buildSavedList()
-                      : _buildStepContent(),
-                ),
-                if (_chatAcik) _buildChatPanel(),
-              ],
-            ),
+          : _showSavedList
+              ? _buildSavedList()
+              : _buildStepContent(),
     );
   }
 
@@ -1991,200 +1967,6 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     );
   }
 
-  // ══════════ AI Sohbet ══════════
-
-  Future<void> _chatGonder() async {
-    final metin = _chatCtrl.text.trim();
-    if (metin.isEmpty || _chatYukleniyor) return;
-
-    setState(() {
-      _chatMesajlar.add(_ChatMesaj(metin: metin, benMi: true));
-      _chatCtrl.clear();
-      _chatYukleniyor = true;
-    });
-    _chatScrollAlt();
-
-    final cevap = await _gemini.mesajGonder(metin);
-
-    if (mounted) {
-      setState(() {
-        _chatMesajlar.add(_ChatMesaj(metin: cevap, benMi: false));
-        _chatYukleniyor = false;
-      });
-      _chatScrollAlt();
-    }
-  }
-
-  void _chatScrollAlt() {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_chatScrollCtrl.hasClients) {
-        _chatScrollCtrl.animateTo(
-          _chatScrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  Widget _buildChatPanel() {
-    return Container(
-      height: 300,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.grey.shade400, offset: const Offset(0, -2), blurRadius: 6)],
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        children: [
-          // Başlık çubuğu
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.smart_toy, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('AI Asistan (Yerleşik)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    _gemini.sifirla();
-                    setState(() => _chatMesajlar.clear());
-                  },
-                  child: const Icon(Icons.refresh, color: Colors.white70, size: 20),
-                ),
-              ],
-            ),
-          ),
-          // Mesajlar
-          Expanded(
-            child: _chatMesajlar.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          _buildOneriChip('5 katlı bina maliyeti ne olur?'),
-                          _buildOneriChip('Kadıköy\'de kat karşılığı analizi'),
-                          _buildOneriChip('Hibe ve kredi avantajları neler?'),
-                          _buildOneriChip('Sığınak kuralları nedir?'),
-                        ],
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _chatScrollCtrl,
-                    padding: const EdgeInsets.all(8),
-                    itemCount: _chatMesajlar.length + (_chatYukleniyor ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _chatMesajlar.length && _chatYukleniyor) {
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.grey.shade500)),
-                                const SizedBox(width: 8),
-                                Text('Düşünüyor...', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      final m = _chatMesajlar[index];
-                      return Align(
-                        alignment: m.benMi ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                          margin: const EdgeInsets.only(bottom: 6),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: m.benMi ? AppTheme.primaryColor : Colors.grey.shade100,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(12),
-                              topRight: const Radius.circular(12),
-                              bottomLeft: Radius.circular(m.benMi ? 12 : 2),
-                              bottomRight: Radius.circular(m.benMi ? 2 : 12),
-                            ),
-                          ),
-                          child: SelectableText(
-                            m.metin,
-                            style: TextStyle(
-                              color: m.benMi ? Colors.white : Colors.black87,
-                              fontSize: 13,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          // Giriş
-          Container(
-            padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _chatCtrl,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _chatGonder(),
-                    maxLines: null,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'İnşaat hakkında sorunuzu yazın...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: AppTheme.primaryColor,
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white, size: 18),
-                    onPressed: _chatYukleniyor ? null : _chatGonder,
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOneriChip(String metin) {
-    return ActionChip(
-      label: Text(metin, style: const TextStyle(fontSize: 11)),
-      onPressed: () {
-        _chatCtrl.text = metin;
-        _chatGonder();
-      },
-      backgroundColor: Colors.purple.shade50,
-      side: BorderSide(color: Colors.purple.shade200),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
   // ══════════ UI Helpers ══════════
 
   Widget _buildVeriKaynagiWidget() {
@@ -2358,10 +2140,4 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       firmaLogosu: SistemYoneticisi().aktifSirket?.logo,
     );
   }
-}
-
-class _ChatMesaj {
-  final String metin;
-  final bool benMi;
-  _ChatMesaj({required this.metin, required this.benMi});
 }

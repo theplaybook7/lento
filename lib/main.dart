@@ -191,6 +191,16 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
               if (_normalizeEmail(s.yoneticiEposta) == email) {
                 bulunanSirket = s;
                 kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
+                // Mevcut şirketlerde adminlar haritasını otomatik oluştur
+                final data = sirketDoc.data() as Map<String, dynamic>?;
+                if (data != null && (data['adminlar'] == null || !(data['adminlar'] as Map).containsKey(user.uid))) {
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('sirketler')
+                        .doc(sirketId)
+                        .update({'adminlar.${user.uid}': true});
+                  } catch (_) {}
+                }
               } else {
                 try {
                   final p = s.personelListesi.firstWhere(

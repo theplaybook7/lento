@@ -432,6 +432,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           'adres': adresCtrl.text,
                           'logoUrl': logoUrl,
                           'personelListesi': [],
+                          'adminlar': {currentUser.uid: true},
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,
                         });

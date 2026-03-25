@@ -7,7 +7,11 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && get(/databases/$(database)/documents/sirketler/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId)).data.adminlar[request.auth.uid] == true;
+      let sirketData = get(/databases/$(database)/documents/sirketler/$(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId)).data;
+      return isAuthenticated() && (
+        sirketData.yoneticiEposta == request.auth.token.email
+        || ('adminlar' in sirketData && request.auth.uid in sirketData.adminlar && sirketData.adminlar[request.auth.uid] == true)
+      );
     }
 
     function userSirketId() {

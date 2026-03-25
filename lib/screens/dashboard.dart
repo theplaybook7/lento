@@ -53,6 +53,109 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     super.dispose();
   }
 
+  Future<void> _sirketDegistir() async {
+    final email = SistemYoneticisi().girisYapanEmail ?? '';
+    if (email.isEmpty) return;
+
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('sirketler')
+          .where('emailler', arrayContains: email)
+          .get();
+
+      if (query.docs.length <= 1) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Yalnızca bir şirkete kayıtlısınız.')),
+          );
+        }
+        return;
+      }
+
+      final sirketler = query.docs.map((d) => Sirket.fromFirestore(d)).toList();
+      final mevcutId = SistemYoneticisi().aktifSirket?.id;
+
+      if (!mounted) return;
+      final secilen = await showDialog<Sirket>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Şirket Değiştir'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: sirketler.length,
+              itemBuilder: (context, i) {
+                final s = sirketler[i];
+                final aktifMi = s.id == mevcutId;
+                return ListTile(
+                  leading: Icon(
+                    aktifMi ? Icons.business : Icons.business_outlined,
+                    color: aktifMi ? AppTheme.primaryColor : null,
+                  ),
+                  title: Text(
+                    s.ad,
+                    style: TextStyle(
+                      fontWeight: aktifMi ? FontWeight.bold : FontWeight.normal,
+                      color: aktifMi ? AppTheme.primaryColor : null,
+                    ),
+                  ),
+                  subtitle: Text(aktifMi ? 'Aktif' : s.yoneticiEposta),
+                  trailing: aktifMi ? const Icon(Icons.check, color: Colors.green) : null,
+                  onTap: aktifMi ? null : () => Navigator.pop(ctx, s),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('İPTAL'),
+            ),
+          ],
+        ),
+      );
+
+      if (secilen != null && mounted) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'sirketId': secilen.id,
+        }, SetOptions(merge: true));
+
+        // Yetkiyi belirle
+        final normalEmail = email.trim().toLowerCase();
+        PersonelYetki? yetki;
+        if (normalEmail == secilen.yoneticiEposta.trim().toLowerCase()) {
+          yetki = PersonelYetki(email: normalEmail, adminMi: true);
+        } else {
+          try {
+            yetki = secilen.personelListesi.firstWhere(
+              (p) => p.email.trim().toLowerCase() == normalEmail,
+            );
+          } catch (_) {}
+        }
+
+        SistemYoneticisi().aktifSirket = secilen;
+        SistemYoneticisi().aktifKullaniciYetkileri = yetki;
+
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const DashboardSayfasi()),
+            (route) => false,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (SistemYoneticisi().cikisYapiliyor) {
@@ -92,7 +195,22 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Lento'),
+        title: GestureDetector(
+          onTap: _sirketDegistir,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  SistemYoneticisi().aktifSirket?.ad ?? 'Lento',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.swap_horiz, size: 18),
+            ],
+          ),
+        ),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 1,
@@ -166,12 +284,15 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     context,
                     MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
                   );
+                } else if (value == 'switch_company') {
+                  _sirketDegistir();
                 } else if (value == 'logout') {
                   SistemYoneticisi().temizle();
                   await FirebaseAuth.instance.signOut();
                 }
               },
               itemBuilder: (context) => const [
+                PopupMenuItem(value: 'switch_company', child: Text('Şirket Değiştir')),
                 PopupMenuItem(value: 'settings', child: Text('Ayarlar')),
                 PopupMenuItem(value: 'logout', child: Text('Çıkış')),
               ],

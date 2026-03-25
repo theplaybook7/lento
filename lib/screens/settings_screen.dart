@@ -426,11 +426,13 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
 
                 try {
                   final updatedList = [..._sirket.personelListesi, yeniPersonel];
+                  final normalizedEmail = emailCtrl.text.trim().toLowerCase();
                   await FirebaseFirestore.instance
                       .collection('sirketler')
                       .doc(_sirket.id)
                       .update({
                     'personelListesi': updatedList.map((p) => p.toMap()).toList(),
+                    'emailler': FieldValue.arrayUnion([normalizedEmail]),
                   });
 
                   _sirket.personelListesi = updatedList;
@@ -648,12 +650,14 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
 
     if (confirm == true) {
       try {
+        final silinecekEmail = personel.email.trim().toLowerCase();
         _sirket.personelListesi.removeWhere((p) => p.email == personel.email);
         await FirebaseFirestore.instance
             .collection('sirketler')
             .doc(_sirket.id)
             .update({
           'personelListesi': _sirket.personelListesi.map((p) => p.toMap()).toList(),
+          'emailler': FieldValue.arrayRemove([silinecekEmail]),
         });
 
         SistemYoneticisi().aktifSirket = _sirket;

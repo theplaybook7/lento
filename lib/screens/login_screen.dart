@@ -432,6 +432,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           'adres': adresCtrl.text,
                           'logoUrl': logoUrl,
                           'personelListesi': [],
+                          'emailler': [currentEmail],
                           'adminlar': {currentUser.uid: true},
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,
@@ -616,11 +617,28 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
 
                       try {
                         // Firebase Auth'ta kullanıcı oluştur
-                        // Giriş sonrası VeriYuklemeEkrani şirket eşleşmesini kontrol edecek
-                        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
                           email: emailCtrl.text.trim(),
                           password: passCtrl.text.trim(),
                         );
+
+                        // Email ile eşleşen şirketi bul ve sirketId'yi kaydet
+                        final normalizedEmail = emailCtrl.text.trim().toLowerCase();
+                        try {
+                          final emailQuery = await FirebaseFirestore.instance
+                              .collection('sirketler')
+                              .where('emailler', arrayContains: normalizedEmail)
+                              .limit(1)
+                              .get();
+                          if (emailQuery.docs.isNotEmpty && credential.user != null) {
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(credential.user!.uid)
+                                .set({'sirketId': emailQuery.docs.first.id}, SetOptions(merge: true));
+                          }
+                        } catch (_) {
+                          // Şirket eşleşmesi opsiyonel — login'de de yapılır
+                        }
 
                         if (!ctx.mounted || !mounted) return;
                         Navigator.pop(ctx);

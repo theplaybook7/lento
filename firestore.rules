@@ -18,6 +18,12 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId;
     }
 
+    // Kullanıcının sirketId'si var mı kontrol et (yoksa null döner)
+    function hasUserSirketId() {
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return 'sirketId' in userData && userData.sirketId != null && userData.sirketId != '';
+    }
+
     // Users koleksiyonu
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId);
@@ -33,7 +39,11 @@ service cloud.firestore {
     // Şirketler koleksiyonu
     match /sirketler/{sirketId} {
       allow create: if isAuthenticated();
-      allow read: if isAuthenticated() && userSirketId() == sirketId;
+      // sirketId varsa normal erişim, yoksa email eşleşmesi ile okumaya izin ver
+      allow read: if isAuthenticated() && (
+        (hasUserSirketId() && userSirketId() == sirketId)
+        || (!hasUserSirketId() && request.auth.token.email in resource.data.emailler)
+      );
       allow write: if isAdmin() && userSirketId() == sirketId;
 
       // Bildirimler alt koleksiyonu

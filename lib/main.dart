@@ -154,6 +154,39 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
     });
   }
 
+  /// Birden fazla şirkete kayıtlı kullanıcı için şirket seçim dialogu
+  Future<Sirket?> _sirketSecDialog(List<Sirket> sirketler) async {
+    return showDialog<Sirket>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Şirket Seçin"),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: sirketler.length,
+            itemBuilder: (context, index) {
+              final s = sirketler[index];
+              return ListTile(
+                leading: const Icon(Icons.business),
+                title: Text(s.ad),
+                subtitle: Text(s.yoneticiEposta),
+                onTap: () => Navigator.pop(ctx, s),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text("İPTAL"),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _sirketVerisiniYukle() async {
     // Yeni giriş yapıldı, flag'i sıfırla
     SistemYoneticisi().cikisYapiliyor = false;
@@ -201,6 +234,20 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                         .update({'adminlar.${user.uid}': true});
                   } catch (_) {}
                 }
+                // emailler field yoksa otomatik oluştur (migration)
+                if (data != null && data['emailler'] == null) {
+                  try {
+                    final emails = <String>[_normalizeEmail(s.yoneticiEposta)];
+                    for (final p in s.personelListesi) {
+                      final pe = _normalizeEmail(p.email);
+                      if (pe.isNotEmpty && !emails.contains(pe)) emails.add(pe);
+                    }
+                    await FirebaseFirestore.instance
+                        .collection('sirketler')
+                        .doc(sirketId)
+                        .update({'emailler': emails});
+                  } catch (_) {}
+                }
               } else {
                 try {
                   final p = s.personelListesi.firstWhere(
@@ -219,8 +266,59 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
         }
 
         if (bulunanSirket == null) {
-          // users dokümanında sirketId yoksa veya şirket bulunamadıysa
-          // Şirket bulunamadı durumuna düş
+          // sirketId yoksa veya şirket bulunamadıysa, email ile tüm şirketlerde ara
+          try {
+            final emailQuery = await FirebaseFirestore.instance
+                .collection('sirketler')
+                .where('emailler', arrayContains: email)
+                .get();
+
+            final bulunanSirketler = <Sirket>[];
+            final bulunanYetkiler = <PersonelYetki>[];
+
+            for (final doc in emailQuery.docs) {
+              final s = Sirket.fromFirestore(doc);
+              PersonelYetki? yetki;
+              if (_normalizeEmail(s.yoneticiEposta) == email) {
+                yetki = PersonelYetki(email: email, adminMi: true);
+              } else {
+                try {
+                  yetki = s.personelListesi.firstWhere(
+                    (element) => _normalizeEmail(element.email) == email,
+                  );
+                } catch (_) {
+                  // emailler array'inde var ama personelListesi'nde yok — skip
+                  continue;
+                }
+              }
+              bulunanSirketler.add(s);
+              bulunanYetkiler.add(yetki);
+            }
+
+            if (bulunanSirketler.length == 1) {
+              bulunanSirket = bulunanSirketler.first;
+              kullaniciYetkisi = bulunanYetkiler.first;
+              // sirketId'yi user doc'a kaydet (gelecek login için hızlı erişim)
+              await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                'sirketId': bulunanSirket!.id,
+              }, SetOptions(merge: true));
+            } else if (bulunanSirketler.length > 1) {
+              // Birden fazla şirket — kullanıcıya seçtir
+              if (mounted) {
+                final secim = await _sirketSecDialog(bulunanSirketler);
+                if (secim != null) {
+                  final idx = bulunanSirketler.indexOf(secim);
+                  bulunanSirket = secim;
+                  kullaniciYetkisi = bulunanYetkiler[idx];
+                  await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                    'sirketId': bulunanSirket!.id,
+                  }, SetOptions(merge: true));
+                }
+              }
+            }
+          } catch (_) {
+            // Sorgu başarısız — devam et, şirket bulunamadı gösterilecek
+          }
         }
 
         if (bulunanSirket != null) {
@@ -438,6 +536,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                           'telefon': '',
                           'adres': '',
                           'personelListesi': [],
+                          'emailler': [userEmail],
                           'adminlar': {user.uid: true},
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,

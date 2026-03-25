@@ -150,16 +150,40 @@ class SistemYoneticisi {
     girisYapanEmail = null;
   }
 
+  /// Kullanıcının admin (şirket sahibi veya adminMi) olup olmadığını kontrol eder.
+  bool get isAdminKullanici {
+    if (aktifSirket != null &&
+        (aktifSirket!.yoneticiEposta.trim().toLowerCase()) ==
+            (girisYapanEmail ?? '').trim().toLowerCase()) {
+      return true;
+    }
+    return aktifKullaniciYetkileri?.adminMi == true;
+  }
+
   bool yetkiVarMi(String modul) {
-    if (aktifSirket != null && aktifSirket!.yoneticiEposta == girisYapanEmail) return true;
+    if (aktifSirket != null &&
+        (aktifSirket!.yoneticiEposta.trim().toLowerCase()) ==
+            (girisYapanEmail ?? '').trim().toLowerCase()) {
+      return true;
+    }
     if (aktifKullaniciYetkileri == null) return false;
-    if (aktifKullaniciYetkileri!.adminMi) return true; 
-    
-    if (modul == 'ruhsat') return aktifKullaniciYetkileri!.goruntulemeRuhsat;
-    if (modul == 'santiye') return aktifKullaniciYetkileri!.goruntulemeSantiye;
-    if (modul == 'muhasebe') return aktifKullaniciYetkileri!.goruntulemeMuhasebe;
-    
-    return true;
+    if (aktifKullaniciYetkileri!.adminMi) return true;
+
+    switch (modul) {
+      case 'ruhsat':
+        return aktifKullaniciYetkileri!.goruntulemeRuhsat;
+      case 'santiye':
+        return aktifKullaniciYetkileri!.goruntulemeSantiye;
+      case 'muhasebe':
+        return aktifKullaniciYetkileri!.goruntulemeMuhasebe;
+      case 'teklif':
+      case 'cari':
+        // Teklif ve cari modülleri ayrıca kısıtlanabilir,
+        // şimdilik personelListesinde olan herkes erişebilir.
+        return true;
+      default:
+        return false;
+    }
   }
 }
 

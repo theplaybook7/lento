@@ -22,8 +22,13 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
   bool _loading = true;
   bool _saving = false;
 
-  bool get _isCompanyOwner =>
-      SistemYoneticisi().aktifSirket?.yoneticiEposta == SistemYoneticisi().girisYapanEmail;
+  bool get _isCompanyOwner {
+    final sirketEmail = SistemYoneticisi().aktifSirket?.yoneticiEposta.trim().toLowerCase();
+    final kullaniciEmail = (SistemYoneticisi().girisYapanEmail ?? '').trim().toLowerCase();
+    return sirketEmail == kullaniciEmail;
+  }
+
+  bool get _isAdmin => _isCompanyOwner || (SistemYoneticisi().aktifKullaniciYetkileri?.adminMi == true);
 
   late TextEditingController _adCtrl;
   late TextEditingController _telefonCtrl;
@@ -48,6 +53,12 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
   }
 
   Future<void> _guncelleSirketBilgileri() async {
+    if (!_isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Şirket bilgilerini sadece yetkililer düzenleyebilir")),
+      );
+      return;
+    }
     if (_adCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Şirket adı boş olamaz")),
@@ -823,7 +834,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: _saving ? null : _logoGuncelle,
+                          onPressed: _saving || !_isAdmin ? null : _logoGuncelle,
                           icon: const Icon(Icons.upload_outlined),
                           label: const Text("Logo Değiştir"),
                           style: ElevatedButton.styleFrom(
@@ -850,7 +861,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _adCtrl,
-                    enabled: !_saving,
+                    enabled: !_saving && _isAdmin,
                     decoration: InputDecoration(
                       labelText: "Şirket Adı",
                       prefixIcon: Icon(Icons.business, color: AppTheme.primaryColor),
@@ -870,7 +881,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _telefonCtrl,
-                    enabled: !_saving,
+                    enabled: !_saving && _isAdmin,
                     decoration: InputDecoration(
                       labelText: "Telefon",
                       prefixIcon: Icon(Icons.phone, color: AppTheme.primaryColor),
@@ -890,7 +901,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _adresCtrl,
-                    enabled: !_saving,
+                    enabled: !_saving && _isAdmin,
                     maxLines: 3,
                     decoration: InputDecoration(
                       labelText: "Adres",
@@ -914,7 +925,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: _saving ? null : _guncelleSirketBilgileri,
+                      onPressed: _saving || !_isAdmin ? null : _guncelleSirketBilgileri,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryColor,
                         foregroundColor: Colors.white,

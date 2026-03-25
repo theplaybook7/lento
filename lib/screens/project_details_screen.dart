@@ -199,7 +199,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           unselectedLabelColor: Colors.white70,
         ),
         actions: [
-          PopupMenuButton<String>(
+          if (SistemYoneticisi().isAdminKullanici)
+            PopupMenuButton<String>(
             onSelected: (value) async {
               if (value == 'archive') {
                 final confirm = await showDialog<bool>(

@@ -130,11 +130,10 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
         if (normalEmail == secilen.yoneticiEposta.trim().toLowerCase()) {
           yetki = PersonelYetki(email: normalEmail, adminMi: true);
         } else {
-          try {
-            yetki = secilen.personelListesi.firstWhere(
-              (p) => p.email.trim().toLowerCase() == normalEmail,
-            );
-          } catch (_) {}
+          final match = secilen.personelListesi.where(
+            (p) => p.email.trim().toLowerCase() == normalEmail,
+          );
+          yetki = match.isNotEmpty ? match.first : null;
         }
 
         SistemYoneticisi().aktifSirket = secilen;

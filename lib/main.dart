@@ -489,6 +489,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   @override
   Widget build(BuildContext context) {
     if (_hataMetni != null) {
+      final isSubscriptionError = _hataMetni!.contains('abonelik') || _hataMetni!.contains('Abonelik');
       return Scaffold(
         body: Center(
           child: Padding(
@@ -496,20 +497,72 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
+                Icon(
+                  isSubscriptionError ? Icons.lock_outline : Icons.error_outline,
+                  size: 64,
+                  color: isSubscriptionError ? Colors.orange.shade400 : Colors.red.shade400,
+                ),
                 const SizedBox(height: 16),
                 Text(_hataMetni!, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _hataMetni = null;
-                      _sirketBulunamadi = false;
-                    });
-                    _sirketVerisiniYukle();
-                  },
-                  child: const Text("Tekrar Dene"),
-                ),
+                if (isSubscriptionError && PaymentService().isApplePaymentSupported) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final purchased = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (ctx) => const PaywallScreen(mode: PaywallMode.subscription),
+                          ),
+                        );
+                        if (purchased == true && mounted) {
+                          setState(() {
+                            _hataMetni = null;
+                            _sirketBulunamadi = false;
+                          });
+                          _sirketVerisiniYukle();
+                        }
+                      },
+                      icon: const Icon(Icons.payment),
+                      label: const Text("Abonelik Satın Al"),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () async {
+                      final paymentService = PaymentService();
+                      await paymentService.initialize();
+                      final restored = await paymentService.restorePurchases();
+                      if (restored && mounted) {
+                        setState(() {
+                          _hataMetni = null;
+                          _sirketBulunamadi = false;
+                        });
+                        _sirketVerisiniYukle();
+                      } else if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(paymentService.lastError.isNotEmpty
+                              ? paymentService.lastError
+                              : 'Geri yüklenecek satın alım bulunamadı.')),
+                        );
+                      }
+                    },
+                    child: const Text("Satın Alımları Geri Yükle"),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (!isSubscriptionError || !PaymentService().isApplePaymentSupported)
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _hataMetni = null;
+                        _sirketBulunamadi = false;
+                      });
+                      _sirketVerisiniYukle();
+                    },
+                    child: const Text("Tekrar Dene"),
+                  ),
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: _cikisYap,

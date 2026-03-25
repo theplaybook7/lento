@@ -21,6 +21,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   bool _productsLoading = true;
   String _statusMessage = "";
   final Map<String, ProductDetails> _products = {};
+  PlanType _selectedPlan = PlanType.yearly;
 
   @override
   void initState() {
@@ -311,7 +312,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: _loading || _productsLoading ? null : () => _buySubscription(PlanType.yearly),
+                  onPressed: _loading || _productsLoading ? null : () => _buySubscription(_selectedPlan),
                   icon: _loading
                       ? SizedBox(
                           width: 20,
@@ -329,7 +330,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   label: Text(
                     _loading
                         ? "İşleniyor..."
-                        : "Başla",
+                        : _selectedPlan == PlanType.yearly ? "Yıllık Başla" : "Aylık Başla",
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -420,15 +421,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
     required PlanType planType,
     required bool isPopular,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isPopular ? AppTheme.primaryColor : Colors.grey.shade300,
-          width: isPopular ? 2 : 1,
+    final isSelected = _selectedPlan == planType;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPlan = planType),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.05) : Colors.white,
         ),
-        borderRadius: BorderRadius.circular(16),
-        color: isPopular ? AppTheme.primaryColor.withValues(alpha: 0.05) : Colors.white,
-      ),
       child: Stack(
         children: [
           Padding(
@@ -538,6 +542,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

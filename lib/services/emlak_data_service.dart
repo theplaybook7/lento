@@ -28,6 +28,8 @@ class EmlakDataService {
         return 1.35;
       case 'Ofis':
         return 1.12;
+      case 'Çatı Katı Daire':
+        return 1.18;
       case 'Daire':
       default:
         return 1.0;

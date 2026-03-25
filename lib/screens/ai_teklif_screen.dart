@@ -148,6 +148,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       _katlar.add({
         'ad': '$i. Bodrum Kat',
         'kat': -i,
+        'catiKati': false,
         'katAlaniCtrl': TextEditingController(text: bodrumM2 > 0 ? _formatN(bodrumM2) : ''),
         'daireler': <Map<String, dynamic>>[],
       });
@@ -157,6 +158,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       _katlar.add({
         'ad': 'Zemin Kat',
         'kat': 0,
+        'catiKati': false,
         'katAlaniCtrl': TextEditingController(text: zeminM2 > 0 ? _formatN(zeminM2) : ''),
         'daireler': <Map<String, dynamic>>[],
       });
@@ -166,6 +168,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       _katlar.add({
         'ad': '$i. Normal Kat',
         'kat': i,
+        'catiKati': false,
         'katAlaniCtrl': TextEditingController(text: normalM2 > 0 ? _formatN(normalM2) : ''),
         'daireler': <Map<String, dynamic>>[],
       });
@@ -405,6 +408,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   List<Map<String, dynamic>> _daireListesiHazirla() {
     final list = <Map<String, dynamic>>[];
     for (final k in _katlar) {
+      final isCati = k['catiKati'] == true;
       for (final d in (k['daireler'] as List)) {
         final tip = d['tip'] as String;
         double m2 = _parseN((d['m2Ctrl'] as TextEditingController).text);
@@ -418,10 +422,11 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         list.add({
           'm2': m2,
           'kat': d['kat'] as int,
-          'tip': tip,
+          'tip': isCati ? (tip == 'Daire' ? 'Çatı Katı Daire' : tip) : tip,
           'sahip': d['sahip'] as String,
           'hibeVar': d['hibeVar'] as bool,
           'krediVar': d['krediVar'] as bool,
+          'catiKati': isCati,
           'hibeTutari': isDukkan ? _parseN(_dukkanHibeTutariCtrl.text) : _parseN(_daireHibeTutariCtrl.text),
           'krediTutari': isDukkan ? _parseN(_dukkanKrediTutariCtrl.text) : _parseN(_daireKrediTutariCtrl.text),
         });
@@ -546,7 +551,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     }
   }
 
-  Future<void> _pdfOlusturVeGoster() async {
+  Future<void> _pdfOlusturVeGoster({bool musteriCiktisi = false}) async {
     if (_hesapSonucu == null) return;
     setState(() {
       _isLoading = true;
@@ -554,13 +559,15 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     });
 
     try {
-      final pdfData = await _generateAiTeklifPdf();
+      final pdfData = await _generateAiTeklifPdf(musteriCiktisi: musteriCiktisi);
       setState(() => _isLoading = false);
       if (!mounted) return;
 
       await Printing.layoutPdf(
         onLayout: (_) async => pdfData,
-        name: 'AI_Teklif_${DateTime.now().millisecondsSinceEpoch}',
+        name: musteriCiktisi
+            ? 'Musteri_Teklif_${DateTime.now().millisecondsSinceEpoch}'
+            : 'AI_Teklif_${DateTime.now().millisecondsSinceEpoch}',
       );
     } catch (e) {
       setState(() => _isLoading = false);
@@ -672,12 +679,19 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                 ),
               if (_currentStep == 4) ...[
                 ElevatedButton.icon(
-                  onPressed: _pdfOlusturVeGoster,
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('PDF'),
+                  onPressed: () => _pdfOlusturVeGoster(musteriCiktisi: false),
+                  icon: const Icon(Icons.analytics, size: 18),
+                  label: const Text('Maliyet PDF'),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600, foregroundColor: Colors.white),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
+                ElevatedButton.icon(
+                  onPressed: () => _pdfOlusturVeGoster(musteriCiktisi: true),
+                  icon: const Icon(Icons.person, size: 18),
+                  label: const Text('Müşteri PDF'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade600, foregroundColor: Colors.white),
+                ),
+                const SizedBox(width: 6),
                 ElevatedButton.icon(
                   onPressed: _kaydet,
                   icon: const Icon(Icons.save),
@@ -1161,13 +1175,18 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     final katData = _katlar[katIndex];
     final ad = katData['ad'] as String;
     final kat = katData['kat'] as int;
+    final isCatiKati = katData['catiKati'] == true;
+    final isTopFloor = katIndex == _katlar.length - 1 && kat > 0;
     final katAlaniCtrl = katData['katAlaniCtrl'] as TextEditingController;
     final daireler = katData['daireler'] as List<Map<String, dynamic>>;
     final phantoms = _phantomCellsForFloor(katIndex);
+    final displayAd = isCatiKati ? 'Çatı Katı' : ad;
 
     // Renk
     Color katBg;
-    if (kat < 0) {
+    if (isCatiKati) {
+      katBg = Colors.brown.shade50;
+    } else if (kat < 0) {
       katBg = Colors.grey.shade100;
     } else if (kat == 0) {
       katBg = Colors.amber.shade50;
@@ -1195,12 +1214,14 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
           // Kat başlığı
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            color: kat < 0 ? Colors.grey.shade200 : (kat == 0 ? Colors.amber.shade100 : Colors.blue.shade50),
+            color: isCatiKati ? Colors.brown.shade200 : (kat < 0 ? Colors.grey.shade200 : (kat == 0 ? Colors.amber.shade100 : Colors.blue.shade50)),
             child: Row(
               children: [
+                if (isCatiKati)
+                  const Padding(padding: EdgeInsets.only(right: 4), child: Icon(Icons.roofing, size: 16, color: Colors.brown)),
                 SizedBox(
-                  width: 100,
-                  child: Text(ad, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  width: isCatiKati ? 80 : 100,
+                  child: Text(displayAd, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isCatiKati ? Colors.brown.shade800 : null)),
                 ),
                 const SizedBox(width: 4),
                 SizedBox(
@@ -1238,6 +1259,27 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                     ),
                   ),
                 const SizedBox(width: 4),
+                // Çatı katı toggle (sadece en üst normal katta)
+                if (isTopFloor)
+                  SizedBox(
+                    height: 28,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        Icons.roofing,
+                        color: isCatiKati ? Colors.brown.shade700 : Colors.grey.shade400,
+                        size: 20,
+                      ),
+                      tooltip: isCatiKati ? 'Normal kata çevir' : 'Çatı katına çevir',
+                      onPressed: () {
+                        setState(() {
+                          katData['catiKati'] = !isCatiKati;
+                          katData['ad'] = isCatiKati ? '${kat}. Normal Kat' : 'Çatı Katı';
+                        });
+                      },
+                    ),
+                  ),
+                const SizedBox(width: 2),
                 // Daire ekle
                 SizedBox(
                   height: 28,
@@ -1368,23 +1410,25 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
                   ],
                 ),
                 const SizedBox(height: 2),
-                SizedBox(
-                  width: 55,
-                  height: 24,
-                  child: TextField(
-                    controller: m2Ctrl,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [_TBinlikFormatter()],
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-                    decoration: InputDecoration(
-                      hintText: 'm²',
-                      hintStyle: TextStyle(fontSize: 9, color: Colors.grey.shade400),
-                      isDense: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: SizedBox(
+                    height: 24,
+                    child: TextField(
+                      controller: m2Ctrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [_TBinlikFormatter()],
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(
+                        hintText: 'm²',
+                        hintStyle: TextStyle(fontSize: 9, color: Colors.grey.shade400),
+                        isDense: true,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                      ),
+                      onChanged: (_) => setState(() {}),
                     ),
-                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 if (tipGosterge.isNotEmpty)
@@ -2092,7 +2136,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
 
   // ============ PDF ============
 
-  Future<Uint8List> _generateAiTeklifPdf() async {
+  Future<Uint8List> _generateAiTeklifPdf({bool musteriCiktisi = false}) async {
     return ai_pdf.generateAiTeklifPdf(
       hesapSonucu: _hesapSonucu!,
       aiOzet: _aiOzet ?? '',
@@ -2101,6 +2145,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       mahalle: _secilenMahalle ?? '',
       firmaAdi: SistemYoneticisi().aktifSirket?.ad ?? '',
       firmaLogosu: SistemYoneticisi().aktifSirket?.logo,
+      musteriCiktisi: musteriCiktisi,
     );
   }
 }

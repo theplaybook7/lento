@@ -23,6 +23,7 @@ Future<Uint8List> generateAiTeklifPdf({
   required String mahalle,
   required String firmaAdi,
   Uint8List? firmaLogosu,
+  bool musteriCiktisi = false,
 }) async {
   final pdf = pw.Document();
   final font = await PdfGoogleFonts.notoSansRegular();
@@ -49,42 +50,54 @@ Future<Uint8List> generateAiTeklifPdf({
         // Başlık
         widgets.add(pw.Center(
           child: pw.Text(
-            'AI DESTEKLİ İNŞAAT TEKLİF ANALİZİ',
+            musteriCiktisi ? 'İNŞAAT TEKLİF RAPORU' : 'AI DESTEKLİ İNŞAAT TEKLİF ANALİZİ',
             style: pw.TextStyle(font: fontBold, fontSize: 16, color: PdfColors.blue900),
           ),
         ));
         widgets.add(pw.SizedBox(height: 4));
-        widgets.add(pw.Center(
-          child: pw.Text(
-            'Senaryo ${senaryo}: ${senaryo == 1 ? "Müteahhit Daire Almıyor" : "Müteahhit Daire Alıyor"}',
-            style: pw.TextStyle(font: font, fontSize: 11, color: PdfColors.grey700),
-          ),
-        ));
+        if (!musteriCiktisi) {
+          widgets.add(pw.Center(
+            child: pw.Text(
+              'Senaryo ${senaryo}: ${senaryo == 1 ? "Müteahhit Daire Almıyor" : "Müteahhit Daire Alıyor"}',
+              style: pw.TextStyle(font: font, fontSize: 11, color: PdfColors.grey700),
+            ),
+          ));
+        }
         widgets.add(pw.SizedBox(height: 16));
 
         // Konum ve Temel Bilgiler
         widgets.add(_sectionTitle('PROJE BİLGİLERİ', fontBold));
-        widgets.add(_buildInfoTable([
-          ['Konum', '$il / $ilce / $mahalle'],
-          ['Toplam İnşaat Alanı', '${_fmt(hesapSonucu['toplamInsaatM2'])} m²'],
-          ['İnşaat Süresi', '${hesapSonucu['insaatSuresi']} ay'],
-          ['Kar Oranı', '%${_fmt(hesapSonucu['karOrani'])}'],
-        ], font, fontBold));
+        if (musteriCiktisi) {
+          widgets.add(_buildInfoTable([
+            ['Konum', '$il / $ilce / $mahalle'],
+            ['Toplam İnşaat Alanı', '${_fmt(hesapSonucu['toplamInsaatM2'])} m²'],
+            ['İnşaat Süresi', '${hesapSonucu['insaatSuresi']} ay'],
+          ], font, fontBold));
+        } else {
+          widgets.add(_buildInfoTable([
+            ['Konum', '$il / $ilce / $mahalle'],
+            ['Toplam İnşaat Alanı', '${_fmt(hesapSonucu['toplamInsaatM2'])} m²'],
+            ['İnşaat Süresi', '${hesapSonucu['insaatSuresi']} ay'],
+            ['Kar Oranı', '%${_fmt(hesapSonucu['karOrani'])}'],
+          ], font, fontBold));
+        }
         widgets.add(pw.SizedBox(height: 12));
 
-        // Maliyet Analizi
-        widgets.add(_sectionTitle('MALİYET ANALİZİ (TCMB İnşaat Maliyet Endeksine Dayalı)', fontBold));
-        widgets.add(_buildInfoTable([
-          ['Güncel m² Maliyeti', '${_fmt(hesapSonucu['guncelM2Maliyet'])} ₺'],
-          ['Yıllık İnşaat Enflasyonu', '%${(hesapSonucu['yillikEnflasyon'] as double).toStringAsFixed(1)}'],
-          ['Enflasyonlu m² Maliyeti', '${_fmt(hesapSonucu['enflasyonluM2Maliyet'])} ₺'],
-          ['Kar Dahil m² Fiyat', '${_fmt(hesapSonucu['karliM2Fiyat'])} ₺'],
-          ['Toplam Proje Maliyeti', '${_fmt(hesapSonucu['toplamMaliyet'])} ₺'],
-        ], font, fontBold));
-        widgets.add(pw.SizedBox(height: 12));
+        // Maliyet Analizi (sadece maliyet çıktısında)
+        if (!musteriCiktisi) {
+          widgets.add(_sectionTitle('MALİYET ANALİZİ (TCMB İnşaat Maliyet Endeksine Dayalı)', fontBold));
+          widgets.add(_buildInfoTable([
+            ['Güncel m² Maliyeti', '${_fmt(hesapSonucu['guncelM2Maliyet'])} ₺'],
+            ['Yıllık İnşaat Enflasyonu', '%${(hesapSonucu['yillikEnflasyon'] as double).toStringAsFixed(1)}'],
+            ['Enflasyonlu m² Maliyeti', '${_fmt(hesapSonucu['enflasyonluM2Maliyet'])} ₺'],
+            ['Kar Dahil m² Fiyat', '${_fmt(hesapSonucu['karliM2Fiyat'])} ₺'],
+            ['Toplam Proje Maliyeti', '${_fmt(hesapSonucu['toplamMaliyet'])} ₺'],
+          ], font, fontBold));
+          widgets.add(pw.SizedBox(height: 12));
+        }
 
-        // Senaryo 2: Müteahhit daireleri
-        if (senaryo == 2 && hesapSonucu['muteahhitDaireleri'] != null) {
+        // Senaryo 2: Müteahhit daireleri (sadece maliyet çıktısında)
+        if (!musteriCiktisi && senaryo == 2 && hesapSonucu['muteahhitDaireleri'] != null) {
           widgets.add(_sectionTitle('MÜTEAHHİT DAİRELERİ', fontBold));
           final mutRows = <List<String>>[
             ['Tip', 'm²', 'Kat', 'Tahmini Satış'],
@@ -112,19 +125,49 @@ Future<Uint8List> generateAiTeklifPdf({
           widgets.add(pw.SizedBox(height: 12));
         }
 
-        // Mal Sahibi Daire Ödemeleri
-        widgets.add(_sectionTitle('MAL SAHİBİ ÖDEME TABLOSU', fontBold));
+        // Mal Sahibi Daire Ödemeleri / Fiyat Tablosu
+        widgets.add(_sectionTitle(musteriCiktisi ? 'DAİRE FİYAT TABLOSU' : 'MAL SAHİBİ ÖDEME TABLOSU', fontBold));
         final daireler = senaryo == 1
             ? (hesapSonucu['daireler'] as List)
             : (hesapSonucu['malSahibiDaireleri'] as List);
 
-        final rows = <List<String>>[
-          ['No', 'Tip', 'm²', 'Kat', 'Brüt Tutar', 'Hibe', 'Kredi', 'Net Ödeme'],
-        ];
-        for (int i = 0; i < daireler.length; i++) {
-          final d = daireler[i];
-          rows.add([
-            '${i + 1}',
+        if (musteriCiktisi) {
+          // Müşteri çıktısı: sadece fiyat ve ödeme
+          final rows = <List<String>>[
+            ['No', 'Tip', 'm²', 'Kat', 'Fiyat'],
+          ];
+          for (int i = 0; i < daireler.length; i++) {
+            final d = daireler[i];
+            rows.add([
+              '${i + 1}',
+              d['tip'] ?? 'Daire',
+              '${_fmt((d['m2'] as num).toDouble())}',
+              '${d['kat']}',
+              '${_fmt((d['netOdeme'] as num).toDouble())} ₺',
+            ]);
+          }
+          widgets.add(_buildTable(rows, font, fontBold));
+
+          // Toplam
+          double toplamFiyat = 0;
+          for (final d in daireler) {
+            toplamFiyat += (d['netOdeme'] as num).toDouble();
+          }
+          widgets.add(pw.SizedBox(height: 6));
+          widgets.add(pw.Container(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text('Toplam: ${_fmt(toplamFiyat)} ₺',
+                style: pw.TextStyle(font: fontBold, fontSize: 11, color: PdfColors.blue900)),
+          ));
+        } else {
+          // Maliyet analizi: detaylı ödeme tablosu
+          final rows = <List<String>>[
+            ['No', 'Tip', 'm²', 'Kat', 'Brüt Tutar', 'Hibe', 'Kredi', 'Net Ödeme'],
+          ];
+          for (int i = 0; i < daireler.length; i++) {
+            final d = daireler[i];
+            rows.add([
+              '${i + 1}',
             d['tip'] ?? 'Daire',
             '${_fmt((d['m2'] as num).toDouble())}',
             '${d['kat']}',
@@ -133,12 +176,13 @@ Future<Uint8List> generateAiTeklifPdf({
             d['krediVar'] == true ? '${_fmt((d['krediTutari'] as num).toDouble())} ₺' : '-',
             '${_fmt((d['netOdeme'] as num).toDouble())} ₺',
           ]);
+          }
+          widgets.add(_buildTable(rows, font, fontBold));
         }
-        widgets.add(_buildTable(rows, font, fontBold));
         widgets.add(pw.SizedBox(height: 16));
 
-        // AI Özet
-        if (aiOzet.isNotEmpty) {
+        // AI Özet (sadece maliyet çıktısında)
+        if (!musteriCiktisi && aiOzet.isNotEmpty) {
           widgets.add(_sectionTitle('AI ANALİZ ÖZETİ', fontBold));
           widgets.add(pw.Container(
             padding: const pw.EdgeInsets.all(10),
@@ -161,8 +205,10 @@ Future<Uint8List> generateAiTeklifPdf({
             borderRadius: pw.BorderRadius.circular(4),
           ),
           child: pw.Text(
-            'NOT: Bu teklif AI destekli tahminler içermektedir. Enflasyon projeksiyonu TCMB İnşaat Maliyet Endeksi\'ne, '
-            'daire satış fiyatları AI tahminlerine dayanmaktadır. Gerçek piyasa koşullarına göre değişiklik gösterebilir.',
+            musteriCiktisi
+                ? 'NOT: Fiyatlar tahmini olup piyasa koşullarına göre değişiklik gösterebilir. Detaylı bilgi için firma ile iletişime geçiniz.'
+                : 'NOT: Bu teklif AI destekli tahminler içermektedir. Enflasyon projeksiyonu TCMB İnşaat Maliyet Endeksi\'ne, '
+                'daire satış fiyatları AI tahminlerine dayanmaktadır. Gerçek piyasa koşullarına göre değişiklik gösterebilir.',
             style: pw.TextStyle(font: font, fontSize: 8, color: PdfColors.grey800),
           ),
         ));

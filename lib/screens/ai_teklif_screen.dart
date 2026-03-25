@@ -54,6 +54,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
   List<String> _ilListesi = [];
   List<String> _ilceListesi = [];
   List<String> _mahalleListesi = [];
+  final _adaCtrl = TextEditingController();
+  final _parselCtrl = TextEditingController();
 
   // Step 2: İnşaat bilgileri — kat tipi bazında m²
   final _bodrumM2Ctrl = TextEditingController();
@@ -115,6 +117,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     _dukkanHibeTutariCtrl.dispose();
     _daireKrediTutariCtrl.dispose();
     _dukkanKrediTutariCtrl.dispose();
+    _adaCtrl.dispose();
+    _parselCtrl.dispose();
     for (final k in _katlar) {
       (k['katAlaniCtrl'] as TextEditingController).dispose();
       for (final d in (k['daireler'] as List)) {
@@ -534,6 +538,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         'il': _secilenIl ?? '',
         'ilce': _secilenIlce ?? '',
         'mahalle': _secilenMahalle ?? '',
+        'ada': _adaCtrl.text,
+        'parsel': _parselCtrl.text,
         'senaryo': _senaryo,
         'hesapSonucu': _hesapSonucu,
         'aiOzet': _aiOzet,
@@ -733,7 +739,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
         Step(
           title: const Text('Konum Bilgileri'),
           subtitle: _currentStep > 0
-              ? Text('${_secilenIl ?? ""} / ${_secilenIlce ?? ""} / ${_secilenMahalle ?? ""}')
+              ? Text('${_secilenIl ?? ""} / ${_secilenIlce ?? ""} / ${_secilenMahalle ?? ""}${_adaCtrl.text.isNotEmpty ? " Ada:${_adaCtrl.text}" : ""}${_parselCtrl.text.isNotEmpty ? " Parsel:${_parselCtrl.text}" : ""}')
               : null,
           isActive: _currentStep >= 0,
           state: _currentStep > 0 ? StepState.complete : StepState.indexed,
@@ -842,6 +848,37 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
               ? (v) => setState(() => _secilenMahalle = v)
               : null,
         ),
+        // Ada / Parsel girişi
+        if (_secilenIl != null && _secilenIlce != null && _secilenMahalle != null) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _adaCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Ada No',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.grid_on),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _parselCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Parsel No',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.grid_view),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
         // Bölge fiyat bilgisi
         if (_secilenIl != null && _secilenIlce != null) ...[
           const SizedBox(height: 12),
@@ -1797,7 +1834,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
             children: [
               const Text('Özet:', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Konum: ${_secilenIl ?? ""} / ${_secilenIlce ?? ""} / ${_secilenMahalle ?? ""}'),
+              Text('Konum: ${_secilenIl ?? ""} / ${_secilenIlce ?? ""} / ${_secilenMahalle ?? ""}${_adaCtrl.text.isNotEmpty ? " • Ada: ${_adaCtrl.text}" : ""}${_parselCtrl.text.isNotEmpty ? " Parsel: ${_parselCtrl.text}" : ""}'),
               Text('Toplam Alan: ${_formatN(_toplamM2)} m²'),
               Text('Süre: $_hesaplananSure ay'),
               Text('Maliyet: ${_guncelMaliyetCtrl.text} ₺/m²  •  Kar: %${_karOraniCtrl.text}'),
@@ -2143,6 +2180,8 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       il: _secilenIl ?? '',
       ilce: _secilenIlce ?? '',
       mahalle: _secilenMahalle ?? '',
+      ada: _adaCtrl.text,
+      parsel: _parselCtrl.text,
       firmaAdi: SistemYoneticisi().aktifSirket?.ad ?? '',
       firmaLogosu: SistemYoneticisi().aktifSirket?.logo,
       musteriCiktisi: musteriCiktisi,

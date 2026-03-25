@@ -21,6 +21,8 @@ Future<Uint8List> generateAiTeklifPdf({
   required String il,
   required String ilce,
   required String mahalle,
+  String ada = '',
+  String parsel = '',
   required String firmaAdi,
   Uint8List? firmaLogosu,
   bool musteriCiktisi = false,
@@ -70,12 +72,16 @@ Future<Uint8List> generateAiTeklifPdf({
         if (musteriCiktisi) {
           widgets.add(_buildInfoTable([
             ['Konum', '$il / $ilce / $mahalle'],
+            if (ada.isNotEmpty || parsel.isNotEmpty)
+              ['Ada / Parsel', '${ada.isNotEmpty ? ada : "-"} / ${parsel.isNotEmpty ? parsel : "-"}'],
             ['Toplam İnşaat Alanı', '${_fmt(hesapSonucu['toplamInsaatM2'])} m²'],
             ['İnşaat Süresi', '${hesapSonucu['insaatSuresi']} ay'],
           ], font, fontBold));
         } else {
           widgets.add(_buildInfoTable([
             ['Konum', '$il / $ilce / $mahalle'],
+            if (ada.isNotEmpty || parsel.isNotEmpty)
+              ['Ada / Parsel', '${ada.isNotEmpty ? ada : "-"} / ${parsel.isNotEmpty ? parsel : "-"}'],
             ['Toplam İnşaat Alanı', '${_fmt(hesapSonucu['toplamInsaatM2'])} m²'],
             ['İnşaat Süresi', '${hesapSonucu['insaatSuresi']} ay'],
             ['Kar Oranı', '%${_fmt(hesapSonucu['karOrani'])}'],

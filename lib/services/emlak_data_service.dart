@@ -55,7 +55,11 @@ class EmlakDataService {
 
   /// Mahalle listesi
   static List<String> mahalleListesi(String il, String ilce) {
-    final prefix = '${_normalize(il)}/${_normalize(ilce)}/';
+    final normalIlce = _normalize(ilce);
+    if (_normalize(il) == 'istanbul' && _istanbulMahalleleri.containsKey(normalIlce)) {
+      return List<String>.from(_istanbulMahalleleri[normalIlce]!)..sort();
+    }
+    final prefix = '${_normalize(il)}/$normalIlce/';
     final mahalleler = <String>[];
     for (final key in _mahalleVerileri.keys) {
       if (key.startsWith(prefix)) {
@@ -182,6 +186,8 @@ class EmlakDataService {
           .replaceAll('Ç', 'ç')
           .replaceAll('Ş', 'ş')
           .replaceAll('Ğ', 'ğ')
+          .replaceAll('Â', 'a')
+          .replaceAll('â', 'a')
           .toLowerCase();
 
   /// Public normalize — dışarıdan erişim için
@@ -565,4 +571,52 @@ class EmlakDataService {
     'istanbul/adalar/kınalıada': {'min': 78000, 'avg': 118000, 'max': 190000},
     'istanbul/adalar/sedefadası': {'min': 105000, 'avg': 155000, 'max': 250000},
   };
+
+  // ── İstanbul ilçe-mahalle tam listesi (Wikipedia kaynaklı) ──
+  static final Map<String, List<String>> _istanbulMahalleleri = _buildMahalleler();
+
+  static Map<String, List<String>> _buildMahalleler() {
+    const v = <String, String>{
+      'adalar': 'Burgazada|Heybeliada|Kınalıada|Maden|Nizam',
+      'arnavutköy': 'Adnan Menderes|Anadolu|Arnavutköy Merkez|Atatürk|Baklalı|Balaban|Boğazköy İstiklal|Bolluca|Boyalık|Çilingir|Deliklikaya|Dursunköy|Durusu|Fatih|Hacımaşlı|Hadımköy|Haraççı|Hastane|Hicret|İmrahor|İslambey|Karaburun|Karlıbayır|Mareşal Fevzi Çakmak|Mavigöl|Mehmet Akif Ersoy|Mustafa Kemal Paşa|Nene Hatun|Ömerli|Sazlıbosna|Taşoluk|Tayakadın|Terkos|Yassıören|Yavuz Selim|Yeniköy|Yeşilbayır|Yunus Emre',
+      'ataşehir': 'Aşıkveysel|Atatürk|Barbaros|Esatpaşa|Ferhatpaşa|Fetih|İçerenköy|İnönü|Kayışdağı|Küçükbakkalköy|Mevlana|Mimarsinan|Mustafa Kemal|Örnek|Yeniçamlıca|Yenişehir|Yenisahra',
+      'avcılar': 'Ambarlı|Cihangir|Denizköşkler|Firuzköy|Gümüşpala|Merkez|Mustafa Kemal Paşa|Tahtakale|Üniversite|Yeşilkent',
+      'bağcılar': '15 Temmuz|Bağlar|Barbaros|Çınar|Demirkapı|Fatih|Fevzi Çakmak|Göztepe|Güneşli|Hürriyet|İnönü|Kâzım Karabekir|Kemalpaşa|Kirazlı|Mahmutbey|Merkez|Sancaktepe|Yavuzselim|Yenigün|Yenimahalle|Yıldıztepe|Yüzyıl',
+      'bahçelievler': 'Bahçelievler|Cumhuriyet|Çobançeşme|Fevzi Çakmak|Hürriyet|Kocasinan|Siyavuşpaşa|Soğanlı|Şirinevler|Yenibosna|Zafer',
+      'bakırköy': 'Ataköy 1. Kısım|Ataköy 2-5-6. Kısım|Ataköy 3-4-11. Kısım|Ataköy 7-8-9-10. Kısım|Basınköy|Cevizlik|Kartaltepe|Osmaniye|Sakızağacı|Şenlikköy|Yenimahalle|Yeşilköy|Yeşilyurt|Zeytinlik|Zuhuratbaba',
+      'başakşehir': 'Altınşehir|Bahçeşehir 1. Kısım|Bahçeşehir 2. Kısım|Başak|Başakşehir|Güvercintepe|Kayabaşı|Şahintepe|Şamlar|Ziya Gökalp',
+      'bayrampaşa': 'Altıntepsi|Cevatpaşa|İsmetpaşa|Kartaltepe|Kocatepe|Muratpaşa|Orta|Terazidere|Vatan|Yenidoğan|Yıldırım',
+      'beşiktaş': 'Abbasağa|Akat|Arnavutköy|Balmumcu|Bebek|Cihannüma|Dikilitaş|Etiler|Gayrettepe|Konaklar|Kuruçeşme|Kültür|Levazım|Levent|Mecidiye|Muradiye|Nisbetiye|Ortaköy|Sinanpaşa|Türkali|Ulus|Vişnezade|Yıldız',
+      'beykoz': 'Acarlar|Akbaba|Alibahadır|Anadolufeneri|Anadoluhisarı|Anadolukavağı|Baklacı|Bozhane|Cumhuriyet|Çamlıbahçe|Çengeldere|Çiftlik|Çiğdem|Çubuklu|Dereseki|Elmalı|Fatih|Göksu|Göllü|Görele|Göztepe|Gümüşsuyu|İncirköy|İshaklı|Kanlıca|Kavacık|Kaynarca|Kılıçlı|Mahmutşevketpaşa|Merkez|Ortaçeşme|Öğümce|Örnekköy|Paşabahçe|Paşamandıra|Polonezköy|Poyrazköy|Riva|Rüzgarlıbahçe|Soğuksu|Tokatköy|Yalıköy|Yavuzselim|Yenimahalle|Zerzevatçı',
+      'beylikdüzü': 'Adnan Kahveci|Barış|Büyükşehir|Cumhuriyet|Dereağzı|Gürpınar|Kavaklı|Marmara|Sahil|Yakuplu',
+      'beyoğlu': 'Arapcami|Asmalımescit|Bedrettin|Bereketzade|Bostan|Bülbül|Camiikebir|Cihangir|Çatmamescit|Çukur|Emekyemez|Evliya Çelebi|Fetihtepe|Firuzağa|Gümüşsuyu|Hacıahmet|Hacımimi|Halıcıoğlu|Hüseyinağa|İstiklal|Kadı Mehmet Efendi|Kamerhatun|Kalyoncukulluğu|Kaptanpaşa|Katip Mustafa Çelebi|Keçecipiri|Kemankeş Kara Mustafa Paşa|Kılıçalipaşa|Kocatepe|Kulaksız|Kuloğlu|Küçükpiyale|Müeyyetzade|Ömeravni|Örnektepe|Piripaşa|Piyalepaşa|Pürtelaş|Sururi|Sütlüce|Şahkulu|Şehit Muhtar|Tomtom|Yahya Kahya|Yenişehir',
+      'büyükçekmece': '19 Mayıs|Ahmediye|Alkent 2000|Atatürk|Bahçelievler|Celaliye|Cumhuriyet|Çakmaklı|Dizdariye|Ekinoba|Fatih|Güzelce|Hürriyet|Kamiloba|Karaağaç|Kumburgaz|Mimaroba|Mimarsinan|Muratçeşme|Pınartepe|Sinanoba|Türkoba|Ulus|Yenimahalle',
+      'çatalca': 'Akalan|Atatürk|Aydınlar|Bahşayiş|Başak|Belgrat|Celepköy|Çakıl|Çanakça|Çiftlikköy|Dağyenice|Elbasan|Fatih|Ferhatpaşa|Gökçeali|Gümüşpınar|Hallaçlı|Hisarbeyli|İhsaniye|İnceğiz|İzzettin|Kabakça|Kaleiçi|Kalfa|Karacaköy|Karamandere|Kestanelik|Kızılcaali|Muratbey|Nakkaş|Oklalı|Ormanlı|Ovayenice|Örcünlü|Örencik|Subaşı|Yalıköy|Yaylacık|Yazlık',
+      'çekmeköy': 'Alemdağ|Aydınlar|Cumhuriyet|Çamlık|Çatalmeşe|Ekşioğlu|Güngören|Hamidiye|Hüseyinli|Kirazlıdere|Koçullu|Mehmet Akif|Merkez|Mimar Sinan|Nişantepe|Ömerli|Reşadiye|Sırapınar|Soğukpınar|Sultançiftliği|Taşdelen',
+      'esenler': '15 Temmuz|Birlik|Çiftehavuzlar|Davutpaşa|Fatih|Fevzi Çakmak|Havaalanı|Kazım Karabekir|Kemer|Menderes|Mimar Sinan|Namık Kemal|Nenehatun|Oruçreis|Tuna|Turgutreis|Yavuz Selim',
+      'esenyurt': 'Akçaburgaz|Akevler|Akşemseddin|Ardıçlı|Aşık Veysel|Atatürk|Bağlarçeşme|Balık Yolu|Barbaros Hayrettin Paşa|Battalgazi|Cumhuriyet|Çınar|Esenkent|Fatih|Gökevler|Güzelyurt|Hürriyet|İncirtepe|İnönü|İstiklal|Koza|Mehmet Akif Ersoy|Mehterçeşme|Mevlana|Namık Kemal|Necip Fazıl Kısakürek|Orhan Gazi|Osmangazi|Örnek|Pınar|Piri Reis|Saadetdere|Selahaddin Eyyubi|Sultaniye|Süleymaniye|Şehitler|Talatpaşa|Turgut Özal|Üçevler|Yenikent|Yeşilkent|Yunus Emre|Zafer',
+      'eyüpsultan': '5. Levent|Akşemsettin|Alibeyköy|Çırçır|Defterdar|Düğmeciler|Emniyettepe|Esentepe|Göktürk|Güzeltepe|İslambey|Karadolap|Merkez|Mimarsinan|Mithatpaşa|Nişanca|Rami Cuma|Rami Yeni|Sakarya|Silahtarağa|Topçular|Yeşilpınar',
+      'fatih': 'Aksaray|Akşemsettin|Alemdar|Ali Kuşçu|Atikali|Ayvansaray|Balabanağa|Balat|Beyazıt|Binbirdirek|Cankurtaran|Cerrahpaşa|Cibali|Demirtaş|Derviş Ali|Eminsinan|Hacıkadın|Hasekisultan|Hırkaişerif|Hobyar|Hoca Giyasettin|Hocapaşa|İskenderpaşa|Kalenderhane|Karagümrük|Katip Kasım|Kemalpaşa|Kocamustafapaşa|Küçükayasofya|Mercan|Mesihpaşa|Mevlanakapı|Mimar Hayrettin|Mimar Kemalettin|Mollafenari|Mollagürani|Mollahüsrev|Muhsinehatun|Nişanca|Rüstempaşa|Saraçishak|Sarıdemir|Seyyid Ömer|Silivrikapı|Sultanahmet|Sururi|Süleymaniye|Sümbülefendi|Şehremini|Şehsuvarbey|Tahtakale|Tayahatun|Topkapı|Yavuzsinan|Yavuz Sultan Selim|Yedikule|Zeyrek',
+      'gaziosmanpaşa': 'Bağlarbaşı|Barbaros Hayrettin Paşa|Fevzi Çakmak|Hürriyet|Karadeniz|Karayolları|Karlıtepe|Kâzım Karabekir|Merkez|Mevlana|Pazariçi|Sarıgöl|Şemsipaşa|Yenidoğan|Yenimahalle|Yıldıztabya',
+      'güngören': 'Abdurrahman Nafiz Gürman|Akıncılar|Gençosman|Güneştepe|Güven|Haznedar|Mareşal Fevzi Çakmak|Mehmet Nezih Özmen|Merkez|Sanayi|Tozkoparan',
+      'kadıköy': '19 Mayıs|Acıbadem|Bostancı|Caddebostan|Caferağa|Dumlupınar|Eğitim|Erenköy|Fenerbahçe|Feneryolu|Fikirtepe|Göztepe|Hasanpaşa|Koşuyolu|Kozyatağı|Merdivenköy|Osmanağa|Rasimpaşa|Sahrayıcedid|Suadiye|Zühtüpaşa',
+      'kağıthane': 'Çağlayan|Çeliktepe|Emniyet Evleri|Gültepe|Gürsel|Hamidiye|Harmantepe|Hürriyet|Mehmet Akif Ersoy|Merkez|Nurtepe|Ortabayır|Seyrantepe|Sultan Selim|Şirintepe|Talatpaşa|Telsizler|Yahya Kemal|Yeşilce',
+      'kartal': 'Atalar|Cevizli|Cumhuriyet|Çavuşoğlu|Esentepe|Gümüşpınar|Hürriyet|Karlıktepe|Kordonboyu|Orhantepe|Ortamahalle|Petrol-İş|Soğanlık|Topselvi|Uğur Mumcu|Yakacık Çarşı|Yakacık Yeni|Yalı|Yukarımahalle|Yunus',
+      'küçükçekmece': 'Atakent|Atatürk|Beşyol|Cennet|Cumhuriyet|Fatih|Fevzi Çakmak|Gültepe|Halkalı|İnönü|İstasyon|Kanarya|Kartaltepe|Kemalpaşa|Mehmet Akif|Söğütlüçeşme|Sultanmurat|Tevfikbey|Yarımburgaz|Yenimahalle|Yeşilova',
+      'maltepe': 'Altayçeşme|Altıntepe|Aydınevler|Bağlarbaşı|Başıbüyük|Büyükbakkalköy|Cevizli|Çınar|Esenkent|Feyzullah|Fındıklı|Girne|Gülensu|Gülsuyu|İdealtepe|Küçükyalı|Yalı|Zümrütevler',
+      'pendik': 'Ahmet Yesevi|Bahçelievler|Batı|Çamçeşme|Çamlık|Çınardere|Doğu|Dumlupınar|Ertuğrulgazi|Esenler|Esenyalı|Fatih|Fevzi Çakmak|Güllübağlar|Güzelyalı|Harmandere|Kavakpınar|Kaynarca|Kurtköy|Orhangazi|Orta|Ramazanoğlu|Sanayi|Sapanbağları|Sülüntepe|Şeyhli|Velibaba|Yayalar|Yenimahalle|Yenişehir|Yeşilbağlar',
+      'sancaktepe': 'Abdurrahmangazi|Akpınar|Atatürk|Emek|Eyüp Sultan|Fatih|Hilal|İnönü|Kemal Türkler|Meclis|Merve|Mevlana|Osmangazi|Safa|Sarıgazi|Veysel Karani|Yenidoğan|Yunus Emre',
+      'sarıyer': 'Ayazağa|Bahçeköy|Bahçeköy Kemer|Bahçeköy Yenimahalle|Baltalimanı|Büyükdere|Cumhuriyet|Çayırbaşı|Darüşşafaka|Demirciköy|Derbent|Emirgân|Fatih Sultan Mehmet|Ferahevler|Garipçe|İstinye|Kâzım Karabekir|Kireçburnu|Kocataş|Kumköy|Maden|Maslak|Merkez|Pınar|Poligon|PTT Evleri|Reşitpaşa|Rumelihisarı|Rumelifeneri|Rumelikavağı|Tarabya|Uskumruköy|Yeniköy|Yenimahalle|Zekeriyaköy',
+      'silivri': 'Alibey|Alipaşa|Büyük Çavuşlu|Cumhuriyet|Çanta Fatih|Çanta Mimarsinan|Değirmenköy Fevzipaşa|Değirmenköy İsmetpaşa|Fatih|Gazitepe|Gümüşyaka|Kadıköy|Kavaklı Cumhuriyet|Kavaklı Hürriyet|Küçük Kılıçlı|Mimar Sinan|Ortaköy|Piri Mehmet Paşa|Selimpaşa|Semizkumlar|Yenimahalle|Yolçatı',
+      'sultanbeyli': 'Abdurrahmangazi|Adil|Ahmet Yesevi|Akşemsettin|Battalgazi|Fatih|Hamidiye|Hasanpaşa|Mecidiye|Mehmet Akif|Mimarsinan|Necip Fazıl|Orhangazi|Turgutreis|Yavuz Selim',
+      'sultangazi': '50. Yıl|75. Yıl|Cebeci|Cumhuriyet|Esentepe|Eski Habibler|Gazi|Habibler|İsmetpaşa|Malkoçoğlu|Sultançiftliği|Uğur Mumcu|Yayla|Yunusemre|Zübeydehanım',
+      'şile': 'Ağva|Balibey|Çavuş|Hacıkasım|Kumbaba',
+      'şişli': '19 Mayıs|Bozkurt|Cumhuriyet|Duatepe|Ergenekon|Esentepe|Eskişehir|Feriköy|Fulya|Gülbahar|Halaskargazi|Halide Edip Adıvar|Halil Rıfat Paşa|Harbiye|İnönü|İzzetpaşa|Kaptanpaşa|Kuştepe|Mahmut Şevket Paşa|Mecidiyeköy|Merkez|Meşrutiyet|Paşa|Teşvikiye|Yayla',
+      'tuzla': 'Akfırat|Anadolu|Aydınlı|Aydıntepe|Cami|Evliya Çelebi|Fatih|İçmeler|İstasyon|Mescit|Mimar Sinan|Orhanlı|Orta|Postane|Şifa|Tepeören|Yayla',
+      'ümraniye': 'Adem Yavuz|Altınşehir|Armağanevler|Aşağıdudullu|Atakent|Atatürk|Cemil Meriç|Çakmak|Çamlık|Dumlupınar|Elmalıkent|Esenevler|Esenkent|Esenşehir|Fatih Sultan Mehmet|Finanskent|Hekimbaşı|Huzur|Ihlamurkuyu|İnkılap|İstiklal|Kâzım Karabekir|Madenler|Mehmet Akif|Namık Kemal|Necip Fazıl|Parseller|Site|Şerifali|Tantavi|Tatlısu|Tepeüstü|Topağacı|Yamanevler|Yukarıdudullu',
+      'üsküdar': 'Acıbadem|Ahmediye|Altunizade|Aziz Mahmud Hüdayi|Bahçelievler|Barbaros|Beylerbeyi|Bulgurlu|Burhaniye|Cumhuriyet|Çengelköy|Ferah|Güzeltepe|İcadiye|Kandilli|Kirazlıtepe|Kısıklı|Kuleli|Kuzguncuk|Küçük Çamlıca|Küçüksu|Küplüce|Mehmet Akif Ersoy|Mimar Sinan|Murat Reis|Salacak|Selami Ali|Selimiye|Sultantepe|Ünalan|Valide-i Atik|Yavuztürk|Zeynep Kamil',
+      'zeytinburnu': 'Beştelsiz|Çırpıcı|Gökalp|Kazlıçeşme|Maltepe|Merkezefendi|Nuripaşa|Seyitnizam|Sümer|Telsiz|Veliefendi|Yenidoğan|Yeşiltepe',
+    };
+    return v.map((k, val) => MapEntry(k, val.split('|')));
+  }
 }

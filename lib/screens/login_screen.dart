@@ -424,7 +424,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                             logoUrl = null;
                           }
                         }
-                        await FirebaseFirestore.instance.collection('sirketler').add({
+                        final companyRef = await FirebaseFirestore.instance.collection('sirketler').add({
                           'ad': sirketAdCtrl.text,
                           'yoneticiEposta': currentEmail,
                           'yoneticiIletisimEposta': currentEmail,
@@ -436,6 +436,24 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,
                         });
+                        // sirketId'yi kullanıcıya kaydet
+                        await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set({
+                          'sirketId': companyRef.id,
+                        }, SetOptions(merge: true));
+                        // Abonelik bilgisini şirkete kopyala
+                        final paymentService = PaymentService();
+                        final subStatus = await paymentService.getSubscriptionStatus();
+                        if (subStatus['active'] == true) {
+                          final t = subStatus['type'] as String?;
+                          final d = subStatus['endDate'] as DateTime?;
+                          if (t != null && d != null) {
+                            await paymentService.updateCompanySubscription(
+                              sirketId: companyRef.id,
+                              subscriptionType: t,
+                              subscriptionEndDate: d,
+                            );
+                          }
+                        }
                         if (!ctx.mounted || !mounted) return;
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(

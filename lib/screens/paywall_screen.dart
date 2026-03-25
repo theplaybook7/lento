@@ -4,8 +4,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../payment_service.dart';
 
+enum PaywallMode { creation, subscription }
+
 class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key});
+  final PaywallMode mode;
+  const PaywallScreen({super.key, this.mode = PaywallMode.creation});
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -152,7 +155,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Şirket Oluşturma"),
+        title: Text(widget.mode == PaywallMode.subscription ? 'Abonelik' : 'Şirket Oluşturma'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -178,7 +181,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.business,
+                  widget.mode == PaywallMode.subscription
+                      ? Icons.autorenew
+                      : Icons.business,
                   size: 60,
                   color: Colors.white,
                 ),
@@ -187,7 +192,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
               // Title
               Text(
-                "Şirket Oluştur",
+                widget.mode == PaywallMode.subscription
+                    ? 'Aboneliği Yenile'
+                    : 'Şirket Oluştur',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppTheme.primaryColor,
@@ -198,7 +205,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
               // Subtitle
               Text(
-                "Yapı yönetim sisteminizi başlatın",
+                widget.mode == PaywallMode.subscription
+                    ? 'Devam etmek için aboneliğinizi yenileyin'
+                    : 'Yapı yönetim sisteminizi başlatın',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.grey.shade600,
                 ),

@@ -129,6 +129,19 @@ class PaymentService {
           'lastPurchaseStatus': purchase.status.name,
         }, SetOptions(merge: true));
 
+        // Şirkete de yaz
+        try {
+          final userDoc = await _firestore.collection('users').doc(user.uid).get();
+          final sirketId = userDoc.data()?['sirketId'] as String?;
+          if (sirketId != null && sirketId.isNotEmpty) {
+            await updateCompanySubscription(
+              sirketId: sirketId,
+              subscriptionType: subscriptionType,
+              subscriptionEndDate: subscriptionEndDate,
+            );
+          }
+        } catch (_) {}
+
         _lastError = '';
         _completePurchaseFlow(true, productId: purchase.productID);
       } else if (_pendingProductId == purchase.productID) {
@@ -333,6 +346,23 @@ class PaymentService {
           ? _storeKitNoResponseMessage()
           : 'Geri yükleme hatası: $e';
       return false;
+    }
+  }
+
+  /// Şirket dokümanına abonelik bilgisini kaydet
+  Future<void> updateCompanySubscription({
+    required String sirketId,
+    required String subscriptionType,
+    required DateTime subscriptionEndDate,
+  }) async {
+    try {
+      await _firestore.collection('sirketler').doc(sirketId).update({
+        'subscriptionType': subscriptionType,
+        'subscriptionEndDate': Timestamp.fromDate(subscriptionEndDate),
+        'autoRenew': true,
+      });
+    } catch (_) {
+      // Best effort
     }
   }
 

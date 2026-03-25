@@ -226,6 +226,78 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
         if (bulunanSirket != null) {
           SistemYoneticisi().aktifSirket = bulunanSirket;
           SistemYoneticisi().aktifKullaniciYetkileri = kullaniciYetkisi;
+
+          // iOS/macOS: Abonelik kontrolü (Guideline 3.1.1)
+          if (PaymentService().isApplePaymentSupported) {
+            bool subscriptionActive = false;
+
+            // 1. Şirket aboneliğini kontrol et
+            if (bulunanSirket.subscriptionEndDate != null) {
+              subscriptionActive = bulunanSirket.subscriptionEndDate!.isAfter(DateTime.now());
+            }
+
+            // 2. Kullanıcının kendi aboneliğini kontrol et (fallback)
+            if (!subscriptionActive) {
+              final subStatus = await PaymentService().getSubscriptionStatus();
+              subscriptionActive = subStatus['active'] as bool;
+              // Kullanıcıda aktif ama şirkette yoksa, şirkete kopyala
+              if (subscriptionActive && bulunanSirket.id.isNotEmpty) {
+                final type = subStatus['type'] as String?;
+                final endDate = subStatus['endDate'] as DateTime?;
+                if (type != null && endDate != null) {
+                  await PaymentService().updateCompanySubscription(
+                    sirketId: bulunanSirket.id,
+                    subscriptionType: type,
+                    subscriptionEndDate: endDate,
+                  );
+                }
+              }
+            }
+
+            if (!subscriptionActive) {
+              final isAdmin = kullaniciYetkisi?.adminMi == true ||
+                  _normalizeEmail(bulunanSirket.yoneticiEposta) == email;
+
+              if (isAdmin) {
+                if (mounted) {
+                  final purchased = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (ctx) => const PaywallScreen(mode: PaywallMode.subscription),
+                    ),
+                  );
+                  if (purchased != true) {
+                    setState(() {
+                      _hataMetni = 'Devam etmek için aktif bir abonelik gerekli.';
+                    });
+                    return;
+                  }
+                  // Satın alma sonrası şirkete kaydet
+                  final newSub = await PaymentService().getSubscriptionStatus();
+                  if (newSub['active'] == true) {
+                    final t = newSub['type'] as String?;
+                    final d = newSub['endDate'] as DateTime?;
+                    if (t != null && d != null) {
+                      await PaymentService().updateCompanySubscription(
+                        sirketId: bulunanSirket.id,
+                        subscriptionType: t,
+                        subscriptionEndDate: d,
+                      );
+                    }
+                  }
+                }
+              } else {
+                // Personel: Yöneticiye başvur
+                if (mounted) {
+                  setState(() {
+                    _hataMetni = 'Şirketinizin aboneliği sona ermiştir. Lütfen şirket yöneticinize başvurun.';
+                  });
+                }
+                return;
+              }
+            }
+          }
+
           if (mounted) {
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardSayfasi()));
           }
@@ -350,16 +422,34 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                         if (user == null || userEmail.isEmpty) {
                           throw Exception("Oturum bulunamadı.");
                         }
-                        await FirebaseFirestore.instance.collection('sirketler').add({
+                        final companyRef = await FirebaseFirestore.instance.collection('sirketler').add({
                           'ad': sirketAdCtrl.text,
                           'yoneticiEposta': userEmail,
                           'yoneticiIletisimEposta': _normalizeEmail(emailCtrl.text),
                           'telefon': '',
                           'adres': '',
                           'personelListesi': [],
+                          'adminlar': {user.uid: true},
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,
                         });
+                        // sirketId'yi kullanıcıya kaydet
+                        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                          'sirketId': companyRef.id,
+                        }, SetOptions(merge: true));
+                        // Abonelik bilgisini şirkete kopyala
+                        final subStatus = await PaymentService().getSubscriptionStatus();
+                        if (subStatus['active'] == true) {
+                          final t = subStatus['type'] as String?;
+                          final d = subStatus['endDate'] as DateTime?;
+                          if (t != null && d != null) {
+                            await PaymentService().updateCompanySubscription(
+                              sirketId: companyRef.id,
+                              subscriptionType: t,
+                              subscriptionEndDate: d,
+                            );
+                          }
+                        }
                         if (ctx.mounted) Navigator.pop(ctx);
                         // Reload company data
                         setState(() {

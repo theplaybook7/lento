@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
+import '../payment_service.dart';
+import 'paywall_screen.dart';
 
 class SettingsSayfasi extends StatefulWidget {
   const SettingsSayfasi({super.key});
@@ -673,6 +677,93 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
     }
   }
 
+  List<Widget> _buildSubscriptionSection() {
+    final sirket = SistemYoneticisi().aktifSirket;
+    final subEnd = sirket?.subscriptionEndDate;
+    final subType = sirket?.subscriptionType;
+    final isActive = subEnd != null && subEnd.isAfter(DateTime.now());
+    final isAdmin = SistemYoneticisi().aktifKullaniciYetkileri?.adminMi == true;
+
+    return [
+      Text(
+        'Abonelik Durumu',
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: AppTheme.primaryColor,
+        ),
+      ),
+      const SizedBox(height: 12),
+      Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isActive ? Icons.check_circle : Icons.warning_amber_rounded,
+                    color: isActive ? Colors.green : Colors.orange,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isActive ? 'Aktif' : 'Pasif',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: isActive ? Colors.green.shade700 : Colors.orange.shade700,
+                    ),
+                  ),
+                ],
+              ),
+              if (subType != null) ...[
+                const SizedBox(height: 8),
+                Text('Plan: ${subType == 'yearly' ? 'Yıllık' : subType == 'monthly' ? 'Aylık' : subType}'),
+              ],
+              if (subEnd != null) ...[
+                const SizedBox(height: 4),
+                Text('Bitiş: ${DateFormat('dd.MM.yyyy').format(subEnd)}'),
+              ],
+              if (isAdmin && !isActive) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final purchased = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(builder: (_) => const PaywallScreen(mode: PaywallMode.subscription)),
+                      );
+                      if (purchased == true && mounted) {
+                        final sub = await PaymentService().getSubscriptionStatus();
+                        if (sub['active'] == true && sirket != null) {
+                          await PaymentService().updateCompanySubscription(
+                            sirketId: sirket.id,
+                            subscriptionType: sub['type'] as String,
+                            subscriptionEndDate: sub['endDate'] as DateTime,
+                          );
+                        }
+                        setState(() {});
+                      }
+                    },
+                    icon: const Icon(Icons.payment),
+                    label: const Text('Aboneliği Yenile'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -740,6 +831,9 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     ),
                   ),
                   const SizedBox(height: 32),
+
+                  // Abonelik Durumu
+                  if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)) ..._buildSubscriptionSection(),
 
                   // Şirket Bilgileri
                   Text(

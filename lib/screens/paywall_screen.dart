@@ -34,9 +34,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
     if (!paymentService.isApplePaymentSupported) {
       if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          Navigator.pop(context, false);
+        setState(() {
+          _productsLoading = false;
+          _statusMessage = 'Abonelik satın alma bu cihazda desteklenmiyor.';
         });
       }
       return;
@@ -75,7 +75,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
       if (!paymentService.isApplePaymentSupported) {
         setState(() {
-          _statusMessage = 'Bu sürümde ödeme yalnızca Apple App Store (İOS/macOS) üzerinden yapılabilir.';
+          _statusMessage = 'Abonelik satın alma bu cihazda desteklenmiyor.';
         });
         return;
       }

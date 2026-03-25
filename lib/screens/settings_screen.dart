@@ -833,7 +833,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   const SizedBox(height: 32),
 
                   // Abonelik Durumu
-                  if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS)) ..._buildSubscriptionSection(),
+                  ..._buildSubscriptionSection(),
 
                   // Şirket Bilgileri
                   Text(

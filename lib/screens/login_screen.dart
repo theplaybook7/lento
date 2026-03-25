@@ -86,8 +86,8 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Platform Desteklenmiyor'),
-            content: const Text('Şirket oluşturma aboneliği bu platformda desteklenmiyor. Lütfen iOS uygulamasını kullanın.'),
+            title: const Text('Abonelik Gerekli'),
+            content: const Text('Şirket oluşturmak için aktif bir abonelik gereklidir.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),

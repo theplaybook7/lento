@@ -48,13 +48,13 @@ class PaymentService {
     if (_initialized) return;
 
     if (!isApplePaymentSupported) {
-      _lastError = 'Bu uygulamada ödeme yalnızca Apple App Store (iOS/macOS) üzerinden desteklenir.';
+      _lastError = 'Abonelik satın alma bu cihazda desteklenmiyor.';
       return;
     }
 
     final iapAvailable = await _iap.isAvailable();
     if (!iapAvailable) {
-      _lastError = 'App Store ödeme servisi şu anda kullanılamıyor.';
+      _lastError = 'Ödeme servisi şu anda kullanılamıyor.';
       return;
     }
 
@@ -215,7 +215,7 @@ class PaymentService {
   Future<List<ProductDetails>> fetchSubscriptionProducts() async {
     try {
       if (!isApplePaymentSupported) {
-        _lastError = 'Bu uygulamada ödeme yalnızca Apple App Store (iOS/macOS) üzerinden desteklenir.';
+        _lastError = 'Abonelik satın alma bu cihazda desteklenmiyor.';
         return [];
       }
 
@@ -250,13 +250,13 @@ class PaymentService {
       await initialize();
 
       if (!isApplePaymentSupported) {
-        _lastError = 'Bu uygulamada ödeme yalnızca Apple App Store (iOS/macOS) üzerinden desteklenir.';
+        _lastError = 'Abonelik satın alma bu cihazda desteklenmiyor.';
         return false;
       }
 
       if (!_initialized) {
         if (_lastError.isEmpty) {
-          _lastError = 'App Store ödeme servisi başlatılamadı.';
+          _lastError = 'Ödeme servisi başlatılamadı.';
         }
         return false;
       }
@@ -334,7 +334,7 @@ class PaymentService {
     try {
       _lastError = '';
       if (!isApplePaymentSupported) {
-        _lastError = 'Geri yükleme yalnızca Apple App Store (iOS/macOS) için kullanılabilir.';
+        _lastError = 'Geri yükleme bu cihazda desteklenmiyor.';
         return false;
       }
 

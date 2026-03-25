@@ -227,74 +227,81 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
           SistemYoneticisi().aktifSirket = bulunanSirket;
           SistemYoneticisi().aktifKullaniciYetkileri = kullaniciYetkisi;
 
-          // iOS/macOS: Abonelik kontrolü (Guideline 3.1.1)
-          if (PaymentService().isApplePaymentSupported) {
-            bool subscriptionActive = false;
+          // Abonelik kontrolü - tüm platformlar (Apple Guideline 3.1.1)
+          bool subscriptionActive = false;
 
-            // 1. Şirket aboneliğini kontrol et
-            if (bulunanSirket.subscriptionEndDate != null) {
-              subscriptionActive = bulunanSirket.subscriptionEndDate!.isAfter(DateTime.now());
-            }
+          // 1. Şirket aboneliğini kontrol et
+          if (bulunanSirket.subscriptionEndDate != null) {
+            subscriptionActive = bulunanSirket.subscriptionEndDate!.isAfter(DateTime.now());
+          }
 
-            // 2. Kullanıcının kendi aboneliğini kontrol et (fallback)
-            if (!subscriptionActive) {
-              final subStatus = await PaymentService().getSubscriptionStatus();
-              subscriptionActive = subStatus['active'] as bool;
-              // Kullanıcıda aktif ama şirkette yoksa, şirkete kopyala
-              if (subscriptionActive && bulunanSirket.id.isNotEmpty) {
-                final type = subStatus['type'] as String?;
-                final endDate = subStatus['endDate'] as DateTime?;
-                if (type != null && endDate != null) {
-                  await PaymentService().updateCompanySubscription(
-                    sirketId: bulunanSirket.id,
-                    subscriptionType: type,
-                    subscriptionEndDate: endDate,
-                  );
-                }
+          // 2. Kullanıcının kendi aboneliğini kontrol et (fallback)
+          if (!subscriptionActive) {
+            final subStatus = await PaymentService().getSubscriptionStatus();
+            subscriptionActive = subStatus['active'] as bool;
+            // Kullanıcıda aktif ama şirkette yoksa, şirkete kopyala
+            if (subscriptionActive && bulunanSirket.id.isNotEmpty) {
+              final type = subStatus['type'] as String?;
+              final endDate = subStatus['endDate'] as DateTime?;
+              if (type != null && endDate != null) {
+                await PaymentService().updateCompanySubscription(
+                  sirketId: bulunanSirket.id,
+                  subscriptionType: type,
+                  subscriptionEndDate: endDate,
+                );
               }
             }
+          }
 
-            if (!subscriptionActive) {
-              final isAdmin = kullaniciYetkisi?.adminMi == true ||
-                  _normalizeEmail(bulunanSirket.yoneticiEposta) == email;
+          if (!subscriptionActive) {
+            final isAdmin = kullaniciYetkisi?.adminMi == true ||
+                _normalizeEmail(bulunanSirket.yoneticiEposta) == email;
 
-              if (isAdmin) {
-                if (mounted) {
-                  final purchased = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (ctx) => const PaywallScreen(mode: PaywallMode.subscription),
-                    ),
-                  );
-                  if (purchased != true) {
-                    setState(() {
-                      _hataMetni = 'Devam etmek için aktif bir abonelik gerekli.';
-                    });
-                    return;
-                  }
-                  // Satın alma sonrası şirkete kaydet
-                  final newSub = await PaymentService().getSubscriptionStatus();
-                  if (newSub['active'] == true) {
-                    final t = newSub['type'] as String?;
-                    final d = newSub['endDate'] as DateTime?;
-                    if (t != null && d != null) {
-                      await PaymentService().updateCompanySubscription(
-                        sirketId: bulunanSirket.id,
-                        subscriptionType: t,
-                        subscriptionEndDate: d,
-                      );
-                    }
-                  }
-                }
-              } else {
-                // Personel: Yöneticiye başvur
-                if (mounted) {
+            if (isAdmin && PaymentService().isApplePaymentSupported) {
+              // iOS/macOS: Abonelik satın alma ekranı göster
+              if (mounted) {
+                final purchased = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) => const PaywallScreen(mode: PaywallMode.subscription),
+                  ),
+                );
+                if (purchased != true) {
                   setState(() {
-                    _hataMetni = 'Şirketinizin aboneliği sona ermiştir. Lütfen şirket yöneticinize başvurun.';
+                    _hataMetni = 'Devam etmek için aktif bir abonelik gerekli.';
                   });
+                  return;
                 }
-                return;
+                // Satın alma sonrası şirkete kaydet
+                final newSub = await PaymentService().getSubscriptionStatus();
+                if (newSub['active'] == true) {
+                  final t = newSub['type'] as String?;
+                  final d = newSub['endDate'] as DateTime?;
+                  if (t != null && d != null) {
+                    await PaymentService().updateCompanySubscription(
+                      sirketId: bulunanSirket.id,
+                      subscriptionType: t,
+                      subscriptionEndDate: d,
+                    );
+                  }
+                }
               }
+            } else if (isAdmin) {
+              // Web/diğer platformlar: Abonelik gerekli ama satın alma yapılamıyor
+              if (mounted) {
+                setState(() {
+                  _hataMetni = 'Devam etmek için aktif bir abonelik gerekli.';
+                });
+              }
+              return;
+            } else {
+              // Personel: Yöneticiye başvur
+              if (mounted) {
+                setState(() {
+                  _hataMetni = 'Şirketinizin aboneliği sona ermiştir. Lütfen şirket yöneticinize başvurun.';
+                });
+              }
+              return;
             }
           }
 
@@ -327,35 +334,37 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
     final paymentService = PaymentService();
     await paymentService.initialize();
 
-    if (!paymentService.isApplePaymentSupported) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Platform Desteklenmiyor'),
-            content: const Text('Şirket oluşturma aboneliği bu platformda desteklenmiyor. Lütfen iOS uygulamasını kullanın.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('TAMAM'),
-              ),
-            ],
-          ),
-        );
-      }
-      return;
-    }
-
-    // Apple IAP ile ödeme
+    // Abonelik kontrolü
     final subStatus = await paymentService.getSubscriptionStatus();
 
     if (!(subStatus['active'] as bool)) {
-      if (mounted) {
-        final purchased = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
-        );
-        if (purchased != true) return;
+      if (paymentService.isApplePaymentSupported) {
+        // iOS/macOS: IAP ile satın alma
+        if (mounted) {
+          final purchased = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+          );
+          if (purchased != true) return;
+        }
+      } else {
+        // Diğer platformlar: Abonelik gerekli
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Abonelik Gerekli'),
+              content: const Text('Devam etmek için aktif bir abonelik gereklidir.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('TAMAM'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
       }
     }
 

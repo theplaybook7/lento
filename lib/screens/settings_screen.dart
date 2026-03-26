@@ -864,7 +864,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                 const SizedBox(height: 4),
                 Text('Bitiş: ${DateFormat('dd.MM.yyyy').format(subEnd)}'),
               ],
-              if (isAdmin && !isActive) ...[
+              if (!isActive && PaymentService().isApplePaymentSupported) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -895,7 +895,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   ),
                 ),
               ],
-              if (isActive && PaymentService().isApplePaymentSupported) ...[
+              if (PaymentService().isApplePaymentSupported) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
@@ -909,6 +909,44 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.primaryColor,
                       side: BorderSide(color: AppTheme.primaryColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      final paymentService = PaymentService();
+                      await paymentService.initialize();
+                      final restored = await paymentService.restorePurchases();
+                      if (mounted) {
+                        if (restored) {
+                          final sub = await paymentService.getSubscriptionStatus();
+                          if (sub['active'] == true && sirket != null) {
+                            await paymentService.updateCompanySubscription(
+                              sirketId: sirket.id,
+                              subscriptionType: sub['type'] as String,
+                              subscriptionEndDate: sub['endDate'] as DateTime,
+                            );
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Satın alımlar geri yüklendi.'), backgroundColor: Colors.green),
+                          );
+                          setState(() {});
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(paymentService.lastError.isNotEmpty
+                                ? paymentService.lastError
+                                : 'Geri yüklenecek satın alım bulunamadı.')),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.restore, size: 18),
+                    label: const Text('Satın Alımları Geri Yükle'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.grey.shade700,
                     ),
                   ),
                 ),

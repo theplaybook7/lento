@@ -352,11 +352,8 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
           }
 
           if (!subscriptionActive) {
-            final isAdmin = kullaniciYetkisi?.adminMi == true ||
-                _normalizeEmail(bulunanSirket.yoneticiEposta) == email;
-
-            if (isAdmin && PaymentService().isApplePaymentSupported) {
-              // iOS/macOS: Abonelik satın alma ekranı göster
+            if (PaymentService().isApplePaymentSupported) {
+              // iOS/macOS: Abonelik satın alma ekranı göster (tüm kullanıcılar)
               if (mounted) {
                 final purchased = await Navigator.push<bool>(
                   context,
@@ -384,19 +381,11 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                   }
                 }
               }
-            } else if (isAdmin) {
+            } else {
               // Web/diğer platformlar: Abonelik gerekli — iOS'tan satın alınmalı
               if (mounted) {
                 setState(() {
                   _hataMetni = 'Devam etmek için aktif bir abonelik gerekli. Lütfen iOS uygulaması üzerinden abonelik satın alın.';
-                });
-              }
-              return;
-            } else {
-              // Personel: Yöneticiye başvur
-              if (mounted) {
-                setState(() {
-                  _hataMetni = 'Şirketinizin aboneliği sona ermiştir. Lütfen şirket yöneticinize başvurun.';
                 });
               }
               return;

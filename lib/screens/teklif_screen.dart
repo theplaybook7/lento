@@ -955,9 +955,9 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
               },
             ),
             ListTile(
-              title: const Text('Arka Bahçe'),
+              title: const Text('Arka Bahçe Çıkışı'),
               onTap: () {
-                _bolumEkle(kat, 'Arka Bahçe', ortak: true);
+                _bolumEkle(kat, 'Arka Bahçe Çıkışı', ortak: true);
                 Navigator.pop(ctx);
               },
             ),

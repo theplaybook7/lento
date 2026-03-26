@@ -187,7 +187,7 @@ Future<Uint8List> generateSimplePdf({
         text,
         textAlign: pw.TextAlign.center,
         style: pw.TextStyle(
-          fontSize: 7,
+          fontSize: 8,
           fontWeight: pw.FontWeight.bold,
           color: PdfColors.white,
           font: fontBold,
@@ -196,7 +196,7 @@ Future<Uint8List> generateSimplePdf({
     );
   }
 
-  pw.Widget bulletText(String text, PdfColor color, {double fontSize = 7}) {
+  pw.Widget bulletText(String text, PdfColor color, {double fontSize = 8}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(left: 8, top: 2),
       child: pw.Row(
@@ -249,15 +249,15 @@ Future<Uint8List> generateSimplePdf({
         pw.TableRow(
           decoration: pw.BoxDecoration(color: b.sahip == 'Muteahhit' ? PdfColors.red50 : PdfColors.white),
           children: [
-            cell('${kat.ad} - ${b.tip}\n(${b.sahip})', align: pw.TextAlign.left, fontSize: 6),
-            cell(_formatNumber(b.toplamMetrekare), fontSize: 6),
-            cell(_formatNumber(insaatMaliyeti), fontSize: 6),
-            cell(_formatNumber(daireBasiOrtakMaliyet), fontSize: 6),
-            cell(hibeTL > 0 ? '-${_formatNumber(hibeTL)}' : '-', color: PdfColors.green700, fontSize: 6),
-            cell(krediTL > 0 ? '-${_formatNumber(krediTL)}' : '-', color: PdfColors.blue700, fontSize: 6),
+            cell('${kat.ad} - ${b.tip}\n(${b.sahip})', align: pw.TextAlign.left, fontSize: 7),
+            cell(_formatNumber(b.toplamMetrekare), fontSize: 7),
+            cell(_formatNumber(insaatMaliyeti), fontSize: 7),
+            cell(_formatNumber(daireBasiOrtakMaliyet), fontSize: 7),
+            cell(hibeTL > 0 ? '-${_formatNumber(hibeTL)}' : '-', color: PdfColors.green700, fontSize: 7),
+            cell(krediTL > 0 ? '-${_formatNumber(krediTL)}' : '-', color: PdfColors.blue700, fontSize: 7),
             if (toprakSutunuVar)
-              cell(b.sahip == 'Mal Sahibi' ? '-${_formatNumber(kisiBasiToprakIadesi.toDouble())}' : '-', color: PdfColors.orange800, fontSize: 6),
-            cell(netTutarStr, color: netColor, isBold: isBold, fontSize: 6),
+              cell(b.sahip == 'Mal Sahibi' ? '-${_formatNumber(kisiBasiToprakIadesi.toDouble())}' : '-', color: PdfColors.orange800, fontSize: 7),
+            cell(netTutarStr, color: netColor, isBold: isBold, fontSize: 7),
           ],
         ),
       );
@@ -270,8 +270,8 @@ Future<Uint8List> generateSimplePdf({
   pw.Widget ozetSatir(String baslik, String deger) {
     return pw.Column(
       children: [
-        pw.Text(baslik, style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700, font: font)),
-        pw.Text(deger, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, font: fontBold)),
+        pw.Text(baslik, style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700, font: font)),
+        pw.Text(deger, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, font: fontBold)),
       ],
     );
   }
@@ -371,8 +371,8 @@ Future<Uint8List> generateSimplePdf({
                     children: [
                       headerCell('Bölüm'),
                       headerCell('m²'),
-                      headerCell('İnş.'),
-                      headerCell('Ort.'),
+                      headerCell('BB Maliyeti'),
+                      headerCell('Ortak Alan\nMaliyeti'),
                       headerCell('Hibe'),
                       headerCell('Kredi'),
                       if (toprakSutunuVar) headerCell('Top. iade'),
@@ -434,13 +434,21 @@ Future<Uint8List> generateSimplePdf({
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('FİNANSAL VE TEKNİK AÇIKLAMA:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 7, decoration: pw.TextDecoration.underline, font: fontBold)),
-                    bulletText('Dahil edilen ortak alanlar: $ortakAlanAciklamasi.', PdfColors.black, fontSize: 6),
+                    pw.Text('FİNANSAL VE TEKNİK AÇIKLAMA:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, decoration: pw.TextDecoration.underline, font: fontBold)),
+                    bulletText('m²: Bağımsız bölümün toplam brüt metrekaresidir (Dubleks/Ters Dubleks/Depolu Dükkan tiplerinde tüm katlar dahildir).', PdfColors.black),
+                    bulletText('BB Maliyeti (Bağımsız Bölüm Maliyeti): Her bağımsız bölümün toplam m² x birim inşaat maliyeti ile hesaplanan yapım bedelidir.', PdfColors.black),
+                    bulletText('Ortak Alan Maliyeti: Asansör, sığınak, otopark vb. ortak alanların bağımsız bölümlere eşit dağıtılmış payıdır.', PdfColors.black),
+                    bulletText('Hibe: Devlet tarafından karşılanan hibe tutarıdır (varsa daire ve/veya dükkan hibesi).', PdfColors.black),
+                    bulletText('Kredi: Devlet destekli kredi tutarıdır (varsa daire ve/veya dükkan kredisi).', PdfColors.black),
+                    if (toprakSutunuVar) bulletText('Top. İade: Müteahhitin ödediği toprak parasının mal sahiplerine eşit dağıtılmış iadesidir.', PdfColors.black),
+                    bulletText('NET: BB Maliyeti + Ortak Alan Maliyeti - Hibe - Kredi - Toprak İadesi = Mal sahibinin ödemesi gereken net tutardır.', PdfColors.black),
+                    pw.SizedBox(height: 4),
+                    bulletText('Dahil edilen ortak alanlar: $ortakAlanAciklamasi.', PdfColors.black),
                     if (muteahhitVar)
-                      bulletText('Müteahhit, kendi dairelerinin maliyeti olan ${_formatNumber(muteahhitToplamMaliyet)} TL tutarını kendi karşılayacaktır.', PdfColors.red, fontSize: 6),
+                      bulletText('Müteahhit, kendi dairelerinin maliyeti olan ${_formatNumber(muteahhitToplamMaliyet)} TL tutarını kendi karşılayacaktır.', PdfColors.red),
                     if (toprakSutunuVar)
-                      bulletText('Müteahhit tarafından ödenen ${_formatNumber(toplamToprakParasi)} TL toprak parası, mal sahiplerinden düşülmüştür.', PdfColors.red, fontSize: 6),
-                    if (binaAyriSayfa) bulletText('Bina kesit görünümü bir sonraki sayfada.', PdfColors.blue, fontSize: 6),
+                      bulletText('Müteahhit tarafından ödenen ${_formatNumber(toplamToprakParasi)} TL toprak parası, mal sahiplerinden düşülmüştür.', PdfColors.red),
+                    if (binaAyriSayfa) bulletText('Bina kesit görünümü bir sonraki sayfada.', PdfColors.blue),
                   ],
                 ),
               ),
@@ -462,7 +470,7 @@ Future<Uint8List> generateSimplePdf({
         margin: const pw.EdgeInsets.all(15),
         build: (context) => pw.Column(
           children: [
-            pw.Text('BİNA KESİT GÖRÜNÜMÜ', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, font: fontBold)),
+            pw.Text('BİNA KESİT GÖRÜNÜMÜ', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, font: fontBold)),
             pw.SizedBox(height: 10),
             pw.Expanded(
               child: pw.Column(
@@ -492,7 +500,7 @@ Future<Uint8List> generateSimplePdf({
                             width: 60,
                             padding: const pw.EdgeInsets.all(3),
                             decoration: pw.BoxDecoration(border: pw.Border.all(), color: PdfColors.grey200),
-                            child: pw.Center(child: pw.Text(katListesi[idx].ad, style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, font: fontBold))),
+                            child: pw.Center(child: pw.Text(katListesi[idx].ad, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, font: fontBold))),
                           ),
                           pw.SizedBox(width: 5),
                           pw.Expanded(
@@ -501,7 +509,7 @@ Future<Uint8List> generateSimplePdf({
                                 return pw.Expanded(
                                   flex: room['flex'] as int,
                                   child: pw.Container(
-                                    height: 40,
+                                    height: 45,
                                     decoration: pw.BoxDecoration(color: room['bg'] as PdfColor, border: pw.Border.all(color: room['border'] as PdfColor, width: 1)),
                                     child: pw.Column(
                                       mainAxisAlignment: pw.MainAxisAlignment.center,
@@ -528,11 +536,11 @@ Future<Uint8List> generateSimplePdf({
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.center,
               children: [
-                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.green50, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('MAL SAHİBİ', style: pw.TextStyle(fontSize: 7, font: font))]),
+                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.green50, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('MAL SAHİBİ', style: pw.TextStyle(fontSize: 8, font: font))]),
                 pw.SizedBox(width: 20),
-                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.white, border: pw.Border.all(color: PdfColors.red, width: 1))), pw.SizedBox(width: 5), pw.Text('MÜTEAHHİT', style: pw.TextStyle(fontSize: 7, font: font))]),
+                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.white, border: pw.Border.all(color: PdfColors.red, width: 1))), pw.SizedBox(width: 5), pw.Text('MÜTEAHHİT', style: pw.TextStyle(fontSize: 8, font: font))]),
                 pw.SizedBox(width: 20),
-                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.grey300, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('ORTAK ALAN', style: pw.TextStyle(fontSize: 7, font: font))]),
+                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.grey300, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('ORTAK ALAN', style: pw.TextStyle(fontSize: 8, font: font))]),
               ],
             ),
           ],

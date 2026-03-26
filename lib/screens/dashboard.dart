@@ -155,6 +155,25 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     }
   }
 
+  Widget _buildNavIcon({
+    required String tooltip,
+    required IconData icon,
+    required IconData selectedIcon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        icon: Icon(
+          isSelected ? selectedIcon : icon,
+          color: isSelected ? AppTheme.primaryColor : Colors.grey.shade600,
+        ),
+        onPressed: onTap,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (SistemYoneticisi().cikisYapiliyor) {
@@ -422,35 +441,42 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         : const Center(child: Text('Yetkiniz yok'))
           : Row(
               children: [
-                NavigationRail(
-                  selectedIndex: navIndex,
-                  onDestinationSelected: (i) => setState(() => _navIndex = i),
-                  backgroundColor: Colors.white,
-                  destinations: [
-                    const NavigationRailDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home),
-                      label: Text('Projeler'),
-                    ),
-                    const NavigationRailDestination(
-                      icon: Icon(Icons.description_outlined),
-                      selectedIcon: Icon(Icons.description),
-                      label: Text('Teklifler'),
-                    ),
-                    const NavigationRailDestination(
-                      icon: Icon(Icons.account_balance_wallet_outlined),
-                      selectedIcon: Icon(Icons.account_balance_wallet),
-                      label: Text('Cariler'),
-                    ),
-                    if (canMuhasebe)
-                      const NavigationRailDestination(
-                        icon: Icon(Icons.assessment_outlined),
-                        selectedIcon: Icon(Icons.assessment),
-                        label: Text('Muhasebe'),
-                      ),
-                  ],
-                  trailing: Column(
+                Container(
+                  width: 56,
+                  color: Colors.white,
+                  child: Column(
                     children: [
+                      const SizedBox(height: 8),
+                      _buildNavIcon(
+                        tooltip: 'Projeler',
+                        icon: Icons.home_outlined,
+                        selectedIcon: Icons.home,
+                        isSelected: navIndex == 0,
+                        onTap: () => setState(() => _navIndex = 0),
+                      ),
+                      _buildNavIcon(
+                        tooltip: 'Teklifler',
+                        icon: Icons.description_outlined,
+                        selectedIcon: Icons.description,
+                        isSelected: navIndex == 1,
+                        onTap: () => setState(() => _navIndex = 1),
+                      ),
+                      _buildNavIcon(
+                        tooltip: 'Cariler',
+                        icon: Icons.account_balance_wallet_outlined,
+                        selectedIcon: Icons.account_balance_wallet,
+                        isSelected: navIndex == 2,
+                        onTap: () => setState(() => _navIndex = 2),
+                      ),
+                      if (canMuhasebe)
+                        _buildNavIcon(
+                          tooltip: 'Muhasebe',
+                          icon: Icons.assessment_outlined,
+                          selectedIcon: Icons.assessment,
+                          isSelected: navIndex == (canMuhasebe ? 3 : -1),
+                          onTap: () => setState(() => _navIndex = 3),
+                        ),
+                      const Spacer(),
                       Tooltip(
                         message: 'Proje Arşivi',
                         child: IconButton(
@@ -477,6 +503,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                           },
                         ),
                       ),
+                      const SizedBox(height: 8),
                     ],
                   ),
                 ),
@@ -1298,6 +1325,7 @@ class _ProjectsTab extends StatefulWidget {
 
 class _ProjectsTabState extends State<_ProjectsTab> {
   final _firebase = FirebaseService();
+  String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
@@ -1328,9 +1356,42 @@ class _ProjectsTabState extends State<_ProjectsTab> {
           );
         }
 
-        final projects = snapshot.data!;
+        final allProjects = snapshot.data!;
+        final projects = _searchQuery.isEmpty
+            ? allProjects
+            : allProjects.where((p) => p.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
-        return ListView.builder(
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Proje ara...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(() => _searchQuery = ''),
+                        )
+                      : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                ),
+                onChanged: (v) => setState(() => _searchQuery = v),
+              ),
+            ),
+            Expanded(
+              child: projects.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Aramayla eşleşen proje bulunamadı',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    )
+                  : ListView.builder(
           padding: const EdgeInsets.all(12),
           itemCount: projects.length,
           itemBuilder: (context, index) {
@@ -1453,6 +1514,9 @@ class _ProjectsTabState extends State<_ProjectsTab> {
               },
             );
           },
+        ),
+            ),
+          ],
         );
       },
     );

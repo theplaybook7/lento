@@ -1325,7 +1325,14 @@ class _ProjectsTab extends StatefulWidget {
 
 class _ProjectsTabState extends State<_ProjectsTab> {
   final _firebase = FirebaseService();
+  final _searchController = TextEditingController();
   String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1366,13 +1373,17 @@ class _ProjectsTabState extends State<_ProjectsTab> {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
               child: TextField(
+                controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Proje ara...',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: () => setState(() => _searchQuery = ''),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
                         )
                       : null,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

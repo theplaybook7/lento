@@ -895,7 +895,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   ),
                 ),
               ],
-              if (PaymentService().isApplePaymentSupported) ...[
+              if (isAdmin && PaymentService().isApplePaymentSupported) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,

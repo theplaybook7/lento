@@ -384,19 +384,19 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                   }
                 }
               }
-            } else if (!isAdmin && PaymentService().isApplePaymentSupported) {
-              // iOS/macOS Personel: Bilgilendirme + IAP seçeneği
+            } else if (isAdmin) {
+              // Web/diğer platformlar Admin: iOS'tan satın alınmalı
               if (mounted) {
                 setState(() {
-                  _hataMetni = 'Şirketinizin aboneliği sona ermiştir. Lütfen şirket yöneticinize başvurun veya aboneliği kendiniz yenileyebilirsiniz.';
+                  _hataMetni = 'Devam etmek için aktif bir abonelik gerekli. Lütfen iOS uygulaması üzerinden abonelik satın alın.';
                 });
               }
               return;
             } else {
-              // Web/diğer platformlar: Abonelik gerekli — iOS'tan satın alınmalı
+              // Personel: Yöneticiye başvur
               if (mounted) {
                 setState(() {
-                  _hataMetni = 'Devam etmek için aktif bir abonelik gerekli. Lütfen iOS uygulaması üzerinden abonelik satın alın.';
+                  _hataMetni = 'Şirketinizin aboneliği sona ermiştir. Lütfen şirket yöneticinize başvurun.';
                 });
               }
               return;
@@ -607,7 +607,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                 const SizedBox(height: 16),
                 Text(_hataMetni!, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
-                if (isSubscriptionError && PaymentService().isApplePaymentSupported) ...[
+                if (isSubscriptionError && PaymentService().isApplePaymentSupported && !_hataMetni!.contains('yöneticinize')) ...[
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -654,7 +654,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                   ),
                   const SizedBox(height: 8),
                 ],
-                if (!isSubscriptionError || !PaymentService().isApplePaymentSupported)
+                if (!isSubscriptionError || !PaymentService().isApplePaymentSupported || _hataMetni!.contains('yöneticinize'))
                   ElevatedButton(
                     onPressed: () {
                       setState(() {

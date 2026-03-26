@@ -509,14 +509,14 @@ Future<Uint8List> generateSimplePdf({
                                 return pw.Expanded(
                                   flex: room['flex'] as int,
                                   child: pw.Container(
-                                    height: 45,
+                                    height: 55,
                                     decoration: pw.BoxDecoration(color: room['bg'] as PdfColor, border: pw.Border.all(color: room['border'] as PdfColor, width: 1)),
                                     child: pw.Column(
                                       mainAxisAlignment: pw.MainAxisAlignment.center,
                                       children: [
-                                        pw.Text(room['label'] as String, style: pw.TextStyle(fontSize: 5, color: room['textCol'] as PdfColor, font: font), textAlign: pw.TextAlign.center),
-                                        pw.Text('${_formatNumber(room['m2'] as double)} m²', style: pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold, color: room['textCol'] as PdfColor, font: fontBold)),
-                                        pw.Text(room['sub'] as String, style: pw.TextStyle(fontSize: 4, color: room['textCol'] as PdfColor, font: font)),
+                                        pw.Text(room['label'] as String, style: pw.TextStyle(fontSize: 8, color: room['textCol'] as PdfColor, font: font), textAlign: pw.TextAlign.center),
+                                        pw.Text('${_formatNumber(room['m2'] as double)} m²', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: room['textCol'] as PdfColor, font: fontBold)),
+                                        pw.Text(room['sub'] as String, style: pw.TextStyle(fontSize: 6, color: room['textCol'] as PdfColor, font: font)),
                                       ],
                                     ),
                                   ),

@@ -1336,75 +1336,77 @@ class _ProjectsTabState extends State<_ProjectsTab> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Project>>(
-      stream: _firebase.getProjectsStream(widget.companyId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          if (SistemYoneticisi().cikisYapiliyor) return const SizedBox.shrink();
-          return const Center(
-            child: Text('Projeler yüklenemedi.'),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.folder_open_outlined, size: 48, color: Colors.grey),
-                const SizedBox(height: 12),
-                const Text('Henüz proje yok'),
-              ],
-            ),
-          );
-        }
-
-        final allProjects = snapshot.data!;
-        final projects = _searchQuery.isEmpty
-            ? allProjects
-            : allProjects.where((p) => p.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Proje ara...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  filled: true,
-                  fillColor: Colors.grey.shade50,
-                ),
-                onChanged: (v) => setState(() => _searchQuery = v),
-              ),
-            ),
-            Expanded(
-              child: projects.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Aramayla eşleşen proje bulunamadı',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Proje ara...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
                     )
-                  : ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: projects.length,
+                  : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              filled: true,
+              fillColor: Colors.grey.shade50,
+            ),
+            onChanged: (v) => setState(() => _searchQuery = v),
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<List<Project>>(
+            stream: _firebase.getProjectsStream(widget.companyId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                if (SistemYoneticisi().cikisYapiliyor) return const SizedBox.shrink();
+                return const Center(
+                  child: Text('Projeler yüklenemedi.'),
+                );
+              }
+
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.folder_open_outlined, size: 48, color: Colors.grey),
+                      const SizedBox(height: 12),
+                      const Text('Henüz proje yok'),
+                    ],
+                  ),
+                );
+              }
+
+              final allProjects = snapshot.data!;
+              final projects = _searchQuery.isEmpty
+                  ? allProjects
+                  : allProjects.where((p) => p.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+              if (projects.isEmpty) {
+                return Center(
+                  child: Text(
+                    'Aramayla eşleşen proje bulunamadı',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: projects.length,
           itemBuilder: (context, index) {
             final project = projects[index];
 
@@ -1524,12 +1526,12 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                 );
               },
             );
+              },
+            );
           },
         ),
-            ),
-          ],
-        );
-      },
+        ),
+      ],
     );
   }
 

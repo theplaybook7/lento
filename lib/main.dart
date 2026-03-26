@@ -385,10 +385,10 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                 }
               }
             } else if (isAdmin) {
-              // Web/diğer platformlar: Abonelik gerekli ama satın alma yapılamıyor
+              // Web/diğer platformlar: Abonelik gerekli — iOS'tan satın alınmalı
               if (mounted) {
                 setState(() {
-                  _hataMetni = 'Devam etmek için aktif bir abonelik gerekli.';
+                  _hataMetni = 'Devam etmek için aktif bir abonelik gerekli. Lütfen iOS uygulaması üzerinden abonelik satın alın.';
                 });
               }
               return;
@@ -446,13 +446,16 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
           if (purchased != true) return;
         }
       } else {
-        // Diğer platformlar: Abonelik gerekli
+        // Diğer platformlar: Abonelik gerekli — iOS üzerinden satın alınmalı
         if (mounted) {
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Abonelik Gerekli'),
-              content: const Text('Devam etmek için aktif bir abonelik gereklidir.'),
+              content: const Text(
+                'Şirket kurmak için aktif bir aboneliğiniz olmalıdır. '
+                'Lütfen iOS uygulaması üzerinden abonelik satın alın.',
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),

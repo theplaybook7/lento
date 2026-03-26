@@ -103,12 +103,29 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
 
       await _showSirketKurForm();
     } else {
-      // Web / Android: Hesap oluşturup direkt şirket kur (abonelik web'de yönetilir)
+      // Web / Android: Hesap oluştur, abonelik kontrol et ve şirket kur
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
         await _iosHesapOlusturVeOde();
         return;
       }
+
+      // Abonelik kontrolü — Web/Android'de de ödeme zorunlu
+      final paymentService = PaymentService();
+      final subStatus = await paymentService.getSubscriptionStatus();
+
+      if (!(subStatus['active'] as bool)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Şirket kurmak için aktif bir aboneliğiniz olmalıdır. Lütfen iOS uygulaması üzerinden abonelik satın alın.'),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
+
       await _showSirketKurForm();
     }
   }

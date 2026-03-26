@@ -353,6 +353,17 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 child: const Text('Satın Alımları Geri Yükle'),
               ),
 
+              // Abonelik Yönetimi Linki (Apple Guideline 3.1.2)
+              const SizedBox(height: 4),
+              TextButton.icon(
+                onPressed: () => launchUrl(
+                  Uri.parse('https://apps.apple.com/account/subscriptions'),
+                  mode: LaunchMode.externalApplication,
+                ),
+                icon: const Icon(Icons.settings, size: 16),
+                label: const Text('Aboneliği Yönet'),
+              ),
+
               // Subscription Terms (Apple Guideline 3.1.2)
               const SizedBox(height: 8),
               Text(
@@ -361,8 +372,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
                 "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade500,
-                  fontSize: 11,
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
                 ),
                 textAlign: TextAlign.center,
               ),

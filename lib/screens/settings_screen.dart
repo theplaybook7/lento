@@ -5,9 +5,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
 import '../payment_service.dart';
+import '../main.dart' show AuthGate;
 import 'paywall_screen.dart';
 
 class SettingsSayfasi extends StatefulWidget {
@@ -302,6 +304,128 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
     if (confirm == true) {
       SistemYoneticisi().temizle();
       await FirebaseAuth.instance.signOut();
+    }
+  }
+
+  Future<void> _hesabiSil() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Hesabı Sil", style: TextStyle(color: Colors.red.shade700)),
+        content: const Text(
+          "Hesabınız ve tüm ilişkili verileriniz kalıcı olarak silinecektir. "
+          "Bu işlem geri alınamaz.\n\n"
+          "Aktif bir aboneliğiniz varsa, lütfen önce Ayarlar > Apple Kimliği > Abonelikler bölümünden iptal edin.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("İPTAL"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("HESABIMI SİL", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    // Ek onay — email yazarak doğrulama
+    final emailCtrl = TextEditingController();
+    final user = FirebaseAuth.instance.currentUser;
+    final userEmail = (user?.email ?? '').trim().toLowerCase();
+
+    final emailConfirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Onay"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Silme işlemini onaylamak için email adresinizi yazın:"),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailCtrl,
+              decoration: InputDecoration(
+                hintText: userEmail,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("İPTAL"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text("ONAYLA", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (emailConfirm != true || emailCtrl.text.trim().toLowerCase() != userEmail) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Email adresi eşleşmedi. İşlem iptal edildi.")),
+        );
+      }
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      // 1. Kullanıcı Firestore verilerini sil
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).delete();
+      }
+
+      // 2. Firebase Auth hesabını sil
+      await user?.delete();
+
+      // 3. Temizle ve çıkış yap
+      SistemYoneticisi().temizle();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Hesabınız silindi."), backgroundColor: Colors.green),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+          (_) => false,
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Güvenlik nedeniyle önce çıkış yapıp tekrar giriş yapın, ardından hesabı silin."),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Hata: ${e.message}")),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Hata: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -771,6 +895,24 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   ),
                 ),
               ],
+              if (isActive && PaymentService().isApplePaymentSupported) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => launchUrl(
+                      Uri.parse('https://apps.apple.com/account/subscriptions'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    icon: const Icon(Icons.settings, size: 18),
+                    label: const Text('Aboneliği Yönet'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primaryColor,
+                      side: BorderSide(color: AppTheme.primaryColor),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1106,6 +1248,23 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
                         foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _saving ? null : _hesabiSil,
+                      icon: const Icon(Icons.delete_forever_outlined),
+                      label: const Text("Hesabımı Sil"),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red.shade700,
+                        side: BorderSide(color: Colors.red.shade300, width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),

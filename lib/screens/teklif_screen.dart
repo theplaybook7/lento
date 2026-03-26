@@ -511,7 +511,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
         for (final k in widget.katListesi) {
           for (final b in k.bolumler) {
             if (b.isOrtakAlan || b.sahip == 'Muteahhit') continue;
-            final insaat = b.girilenM2 * (b.tip.contains('Dükkan') ? widget.dukkanMaliyet : widget.daireMaliyet);
+            final insaat = b.toplamMetrekare * (b.tip.contains('Dükkan') ? widget.dukkanMaliyet : widget.daireMaliyet);
             final toplam = insaat + daireBasiOrtakMaliyet;
             final hibeKredi = (b.daireHibeSayisi * widget.daireHibeLim) + (b.daireKrediSayisi * widget.daireKrediLim) + (b.dukkanHibeSayisi * widget.dukkanHibeLim) + (b.dukkanKrediSayisi * widget.dukkanKrediLim);
             final net = toplam - hibeKredi - kisiToprak;

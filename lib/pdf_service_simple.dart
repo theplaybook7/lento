@@ -67,7 +67,7 @@ Future<Uint8List> generateSimplePdf({
         ortakAlanIsimleri.add('${b.tip} (${_formatNumber(b.girilenM2)} m²)');
       } else {
         final birimMaliyet = b.tip.contains('Dükkan') ? dukkanBirimMaliyet : daireBirimMaliyet;
-        final insaatMaliyeti = b.girilenM2 * birimMaliyet;
+        final insaatMaliyeti = b.toplamMetrekare * birimMaliyet;
         final toplamMaliyet = insaatMaliyeti + daireBasiOrtakMaliyet;
         if (b.sahip == 'Müteahhit') {
           muteahhitVar = true;
@@ -211,7 +211,7 @@ Future<Uint8List> generateSimplePdf({
   for (final kat in katListesi) {
     for (final b in kat.bolumler.where((b) => !b.isOrtakAlan)) {
       final birimMaliyet = b.tip.contains('Dükkan') ? dukkanBirimMaliyet : daireBirimMaliyet;
-      final insaatMaliyeti = b.girilenM2 * birimMaliyet;
+      final insaatMaliyeti = b.toplamMetrekare * birimMaliyet;
       final hibeTL = (b.daireHibeSayisi * daireHibeLim) + (b.dukkanHibeSayisi * dukkanHibeLim);
       final krediTL = (b.daireKrediSayisi * daireKrediLim) + (b.dukkanKrediSayisi * dukkanKrediLim);
 

@@ -7,7 +7,6 @@ import '../notification_service.dart';
 import '../models/project_model.dart';
 import '../theme/app_theme.dart';
 import 'teklif_screen.dart';
-import 'ai_teklif_screen.dart';
 import 'arsiv_screen.dart';
 import 'new_project_screen.dart';
 import 'project_details_screen.dart';
@@ -585,38 +584,19 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
               backgroundColor: AppTheme.primaryColor,
             )
             : navIndex == 1
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FloatingActionButton.small(
-                      heroTag: 'aiTeklif',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (c) => const AiTeklifScreen(),
-                          ),
-                        );
-                      },
-                      backgroundColor: Colors.purple,
-                      child: const Icon(Icons.smart_toy, color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(height: 8),
-                    FloatingActionButton.extended(
-                      heroTag: 'yeniTeklif',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (c) => const TeklifSayfasi(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Yeni Teklif'),
-                      backgroundColor: AppTheme.primaryColor,
-                    ),
-                  ],
+              ? FloatingActionButton.extended(
+                  heroTag: 'yeniTeklif',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => const TeklifSayfasi(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Yeni Teklif'),
+                  backgroundColor: AppTheme.primaryColor,
                 )
               : navIndex == 2
                 ? FloatingActionButton.extended(

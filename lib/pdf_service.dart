@@ -536,11 +536,11 @@ Future<Uint8List> generateSimplePdf({
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.center,
               children: [
-                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.green50, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('MAL SAHİBİ', style: pw.TextStyle(fontSize: 8, font: font))]),
+                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.green50, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('MAL SAHİBİ', style: pw.TextStyle(fontSize: 10, font: font))]),
                 pw.SizedBox(width: 20),
-                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.white, border: pw.Border.all(color: PdfColors.red, width: 1))), pw.SizedBox(width: 5), pw.Text('MÜTEAHHİT', style: pw.TextStyle(fontSize: 8, font: font))]),
+                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.white, border: pw.Border.all(color: PdfColors.red, width: 1))), pw.SizedBox(width: 5), pw.Text('MÜTEAHHİT', style: pw.TextStyle(fontSize: 10, font: font))]),
                 pw.SizedBox(width: 20),
-                pw.Row(children: [pw.Container(width: 15, height: 15, decoration: pw.BoxDecoration(color: PdfColors.grey300, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('ORTAK ALAN', style: pw.TextStyle(fontSize: 8, font: font))]),
+                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.grey300, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('ORTAK ALAN', style: pw.TextStyle(fontSize: 10, font: font))]),
               ],
             ),
           ],

@@ -864,7 +864,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                 const SizedBox(height: 4),
                 Text('Bitiş: ${DateFormat('dd.MM.yyyy').format(subEnd)}'),
               ],
-              if (!isActive && PaymentService().isApplePaymentSupported) ...[
+              if (isAdmin && !isActive && PaymentService().isApplePaymentSupported) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,

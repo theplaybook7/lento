@@ -352,8 +352,11 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
           }
 
           if (!subscriptionActive) {
-            if (PaymentService().isApplePaymentSupported) {
-              // iOS/macOS: Abonelik satın alma ekranı göster (tüm kullanıcılar)
+            final isAdmin = kullaniciYetkisi?.adminMi == true ||
+                _normalizeEmail(bulunanSirket.yoneticiEposta) == email;
+
+            if (isAdmin && PaymentService().isApplePaymentSupported) {
+              // iOS/macOS Admin: Direkt PaywallScreen göster
               if (mounted) {
                 final purchased = await Navigator.push<bool>(
                   context,
@@ -381,6 +384,14 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                   }
                 }
               }
+            } else if (!isAdmin && PaymentService().isApplePaymentSupported) {
+              // iOS/macOS Personel: Bilgilendirme + IAP seçeneği
+              if (mounted) {
+                setState(() {
+                  _hataMetni = 'Şirketinizin aboneliği sona ermiştir. Lütfen şirket yöneticinize başvurun veya aboneliği kendiniz yenileyebilirsiniz.';
+                });
+              }
+              return;
             } else {
               // Web/diğer platformlar: Abonelik gerekli — iOS'tan satın alınmalı
               if (mounted) {

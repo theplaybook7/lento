@@ -163,7 +163,7 @@ Future<Uint8List> generateSimplePdf({
     pw.TextAlign align = pw.TextAlign.center,
     PdfColor color = PdfColors.black,
     bool isBold = false,
-    double fontSize = 7,
+    double fontSize = 8,
   }) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(2),
@@ -187,7 +187,7 @@ Future<Uint8List> generateSimplePdf({
         text,
         textAlign: pw.TextAlign.center,
         style: pw.TextStyle(
-          fontSize: 8,
+          fontSize: 10,
           fontWeight: pw.FontWeight.bold,
           color: PdfColors.white,
           font: fontBold,
@@ -249,22 +249,22 @@ Future<Uint8List> generateSimplePdf({
         pw.TableRow(
           decoration: pw.BoxDecoration(color: b.sahip == 'Muteahhit' ? PdfColors.red50 : PdfColors.white),
           children: [
-            cell('${kat.ad} - ${b.tip}\n(${b.sahip})', align: pw.TextAlign.left, fontSize: 7),
-            cell(_formatNumber(b.toplamMetrekare), fontSize: 7),
-            cell(_formatNumber(insaatMaliyeti), fontSize: 7),
-            cell(_formatNumber(daireBasiOrtakMaliyet), fontSize: 7),
-            cell(hibeTL > 0 ? '-${_formatNumber(hibeTL)}' : '-', color: PdfColors.green700, fontSize: 7),
-            cell(krediTL > 0 ? '-${_formatNumber(krediTL)}' : '-', color: PdfColors.blue700, fontSize: 7),
+            cell('${kat.ad} - ${b.tip}\n(${b.sahip})', align: pw.TextAlign.left, fontSize: 8),
+            cell(_formatNumber(b.toplamMetrekare), fontSize: 8),
+            cell(_formatNumber(insaatMaliyeti), fontSize: 8),
+            cell(_formatNumber(daireBasiOrtakMaliyet), fontSize: 8),
+            cell(hibeTL > 0 ? '-${_formatNumber(hibeTL)}' : '-', color: PdfColors.green700, fontSize: 8),
+            cell(krediTL > 0 ? '-${_formatNumber(krediTL)}' : '-', color: PdfColors.blue700, fontSize: 8),
             if (toprakSutunuVar)
-              cell(b.sahip == 'Mal Sahibi' ? '-${_formatNumber(kisiBasiToprakIadesi.toDouble())}' : '-', color: PdfColors.orange800, fontSize: 7),
-            cell(netTutarStr, color: netColor, isBold: isBold, fontSize: 7),
+              cell(b.sahip == 'Mal Sahibi' ? '-${_formatNumber(kisiBasiToprakIadesi.toDouble())}' : '-', color: PdfColors.orange800, fontSize: 8),
+            cell(netTutarStr, color: netColor, isBold: isBold, fontSize: 8),
           ],
         ),
       );
     }
   }
 
-  const int satirPerPage = 18;
+  const int satirPerPage = 15;
   final int toplamSayfaSayisi = (tumSatirlar.length / satirPerPage).ceil().clamp(1, 9999);
 
   pw.Widget ozetSatir(String baslik, String deger) {
@@ -347,7 +347,7 @@ Future<Uint8List> generateSimplePdf({
               child: pw.Center(
                 child: pw.Text(
                   ilkSayfa ? 'MALİYET DAĞILIM TABLOSU' : 'MALİYET DAĞILIM TABLOSU (Devam)',
-                  style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, font: fontBold),
+                  style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, font: fontBold),
                 ),
               ),
             ),

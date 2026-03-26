@@ -36,7 +36,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
   @override
   void initState() {
     super.initState();
-    _companyId = SistemYoneticisi().aktifSirket?.id ?? 'default';
+    _companyId = SistemYoneticisi().aktifSirket?.id ?? '';
     _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user == null && mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -218,7 +218,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
             stream: BildirimServisi.bildirimleriDinle(),
             builder: (context, snapshot) {
               int okunmayanSayisi = 0;
-              if (snapshot.hasData) {
+              if (snapshot.hasData && !snapshot.hasError) {
                 okunmayanSayisi = snapshot.data!.docs.where((doc) {
                   final b = doc.data() as Map<String, dynamic>;
                   final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
@@ -745,7 +745,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
             child: StreamBuilder<QuerySnapshot>(
               stream: BildirimServisi.bildirimleriDinle(),
               builder: (ctx, snap) {
-                if (!snap.hasData || snap.data!.docs.isEmpty) {
+                if (snap.hasError || !snap.hasData || snap.data!.docs.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.all(16),
                     child: Text('Bildirim yok'),
@@ -884,7 +884,7 @@ class _CarilerTabState extends State<_CarilerTab> {
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 if (SistemYoneticisi().cikisYapiliyor) return const SizedBox.shrink();
-                return Center(child: Text('Hata: ${snapshot.error}'));
+                return const Center(child: Text('Cari hesaplar yüklenemedi.'));
               }
               if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
@@ -1310,8 +1310,8 @@ class _ProjectsTabState extends State<_ProjectsTab> {
 
         if (snapshot.hasError) {
           if (SistemYoneticisi().cikisYapiliyor) return const SizedBox.shrink();
-          return Center(
-            child: Text('Hata: ${snapshot.error}'),
+          return const Center(
+            child: Text('Projeler yüklenemedi.'),
           );
         }
 

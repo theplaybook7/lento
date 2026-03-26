@@ -80,50 +80,37 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
   }
 
   Future<void> _sirketKurDialog() async {
-    // Önce hesap oluştur, sonra ödeme, sonra şirket kur
-    if (!PaymentService().isApplePaymentSupported) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Abonelik Gerekli'),
-            content: const Text('Şirket oluşturmak için aktif bir abonelik gereklidir.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('TAMAM'),
-              ),
-            ],
-          ),
-        );
+    if (PaymentService().isApplePaymentSupported) {
+      // iOS/macOS: IAP akışı
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        await _iosHesapOlusturVeOde();
+        return;
       }
-      return;
-    }
 
-    // iOS: Kullanıcı giriş yapmış mı kontrol et
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      // Giriş yapmamış - önce hesap oluşturmalı
-      await _iosHesapOlusturVeOde();
-      return;
-    }
+      final paymentService = PaymentService();
+      final subStatus = await paymentService.getSubscriptionStatus();
 
-    // Giriş yapmış kullanıcı - direkt ödeme akışına git
-    final paymentService = PaymentService();
-    final subStatus = await paymentService.getSubscriptionStatus();
-
-    if (!(subStatus['active'] as bool)) {
-      if (mounted) {
-        final purchased = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
-        );
-        if (purchased != true) return;
+      if (!(subStatus['active'] as bool)) {
+        if (mounted) {
+          final purchased = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+          );
+          if (purchased != true) return;
+        }
       }
-    }
 
-    // Aktif subscription varsa, şirket kurma dialogunu göster
-    await _showSirketKurForm();
+      await _showSirketKurForm();
+    } else {
+      // Web / Android: Hesap oluşturup direkt şirket kur (abonelik web'de yönetilir)
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        await _iosHesapOlusturVeOde();
+        return;
+      }
+      await _showSirketKurForm();
+    }
   }
 
   /// iOS: Hesap oluştur → Ödeme → Şirket kur

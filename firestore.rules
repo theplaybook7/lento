@@ -48,15 +48,15 @@ service cloud.firestore {
 
       // Bildirimler alt koleksiyonu
       match /bildirimler/{bildirimId} {
-        allow read, write: if isAuthenticated() && userSirketId() == sirketId;
+        allow read, write: if isAuthenticated() && hasUserSirketId() && userSirketId() == sirketId;
       }
     }
 
     // Cari Hesaplar
     match /cari_hesaplar/{cariId} {
-      allow read: if isAuthenticated() && resource.data.sirketId == userSirketId();
-      allow create: if isAuthenticated() && request.resource.data.sirketId == userSirketId();
-      allow update, delete: if isAuthenticated() && resource.data.sirketId == userSirketId();
+      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
+      allow create: if isAuthenticated() && hasUserSirketId() && request.resource.data.sirketId == userSirketId();
+      allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
 
       match /hareketler/{hareketId} {
         allow read, write: if isAuthenticated();
@@ -65,16 +65,16 @@ service cloud.firestore {
 
     // Projeler koleksiyonu
     match /projects/{projectId} {
-      allow read: if isAuthenticated() && resource.data.companyId == userSirketId();
-      allow create: if isAuthenticated() && request.resource.data.companyId == userSirketId();
-      allow update, delete: if isAuthenticated() && resource.data.companyId == userSirketId();
+      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.companyId == userSirketId();
+      allow create: if isAuthenticated() && hasUserSirketId() && request.resource.data.companyId == userSirketId();
+      allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.companyId == userSirketId();
 
       match /phases/{phaseId} {
-        allow read, write: if get(/databases/$(database)/documents/projects/$(projectId)).data.companyId == userSirketId();
+        allow read, write: if hasUserSirketId() && get(/databases/$(database)/documents/projects/$(projectId)).data.companyId == userSirketId();
       }
 
       match /transactions/{transactionId} {
-        allow read, write: if get(/databases/$(database)/documents/projects/$(projectId)).data.companyId == userSirketId();
+        allow read, write: if hasUserSirketId() && get(/databases/$(database)/documents/projects/$(projectId)).data.companyId == userSirketId();
       }
     }
 
@@ -94,8 +94,8 @@ service cloud.firestore {
 
     // Şirket Finansmanı
     match /company_finance/{companyId} {
-      allow read: if isAuthenticated() && userSirketId() == companyId;
-      allow write: if isAuthenticated() && userSirketId() == companyId;
+      allow read: if isAuthenticated() && hasUserSirketId() && userSirketId() == companyId;
+      allow write: if isAuthenticated() && hasUserSirketId() && userSirketId() == companyId;
     }
 
     // Teklifler

@@ -225,7 +225,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                 bulunanSirket = s;
                 kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
                 // Mevcut şirketlerde adminlar haritasını otomatik oluştur
-                final data = sirketDoc.data() as Map<String, dynamic>?;
+                final data = sirketDoc.data();
                 if (data != null && (data['adminlar'] == null || !(data['adminlar'] as Map).containsKey(user.uid))) {
                   try {
                     await FirebaseFirestore.instance
@@ -300,7 +300,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
               kullaniciYetkisi = bulunanYetkiler.first;
               // sirketId'yi user doc'a kaydet (gelecek login için hızlı erişim)
               await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-                'sirketId': bulunanSirket!.id,
+                'sirketId': bulunanSirket.id,
               }, SetOptions(merge: true));
             } else if (bulunanSirketler.length > 1) {
               // Birden fazla şirket — kullanıcıya seçtir
@@ -311,7 +311,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                   bulunanSirket = secim;
                   kullaniciYetkisi = bulunanYetkiler[idx];
                   await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-                    'sirketId': bulunanSirket!.id,
+                    'sirketId': bulunanSirket.id,
                   }, SetOptions(merge: true));
                 }
               }

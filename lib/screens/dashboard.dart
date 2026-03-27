@@ -1348,6 +1348,84 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  static const _ruhsatMaddeleri = [
+    'Aplikasyon Krokisi',
+    'Kentsel dönüşüm kontrolü',
+    'İmar durumu',
+    'İstikamet',
+    'Kot Kesit',
+    'Rbt ve Muafiyet Onayı',
+    'Bina Boş Yazısı',
+    'Yıkım Ruhsatı',
+    'Yanan Yıkılan',
+    'Zemine Etütü',
+    'Harita Folyosu',
+    'Hibe/İfraz/Tevhit kontrolü',
+    'Encümen onayı',
+    'Kadastro onayı',
+    'İski müracatı',
+    'İski harcı',
+    'Ruhsat Dilekçesi',
+    'Mimari Proje Ozalit',
+    'Fen işleri harç hesabı',
+    'Yapı Denetim Ataması',
+    'Mimari Proje Onayı',
+    'Statik Proje Onayı',
+    'Elektrik Proje Onayı',
+    'Makine Proje Onayı',
+    'Akustik Onayı',
+    'Zemin Etütü Onayı',
+    'Harçlar',
+    'Asansör Proje',
+    'Teminat Mektubu',
+    'Şantiye Şefi Sözleşmesi',
+    'Müteahhit Taahhütü',
+    'Ruhsat Yazdır',
+  ];
+
+  Future<Map<String, dynamic>> _getRuhsatOzet(String projectId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('ruhsat')
+        .doc(projectId)
+        .collection('islemler')
+        .get();
+
+    int tamamlanan = 0;
+    int devamEden = 0;
+    int sonTamamlananSira = 0;
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      final durum = data['durum'] as int? ?? 0;
+      final sira = data['sira'] as int? ?? 0;
+      if (durum == 2) {
+        tamamlanan++;
+        if (sira > sonTamamlananSira) sonTamamlananSira = sira;
+      }
+      if (durum == 1) devamEden++;
+    }
+
+    // Şu anki aşama: devam eden varsa onu göster, yoksa son tamamlananın sonraki adımı
+    int aktifSira = 0;
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      if ((data['durum'] as int? ?? 0) == 1) {
+        final s = data['sira'] as int? ?? 0;
+        if (aktifSira == 0 || s < aktifSira) aktifSira = s;
+      }
+    }
+    if (aktifSira == 0 && sonTamamlananSira < _ruhsatMaddeleri.length) {
+      aktifSira = sonTamamlananSira + 1;
+    }
+
+    return {
+      'tamamlanan': tamamlanan,
+      'devamEden': devamEden,
+      'toplam': _ruhsatMaddeleri.length,
+      'aktifSira': aktifSira,
+    };
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -1538,6 +1616,99 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                   backgroundColor: Colors.blue.withValues(alpha: 0.1),
                                 ),
                               ],
+                            ),
+                          // Ruhsat ilerleme durumu
+                          if (SistemYoneticisi().yetkiVarMi('ruhsat'))
+                            FutureBuilder<Map<String, dynamic>>(
+                              future: _getRuhsatOzet(project.id),
+                              builder: (context, ruhsatSnap) {
+                                if (!ruhsatSnap.hasData) return const SizedBox.shrink();
+                                final r = ruhsatSnap.data!;
+                                final tamamlanan = r['tamamlanan'] as int;
+                                final devamEden = r['devamEden'] as int;
+                                final toplam = r['toplam'] as int;
+                                final aktifSira = r['aktifSira'] as int;
+
+                                if (tamamlanan == 0 && devamEden == 0) return const SizedBox.shrink();
+
+                                final aktifMadde = aktifSira > 0 && aktifSira <= _ruhsatMaddeleri.length
+                                    ? _ruhsatMaddeleri[aktifSira - 1]
+                                    : null;
+                                final tamamlandi = tamamlanan == toplam;
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: tamamlandi
+                                          ? Colors.green.withValues(alpha: 0.06)
+                                          : Colors.orange.withValues(alpha: 0.06),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: tamamlandi
+                                            ? Colors.green.withValues(alpha: 0.2)
+                                            : Colors.orange.withValues(alpha: 0.2),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              tamamlandi ? Icons.verified : Icons.description_outlined,
+                                              size: 15,
+                                              color: tamamlandi ? Colors.green.shade700 : Colors.orange.shade700,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Ruhsat: $tamamlanan/$toplam',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: tamamlandi ? Colors.green.shade700 : Colors.orange.shade700,
+                                              ),
+                                            ),
+                                            if (devamEden > 0) ...[
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                '($devamEden devam ediyor)',
+                                                style: TextStyle(fontSize: 10, color: Colors.orange.shade600),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: LinearProgressIndicator(
+                                            value: toplam > 0 ? tamamlanan / toplam : 0,
+                                            backgroundColor: Colors.grey.shade200,
+                                            valueColor: AlwaysStoppedAnimation(
+                                              tamamlandi ? Colors.green.shade500 : Colors.orange.shade500,
+                                            ),
+                                            minHeight: 5,
+                                          ),
+                                        ),
+                                        if (aktifMadde != null && !tamamlandi) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            '▸ $aktifMadde',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey.shade600,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                         ],
                       ),

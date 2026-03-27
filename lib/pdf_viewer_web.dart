@@ -3,6 +3,7 @@ import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import 'utils/error_handler.dart';
 
 class PdfViewerWeb extends StatefulWidget {
   final Uint8List pdfBytes;
@@ -80,7 +81,7 @@ class _PdfViewerWebState extends State<PdfViewerWeb> {
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('İndirme hatası: $e')),
+                    SnackBar(content: Text(hataCevir(e))),
                   );
                 }
               }

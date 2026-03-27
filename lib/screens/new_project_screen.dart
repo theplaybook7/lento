@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/firebase_service.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 
 class NewProjectScreen extends StatefulWidget {
   final String companyId;
@@ -79,7 +80,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 import '../payment_service.dart';
 import '../main.dart' show companyCreationInProgress;
 import 'paywall_screen.dart';
@@ -73,7 +74,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
       }
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Giriş Hatası: $e")));
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hataCevir(e))));
     } finally {
       if(mounted) setState(() => _loading = false);
     }
@@ -252,7 +253,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                         }
                         setState(() { loading = false; hata = msg; });
                       } catch (e) {
-                        setState(() { loading = false; hata = 'Hata: $e'; });
+                        setState(() { loading = false; hata = hataCevir(e); });
                       }
                     },
               style: ElevatedButton.styleFrom(
@@ -336,7 +337,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                       }
                     } catch (e) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Görsel seçme hatası: $e")));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hataCevir(e))));
                       }
                     }
                   },
@@ -465,7 +466,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           const SnackBar(content: Text('Şirket başarıyla kuruldu!'), backgroundColor: Colors.green),
                         );
                       } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red));
                       } finally {
                         if (mounted) setState(() => kurLoading = false);
                       }
@@ -662,7 +663,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                       } catch (e) {
                         setDialogState(() {
                           kayitLoading = false;
-                          hataMetni = "Hata: $e";
+                          hataMetni = hataCevir(e);
                         });
                       }
                     },

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 
 class CreatePaymentPlanScreen extends StatefulWidget {
   final String projectId;
@@ -188,7 +189,7 @@ class _CreatePaymentPlanScreenState extends State<CreatePaymentPlanScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hata: $e')),
+        SnackBar(content: Text(hataCevir(e))),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

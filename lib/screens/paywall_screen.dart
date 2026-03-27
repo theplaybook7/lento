@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 import '../payment_service.dart';
 
 enum PaywallMode { creation, subscription }
@@ -112,7 +113,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
       }
     } catch (e) {
       setState(() {
-        _statusMessage = "❌ Hata: $e";
+        _statusMessage = "❌ ${hataCevir(e)}";
       });
     } finally {
       if (mounted) {

@@ -17,6 +17,7 @@ import 'settings_screen.dart';
 import '../services/firebase_service.dart';
 import '../main.dart' show AuthGate;
 import '../utils/format_utils.dart' as format_utils;
+import '../utils/error_handler.dart';
 
 class DashboardSayfasi extends StatefulWidget {
   const DashboardSayfasi({super.key});
@@ -148,7 +149,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
+          SnackBar(content: Text(hataCevir(e))),
         );
       }
     }
@@ -1177,7 +1178,7 @@ class _TekliflerListesiState extends State<_TekliflerListesi> {
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: Text(
-                      "Veriler yüklenemedi.\nLütfen Firebase Console'da INDEX oluşturun.\n\nHata: ${snapshot.error}",
+                      "Veriler yüklenemedi.\n${hataCevir(snapshot.error ?? 'Bilinmeyen hata')}",
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.red),
                     ),

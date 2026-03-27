@@ -4,6 +4,7 @@ import '../models/payment_model.dart';
 import '../services/firebase_service.dart';
 import '../services/payment_notification_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 import 'payment_plan_details_screen.dart';
 import 'create_payment_plan_screen.dart';
 
@@ -56,7 +57,7 @@ class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
 
           if (snapshot.hasError) {
             return Center(
-              child: Text('Hata: ${snapshot.error}'),
+              child: Text(hataCevir(snapshot.error ?? '')),
             );
           }
 

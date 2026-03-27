@@ -3,6 +3,7 @@ import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 import 'project_details_screen.dart';
 
 class ProjectArchiveScreen extends StatefulWidget {
@@ -27,7 +28,7 @@ class _ProjectArchiveScreenState extends State<ProjectArchiveScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
       );
     }
   }
@@ -54,7 +55,7 @@ class _ProjectArchiveScreenState extends State<ProjectArchiveScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Text(
-                  'Hata: ${snapshot.error}',
+                  'Hata: ${hataCevir(snapshot.error ?? '')}',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Colors.red,

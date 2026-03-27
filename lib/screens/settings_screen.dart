@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 import '../payment_service.dart';
 import '../main.dart' show AuthGate;
 import 'paywall_screen.dart';
@@ -96,7 +97,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Hata: $e")),
+          SnackBar(content: Text(hataCevir(e))),
         );
       }
     } finally {
@@ -161,7 +162,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Logo yükleme hatası: $e")),
+            SnackBar(content: Text(hataCevir(e))),
           );
         }
       }
@@ -263,7 +264,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Şifre değiştirme hatası: $e")),
+                    SnackBar(content: Text(hataCevir(e))),
                   );
                 }
               }
@@ -413,14 +414,14 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Hata: ${e.message}")),
+            SnackBar(content: Text(hataCevir(e))),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Hata: $e")),
+          SnackBar(content: Text(hataCevir(e))),
         );
       }
     } finally {
@@ -585,7 +586,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Hata: $e")),
+                      SnackBar(content: Text(hataCevir(e))),
                     );
                   }
                 }
@@ -736,7 +737,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Hata: $e")),
+                      SnackBar(content: Text(hataCevir(e))),
                     );
                   }
                 }
@@ -808,7 +809,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Hata: $e")),
+            SnackBar(content: Text(hataCevir(e))),
           );
         }
       }

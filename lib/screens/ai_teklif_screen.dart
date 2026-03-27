@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:printing/printing.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 import '../services/ai_teklif_service.dart';
 import '../services/emlak_data_service.dart';
 import '../services/ai_teklif_pdf_service.dart' as ai_pdf;
@@ -518,7 +519,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -552,7 +553,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kayıt hatası: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hataCevir(e))));
       }
     }
   }
@@ -579,7 +580,7 @@ class _AiTeklifScreenState extends State<AiTeklifScreen> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF hatası: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
         );
       }
     }

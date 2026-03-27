@@ -10,6 +10,7 @@ import '../models/project_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart' as format_utils;
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 import '../project_core.dart';
 import '../notification_service.dart';
 import '../web/web_utils.dart' as web_utils;
@@ -241,7 +242,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   } catch (e) {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+                      SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
                     );
                   }
                 }
@@ -275,7 +276,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   } catch (e) {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Hata: $e'), backgroundColor: Colors.red),
+                      SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
                     );
                   }
                 }
@@ -1201,7 +1202,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Hata: $e'),
+          content: Text(hataCevir(e)),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -1241,7 +1242,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Hata: $e'),
+          content: Text(hataCevir(e)),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -1360,7 +1361,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Hata: $e'),
+          content: Text(hataCevir(e)),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -1496,7 +1497,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Hata: $e'),
+          content: Text(hataCevir(e)),
           backgroundColor: Colors.red.shade700,
         ),
       );
@@ -2166,7 +2167,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: $e'),
+            content: Text(hataCevir(e)),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -2230,7 +2231,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata: $e'),
+            content: Text(hataCevir(e)),
             backgroundColor: Colors.red,
           ),
         );

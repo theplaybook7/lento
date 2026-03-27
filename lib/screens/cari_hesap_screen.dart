@@ -10,6 +10,7 @@ import '../services/firebase_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/image_utils.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 import '../project_core.dart' show SistemYoneticisi;
 import '../web/web_utils.dart' as web_utils;
 
@@ -60,7 +61,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
         stream: FirebaseFirestore.instance.collection('cari_hesaplar').where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Hata: ${snapshot.error}'));
+            return Center(child: Text(hataCevir(snapshot.error ?? '')));
           }
 
           if (!snapshot.hasData) {
@@ -1542,7 +1543,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                 } catch (e) {
                   if (!ctx.mounted) return;
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('Hata: $e')),
+                    SnackBar(content: Text(hataCevir(e))),
                   );
                 }
               },
@@ -1984,7 +1985,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                 } catch (e) {
                   if (!ctx.mounted) return;
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('Hata: $e')),
+                    SnackBar(content: Text(hataCevir(e))),
                   );
                 }
               },
@@ -2089,7 +2090,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Hata: $e')),
+            SnackBar(content: Text(hataCevir(e))),
           );
         }
       }
@@ -2271,7 +2272,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('İndirme hatası: $e')),
+        SnackBar(content: Text(hataCevir(e))),
       );
     }
   }  Future<void> _projeSec() async {

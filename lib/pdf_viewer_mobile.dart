@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'utils/error_handler.dart';
 
 class PdfViewerWeb extends StatelessWidget {
   final Uint8List pdfBytes;
@@ -31,7 +32,7 @@ class PdfViewerWeb extends StatelessWidget {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Indirme hatasi: $e')),
+                    SnackBar(content: Text(hataCevir(e))),
                   );
                 }
               }

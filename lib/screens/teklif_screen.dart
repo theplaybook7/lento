@@ -6,6 +6,8 @@ import '../pdf_service.dart';
 import '../pdf_viewer.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
+import '../utils/format_utils.dart' as format_utils;
+import '../utils/error_handler.dart';
 import 'arsiv_screen.dart';
 
 class TeklifSayfasi extends StatefulWidget {
@@ -129,7 +131,7 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Teklif güncellendi')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Güncelleme hatası: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hataCevir(e))));
     }
   }
 
@@ -570,7 +572,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hataCevir(e))));
     }
   }
 
@@ -630,7 +632,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kayıt hatası: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hataCevir(e))));
     }
   }
 
@@ -824,7 +826,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('PDF hatası: $e'),
+            content: Text(hataCevir(e)),
             duration: const Duration(seconds: 5),
           ),
         );

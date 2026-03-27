@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../project_core.dart'; 
 import '../notification_service.dart'; 
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 
 // --------------------------------------------------------------------------
 // 1. ANA LİSTE EKRANI (FİLTRELEMELİ)
@@ -607,7 +608,7 @@ class _MuhasebeTabState extends State<_MuhasebeTab> {
 
       // if (mounted) Navigator.push(context, MaterialPageRoute(builder: (c) => Scaffold(appBar: AppBar(title: const Text("PDF Önizleme")), body: PdfPreview(build: (f) => Future.value(pdf)))));
     } catch (e) {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("PDF Hatası: $e")));
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(hataCevir(e))));
     }
   }
 

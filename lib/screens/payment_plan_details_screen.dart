@@ -8,6 +8,7 @@ import '../models/payment_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/image_utils.dart';
 import '../theme/app_theme.dart';
+import '../utils/error_handler.dart';
 
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
@@ -76,7 +77,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Hata: ${snapshot.error}'));
+            return Center(child: Text(hataCevir(snapshot.error ?? '')));
           }
 
           final installments = snapshot.data ?? [];
@@ -862,7 +863,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
+          SnackBar(content: Text(hataCevir(e))),
         );
       }
     }
@@ -1118,7 +1119,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Güncelleme hatası: $e')),
+          SnackBar(content: Text(hataCevir(e))),
         );
       }
     }

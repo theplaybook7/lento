@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart'; 
 import 'services/payment_notification_service.dart';
 import 'theme/app_theme.dart';
+import 'utils/error_handler.dart';
 import 'payment_service.dart';
 import 'screens/paywall_screen.dart';
 
@@ -416,7 +417,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
       } catch (e) {
         if (mounted) {
           setState(() {
-            _hataMetni = 'Veri yükleme hatası: $e';
+            _hataMetni = hataCevir(e);
           });
         }
       }
@@ -571,7 +572,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Hata: $e")),
+                            SnackBar(content: Text(hataCevir(e))),
                           );
                         }
                       } finally {

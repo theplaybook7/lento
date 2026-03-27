@@ -3,6 +3,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
+import '../utils/responsive_utils.dart' as resp;
 import '../payment_service.dart';
 
 enum PaywallMode { creation, subscription }
@@ -165,14 +166,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(resp.isMobile(context) ? 14.0 : 24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // Premium Icon
               Container(
-                width: 120,
-                height: 120,
+                width: resp.isMobile(context) ? 80 : 120,
+                height: resp.isMobile(context) ? 80 : 120,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -186,7 +187,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   widget.mode == PaywallMode.subscription
                       ? Icons.autorenew
                       : Icons.business,
-                  size: 60,
+                  size: resp.isMobile(context) ? 40 : 60,
                   color: Colors.white,
                 ),
               ),
@@ -231,11 +232,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   children: [
                     Icon(Icons.verified_outlined, size: 16, color: AppTheme.primaryColor),
                     const SizedBox(width: 6),
-                    Text(
-                      'Ödeme App Store üzerinden güvenli şekilde yapılır',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        'Ödeme App Store üzerinden güvenli şekilde yapılır',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -448,14 +451,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(resp.isMobile(context) ? 14.0 : 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
+                    Flexible(child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -472,7 +475,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           ),
                         ),
                       ],
-                    ),
+                    )),
                     if (isPopular)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

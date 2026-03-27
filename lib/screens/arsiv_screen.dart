@@ -83,8 +83,10 @@ class ArsivSayfasi extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       color: AppTheme.primaryColor,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  subtitle: Text("${data['ada']} / ${data['parsel']} - ${tarih.day}.${tarih.month}.${tarih.year}"),
+                  subtitle: Text("${data['ada']} / ${data['parsel']} - ${tarih.day}.${tarih.month}.${tarih.year}", maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

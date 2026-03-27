@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart'; 
 import '../project_core.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive_utils.dart' as resp;
 import 'login_screen.dart';
 
 class AyarlarSayfasi extends StatefulWidget {
@@ -41,20 +42,22 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text("Personel Ekle"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: emailCtrl, 
-                decoration: const InputDecoration(labelText: "Personel E-Mail", border: OutlineInputBorder())
-              ),
-              const SizedBox(height: 10),
-              const Text("Erişim Yetkileri:", style: TextStyle(fontWeight: FontWeight.bold)),
-              const Divider(),
-              CheckboxListTile(title: const Text("Ruhsat İşlemleri"), value: ruhsat, onChanged: (v)=> setDialogState(()=>ruhsat=v!)),
-              CheckboxListTile(title: const Text("Şantiye Takibi"), value: santiye, onChanged: (v)=> setDialogState(()=>santiye=v!)),
-              CheckboxListTile(title: const Text("Muhasebe"), value: muhasebe, onChanged: (v)=> setDialogState(()=>muhasebe=v!)),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: emailCtrl, 
+                  decoration: const InputDecoration(labelText: "Personel E-Mail", border: OutlineInputBorder())
+                ),
+                const SizedBox(height: 10),
+                const Text("Erişim Yetkileri:", style: TextStyle(fontWeight: FontWeight.bold)),
+                const Divider(),
+                CheckboxListTile(title: const Text("Ruhsat İşlemleri"), value: ruhsat, onChanged: (v)=> setDialogState(()=>ruhsat=v!)),
+                CheckboxListTile(title: const Text("Şantiye Takibi"), value: santiye, onChanged: (v)=> setDialogState(()=>santiye=v!)),
+                CheckboxListTile(title: const Text("Muhasebe"), value: muhasebe, onChanged: (v)=> setDialogState(()=>muhasebe=v!)),
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: ()=>Navigator.pop(ctx), child: const Text("İPTAL")),
@@ -104,13 +107,15 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text("${p.email} Yetkileri"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CheckboxListTile(title: const Text("Ruhsat"), value: ruhsat, onChanged: (v)=> setDialogState(()=>ruhsat=v!)),
-              CheckboxListTile(title: const Text("Şantiye"), value: santiye, onChanged: (v)=> setDialogState(()=>santiye=v!)),
-              CheckboxListTile(title: const Text("Muhasebe"), value: muhasebe, onChanged: (v)=> setDialogState(()=>muhasebe=v!)),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CheckboxListTile(title: const Text("Ruhsat"), value: ruhsat, onChanged: (v)=> setDialogState(()=>ruhsat=v!)),
+                CheckboxListTile(title: const Text("Şantiye"), value: santiye, onChanged: (v)=> setDialogState(()=>santiye=v!)),
+                CheckboxListTile(title: const Text("Muhasebe"), value: muhasebe, onChanged: (v)=> setDialogState(()=>muhasebe=v!)),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -160,7 +165,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
         foregroundColor: Colors.white,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(resp.responsivePadding(context)),
         children: [
           const Text("Şirket Bilgileri", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const Divider(),
@@ -193,7 +198,7 @@ class _AyarlarSayfasiState extends State<AyarlarSayfasi> {
             margin: const EdgeInsets.only(bottom: 10),
             child: ListTile(
               leading: Icon(Icons.person, color: p.adminMi ? Colors.red : Colors.blue),
-              title: Text(p.email),
+              title: Text(p.email, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text(
                 "Yetkiler: ${p.goruntulemeMuhasebe ? 'Muhasebe ✅ ' : ''}${p.goruntulemeSantiye ? 'Şantiye ✅ ' : ''}${p.goruntulemeRuhsat ? 'Ruhsat ✅' : ''}",
                 style: const TextStyle(fontSize: 12),

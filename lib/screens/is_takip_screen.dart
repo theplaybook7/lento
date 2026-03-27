@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../project_core.dart'; 
 import '../notification_service.dart'; 
 import '../theme/app_theme.dart';
+import '../utils/responsive_utils.dart' as resp;
 import '../utils/error_handler.dart';
 
 // --------------------------------------------------------------------------
@@ -52,12 +53,18 @@ class IsTakipSayfasi extends StatelessWidget {
       
       // Sadece Ruhsat sayfasında "Yeni Dosya" butonu olur
       floatingActionButton: acilisIndex == 0 
-        ? FloatingActionButton.extended(
-            onPressed: () => _yeniDosyaOlusturDialog(context),
-            backgroundColor: Colors.indigo,
-            icon: const Icon(Icons.add_business, color: Colors.white),
-            label: const Text("YENİ RUHSAT DOSYASI", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          )
+        ? (resp.isMobile(context)
+            ? FloatingActionButton(
+                onPressed: () => _yeniDosyaOlusturDialog(context),
+                backgroundColor: Colors.indigo,
+                child: const Icon(Icons.add_business, color: Colors.white),
+              )
+            : FloatingActionButton.extended(
+                onPressed: () => _yeniDosyaOlusturDialog(context),
+                backgroundColor: Colors.indigo,
+                icon: const Icon(Icons.add_business, color: Colors.white),
+                label: const Text("YENİ RUHSAT DOSYASI", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ))
         : null,
       
       body: StreamBuilder<QuerySnapshot>(

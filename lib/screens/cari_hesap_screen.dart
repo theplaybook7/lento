@@ -492,7 +492,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           children: [
                             Icon(Icons.phone, size: 18, color: Colors.grey.shade600),
                             const SizedBox(width: 8),
-                            Text(telefon),
+                            Expanded(child: Text(telefon, maxLines: 1, overflow: TextOverflow.ellipsis)),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -502,7 +502,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           children: [
                             Icon(Icons.email, size: 18, color: Colors.grey.shade600),
                             const SizedBox(width: 8),
-                            Text(email),
+                            Expanded(child: Text(email, maxLines: 1, overflow: TextOverflow.ellipsis)),
                           ],
                         ),
                         const SizedBox(height: 8),

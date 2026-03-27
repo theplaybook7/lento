@@ -13,6 +13,7 @@ import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
 import '../project_core.dart' show SistemYoneticisi;
 import '../web/web_utils.dart' as web_utils;
+import '../utils/responsive_utils.dart' as resp;
 
 class CariHesapScreen extends StatefulWidget {
   const CariHesapScreen({super.key});
@@ -98,7 +99,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(resp.responsivePadding(context)),
             itemCount: docs.length,
             itemBuilder: (context, index) => _cariKart(context, docs[index]),
           );
@@ -206,7 +207,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(resp.isMobile(context) ? 12 : 16),
           child: Row(
             children: [
               Container(
@@ -220,7 +221,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
                 ),
                 child: Icon(ikon, color: renk, size: 24),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,6 +232,8 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
                         fontWeight: FontWeight.w600,
                         color: AppTheme.primaryColor,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     if (telefon.isNotEmpty) ...[
                       const SizedBox(height: 4),

@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
+import '../utils/responsive_utils.dart' as resp;
 import '../payment_service.dart';
 import '../main.dart' show AuthGate;
 import 'paywall_screen.dart';
@@ -972,7 +973,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(resp.responsivePadding(context)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1171,10 +1172,15 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                                 backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                                 child: Icon(Icons.person, color: AppTheme.primaryColor),
                               ),
-                              title: Text(personel.email),
+                              title: Text(
+                                personel.email,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               subtitle: Text(
                                 _yetkiMetniOlustur(personel),
                                 style: Theme.of(context).textTheme.bodySmall,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,

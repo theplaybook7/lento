@@ -15,6 +15,7 @@ import 'company_finance_dashboard.dart';
 import 'cari_hesap_screen.dart';
 import 'settings_screen.dart';
 import '../services/firebase_service.dart';
+import '../utils/responsive_utils.dart' as resp;
 import '../main.dart' show AuthGate;
 import '../utils/format_utils.dart' as format_utils;
 import '../utils/error_handler.dart';
@@ -557,51 +558,95 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
             )
           : null,
       floatingActionButton: navIndex == 0
-          ? FloatingActionButton.extended(
-              onPressed: () async {
-                if (!mounted) return;
-                // ignore: use_build_context_synchronously
-                final projectId = await Navigator.push<String?>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (c) => NewProjectScreen(companyId: _companyId),
-                  ),
-                );
-                if (!mounted || projectId == null) return;
-                // ignore: use_build_context_synchronously
-                await Navigator.push<void>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (c) => ProjectDetailsScreen(projectId: projectId),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Yeni Proje'),
-              backgroundColor: AppTheme.primaryColor,
-            )
-            : navIndex == 1
-              ? FloatingActionButton.extended(
-                  heroTag: 'yeniTeklif',
-                  onPressed: () {
-                    Navigator.push(
+          ? (resp.isMobile(context)
+              ? FloatingActionButton(
+                  onPressed: () async {
+                    if (!mounted) return;
+                    final projectId = await Navigator.push<String?>(
                       context,
                       MaterialPageRoute(
-                        builder: (c) => const TeklifSayfasi(),
+                        builder: (c) => NewProjectScreen(companyId: _companyId),
+                      ),
+                    );
+                    if (!mounted || projectId == null) return;
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => ProjectDetailsScreen(projectId: projectId),
+                      ),
+                    );
+                  },
+                  backgroundColor: AppTheme.primaryColor,
+                  tooltip: 'Yeni Proje',
+                  child: const Icon(Icons.add),
+                )
+              : FloatingActionButton.extended(
+                  onPressed: () async {
+                    if (!mounted) return;
+                    // ignore: use_build_context_synchronously
+                    final projectId = await Navigator.push<String?>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => NewProjectScreen(companyId: _companyId),
+                      ),
+                    );
+                    if (!mounted || projectId == null) return;
+                    // ignore: use_build_context_synchronously
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (c) => ProjectDetailsScreen(projectId: projectId),
                       ),
                     );
                   },
                   icon: const Icon(Icons.add),
-                  label: const Text('Yeni Teklif'),
+                  label: const Text('Yeni Proje'),
                   backgroundColor: AppTheme.primaryColor,
-                )
+                ))
+            : navIndex == 1
+              ? (resp.isMobile(context)
+                  ? FloatingActionButton(
+                      heroTag: 'yeniTeklif',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => const TeklifSayfasi(),
+                          ),
+                        );
+                      },
+                      backgroundColor: AppTheme.primaryColor,
+                      tooltip: 'Yeni Teklif',
+                      child: const Icon(Icons.add),
+                    )
+                  : FloatingActionButton.extended(
+                      heroTag: 'yeniTeklif',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => const TeklifSayfasi(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Yeni Teklif'),
+                      backgroundColor: AppTheme.primaryColor,
+                    ))
               : navIndex == 2
-                ? FloatingActionButton.extended(
-                    onPressed: () => _yeniCariDialogGlobal(context),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Cari Ekle'),
-                    backgroundColor: AppTheme.primaryColor,
-                  )
+                ? (resp.isMobile(context)
+                    ? FloatingActionButton(
+                        onPressed: () => _yeniCariDialogGlobal(context),
+                        backgroundColor: AppTheme.primaryColor,
+                        tooltip: 'Cari Ekle',
+                        child: const Icon(Icons.add),
+                      )
+                    : FloatingActionButton.extended(
+                        onPressed: () => _yeniCariDialogGlobal(context),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Cari Ekle'),
+                        backgroundColor: AppTheme.primaryColor,
+                      ))
                 : null,
     );
   }
@@ -960,7 +1005,7 @@ class _CarilerTabState extends State<_CarilerTab> {
                               ),
                               child: Icon(ikon, color: renk, size: 24),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -971,6 +1016,8 @@ class _CarilerTabState extends State<_CarilerTab> {
                                       fontWeight: FontWeight.w600,
                                       color: AppTheme.primaryColor,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   if (telefon.toString().isNotEmpty) ...[
                                     const SizedBox(height: 4),

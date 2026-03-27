@@ -13,6 +13,7 @@ import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
 import '../project_core.dart';
 import '../notification_service.dart';
+import '../utils/responsive_utils.dart' as resp;
 import '../web/web_utils.dart' as web_utils;
 import 'payment_plans_screen.dart';
 import 'cari_hesap_screen.dart';
@@ -192,10 +193,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         elevation: 1,
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Muhasebe', icon: Icon(Icons.info_outline, size: 20)),
-            Tab(text: 'Ruhsat', icon: Icon(Icons.description_outlined, size: 20)),
-            Tab(text: 'Şantiye', icon: Icon(Icons.construction_outlined, size: 20)),
+          isScrollable: resp.isMobile(context),
+          tabAlignment: resp.isMobile(context) ? TabAlignment.start : null,
+          tabs: [
+            Tab(text: 'Muhasebe', icon: Icon(Icons.info_outline, size: resp.isMobile(context) ? 18 : 20)),
+            Tab(text: 'Ruhsat', icon: Icon(Icons.description_outlined, size: resp.isMobile(context) ? 18 : 20)),
+            Tab(text: 'Şantiye', icon: Icon(Icons.construction_outlined, size: resp.isMobile(context) ? 18 : 20)),
           ],
           indicatorColor: Colors.white,
           indicatorSize: TabBarIndicatorSize.tab,
@@ -508,7 +511,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     return Column(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: EdgeInsets.all(resp.responsivePadding(context)),
                           child: Column(
                             children: [
                               const Text(
@@ -525,7 +528,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                       color: Colors.green,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: _FinanceCard(
                                       title: 'Gider',
@@ -533,15 +536,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                       color: Colors.red,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _FinanceCard(
-                                      title: 'Kâr',
-                                      amount: finance.profit,
-                                      color: finance.profit >= 0 ? Colors.blue : Colors.orange,
-                                    ),
-                                  ),
                                 ],
+                              ),
+                              const SizedBox(height: 8),
+                              _FinanceCard(
+                                title: 'Kâr',
+                                amount: finance.profit,
+                                color: finance.profit >= 0 ? Colors.blue : Colors.orange,
                               ),
                               const SizedBox(height: 16),
                               Container(
@@ -810,7 +811,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             children: [
               Row(
                 children: [
-                  Text('$tamamlanan/$toplam tamamlandı', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                  Flexible(child: Text('$tamamlanan/$toplam tamamlandı', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700))),
                   if (devamEden > 0) ...[
                     const SizedBox(width: 8),
                     Text('• $devamEden devam ediyor', style: TextStyle(fontSize: 12, color: Colors.orange.shade600)),
@@ -828,12 +829,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 ),
               ),
               const SizedBox(height: 10),
-              Row(
+              Wrap(
+                spacing: 16,
+                runSpacing: 8,
                 children: [
                   _buildLegendItem(Colors.blueGrey.shade400, 'Başlamadı'),
-                  const SizedBox(width: 16),
                   _buildLegendItem(Colors.orange.shade600, 'Devam Ediyor'),
-                  const SizedBox(width: 16),
                   _buildLegendItem(Colors.green.shade600, 'Tamamlandı'),
                 ],
               ),
@@ -1026,10 +1027,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
         actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
         title: Text('Madde $sira', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Text(madde, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
             const SizedBox(height: 16),
             const Text('Durum', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
@@ -1063,6 +1065,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               style: const TextStyle(fontSize: 13),
             ),
           ],
+          ),
         ),
         actions: [
           TextButton(
@@ -1475,8 +1478,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         context: context,
         builder: (context) => Dialog(
           child: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.85,
-            height: MediaQuery.of(context).size.height * 0.85,
+            width: resp.dialogWidth(context),
+            height: resp.dialogHeight(context),
             child: Column(
               children: [
                 // Başlık ve Kapat butonu
@@ -1705,7 +1708,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   Widget _buildSantiyeTab() {
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(resp.responsivePadding(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2839,11 +2842,15 @@ class _FinanceCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            '${format_utils.formatNumber(amount)} ₺',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: color,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '${format_utils.formatNumber(amount)} ₺',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
             ),
           ),
         ],

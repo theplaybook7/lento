@@ -31,6 +31,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   
   // Ruhsat işlem sırası durum yönetimi
   final Map<int, int> _ruhsatDurumlari = {}; // sıra -> durum (0: başlamadı, 1: devam ediyor, 2: tamamlandı)
+  final Map<int, String> _ruhsatNotlari = {}; // sıra -> not metni
   
   // Belgeler
   final List<Map<String, String>> _yuklenenBelgeler = []; // {başlık, tarih, type}
@@ -62,10 +63,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         final data = doc.data();
         final sira = data['sira'] as int?;
         final durum = data['durum'] as int?;
+        final not = data['not'] as String?;
         
-        if (sira != null && durum != null && mounted) {
+        if (sira != null && mounted) {
           setState(() {
-            _ruhsatDurumlari[sira] = durum;
+            if (durum != null) _ruhsatDurumlari[sira] = durum;
+            if (not != null && not.isNotEmpty) _ruhsatNotlari[sira] = not;
           });
         }
       }
@@ -745,7 +748,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       'Statik Proje Belediye Onayı',
       'Elektrik Proje Belediye Onayı',
       'Makine Proje Belediye Onayı',
-      'Akustilk Belediye Onayı',
+      'Akustik Belediye Onayı',
       'Zemin Etütü Belediye Onayı',
       'Harçları Hesaplat Yatır (Otopark Harcı, Proje Kontrol Harcı, Ruhsat Harcı, Tesisat Harcı)',
       'Asansör Proje',
@@ -785,21 +788,53 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Widget _buildRuhsatIslemSirasi(List<String> ruhsatMaddeleri) {
+    // İlerleme hesapla
+    final tamamlanan = _ruhsatDurumlari.values.where((d) => d == 2).length;
+    final devamEden = _ruhsatDurumlari.values.where((d) => d == 1).length;
+    final toplam = ruhsatMaddeleri.length;
+
     return Column(
       children: [
-        // Başlık ve Legendler
-        Padding(
-          padding: const EdgeInsets.all(16),
+        // İlerleme barı ve legend
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+            ],
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  _buildLegendItem(Colors.grey.shade300, 'Başlamadı'),
-                  const SizedBox(width: 24),
-                  _buildLegendItem(Colors.amber.shade100, 'Devam Ediyor'),
-                  const SizedBox(width: 24),
-                  _buildLegendItem(Colors.green.shade100, 'Tamamlandı'),
+                  Text('$tamamlanan/$toplam tamamlandı', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                  if (devamEden > 0) ...[
+                    const SizedBox(width: 8),
+                    Text('• $devamEden devam ediyor', style: TextStyle(fontSize: 12, color: Colors.orange.shade600)),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: toplam > 0 ? tamamlanan / toplam : 0,
+                  backgroundColor: const Color(0xFFE8EAF0),
+                  valueColor: AlwaysStoppedAnimation(Colors.green.shade500),
+                  minHeight: 7,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _buildLegendItem(Colors.blueGrey.shade400, 'Başlamadı'),
+                  const SizedBox(width: 16),
+                  _buildLegendItem(Colors.orange.shade600, 'Devam Ediyor'),
+                  const SizedBox(width: 16),
+                  _buildLegendItem(Colors.green.shade600, 'Tamamlandı'),
                 ],
               ),
             ],
@@ -808,7 +843,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         // Kanban Kartları
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             itemCount: ruhsatMaddeleri.length,
             itemBuilder: (context, index) {
               final madde = ruhsatMaddeleri[index];
@@ -838,164 +873,312 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Widget _buildKanbanCard(String madde, int sira) {
-    // Status: 0 = Başlamadı, 1 = Devam Ediyor, 2 = Tamamlandı
     final statusValue = _ruhsatDurumlari[sira] ?? 0;
+    final not = _ruhsatNotlari[sira];
 
-    final colors = [Colors.grey.shade300, Colors.amber.shade100, Colors.green.shade100];
+    final statusColors = [
+      const Color(0xFFE8EAF0), // Başlamadı - soft grey-blue
+      const Color(0xFFFFF3E0), // Devam Ediyor - warm amber
+      const Color(0xFFE8F5E9), // Tamamlandı - soft green
+    ];
+    final statusAccents = [
+      Colors.blueGrey.shade400,
+      Colors.orange.shade600,
+      Colors.green.shade600,
+    ];
+    final statusIcons = [
+      Icons.radio_button_unchecked,
+      Icons.timelapse_rounded,
+      Icons.check_circle_rounded,
+    ];
     final statusLabels = ['Başlamadı', 'Devam Ediyor', 'Tamamlandı'];
 
     return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Madde $sira - Durum Seç'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (i) => _buildStatusOption(i, statusLabels[i], colors[i], sira, madde)),
+      onTap: () => _showMaddeDialog(sira, madde, statusLabels, statusColors, statusAccents),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: statusColors[statusValue], width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: statusAccents[statusValue].withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Kapat'),
-                  ),
-                ],
+          ],
+        ),
+        child: Column(
+          children: [
+            // Üst renkli şerit
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                color: statusAccents[statusValue],
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(14),
+                  topRight: Radius.circular(14),
+                ),
               ),
-            );
-          },
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            color: colors[statusValue],
-            elevation: 1,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Sıra numarası
                       Container(
-                        width: 42,
-                        height: 42,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [AppTheme.primaryColor.withValues(alpha: 0.9), AppTheme.primaryColor],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ],
+                          color: statusAccents[statusValue].withValues(alpha: 0.12),
                         ),
                         child: Center(
                           child: Text(
                             '$sira',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                            style: TextStyle(
+                              color: statusAccents[statusValue],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
+                      // Madde adı
                       Expanded(
-                        child: Text(
-                          madde,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            height: 1.4,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              madde,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                height: 1.35,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
+                            if (not != null && not.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.sticky_note_2_outlined, size: 14, color: Colors.grey.shade500),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      not,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                        fontStyle: FontStyle.italic,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+                  // Alt durum satırı
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white, width: 1),
-                        ),
-                        child: Text(
-                          statusLabels[statusValue],
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimaryColor,
-                          ),
+                      Icon(statusIcons[statusValue], size: 16, color: statusAccents[statusValue]),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusLabels[statusValue],
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: statusAccents[statusValue],
                         ),
                       ),
-                      const Icon(Icons.touch_app, size: 16, color: Colors.grey),
+                      const Spacer(),
+                      Icon(Icons.edit_note_rounded, size: 18, color: Colors.grey.shade400),
                     ],
                   ),
                 ],
               ),
             ),
-          ),
-        );
+          ],
+        ),
+      ),
+    );
   }
 
-  Widget _buildStatusOption(int index, String label, Color color, int sira, String madde) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: ElevatedButton.icon(
-        onPressed: () async {
-          // Local state güncelle
-          setState(() {
-            _ruhsatDurumlari[sira] = index;
-          });
-          
-          // Firestore'a kaydet
-          await FirebaseFirestore.instance
-              .collection('ruhsat')
-              .doc(widget.projectId)
-              .collection('islemler')
-              .doc('madde_$sira')
-              .set({
-                'sira': sira,
-                'madde': madde,
-                'durum': index,
-                'label': label,
-                'guncellendiTarihi': DateTime.now(),
-              }, SetOptions(merge: true));
-          
-          // Proje adını al ve bildirim gönder
-          final projeDoc = await FirebaseFirestore.instance
-              .collection('projects')
-              .doc(widget.projectId)
-              .get();
-          final projeAdi = projeDoc.data()?['name'] ?? 'Proje';
-          
-          await BildirimServisi.bildirimGonder(
-            baslik: 'Ruhsat Durumu Güncellendi',
-            mesaj: '$projeAdi - $madde: $label',
-            projeId: widget.projectId,
-          );
-          
-          developer.log('✅ Bildirim gönderildi: $projeAdi - $madde: $label');
-          
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Durum: $label olarak işaretlendi')),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.black87,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+  void _showMaddeDialog(int sira, String madde, List<String> statusLabels, List<Color> statusColors, List<Color> statusAccents) {
+    final notController = TextEditingController(text: _ruhsatNotlari[sira] ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+        title: Text('Madde $sira', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(madde, style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+            const SizedBox(height: 16),
+            const Text('Durum', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...List.generate(3, (i) => _buildStatusOption(i, statusLabels[i], statusColors[i], statusAccents[i], sira, madde, notController)),
+            const SizedBox(height: 16),
+            const Text('Not', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: notController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Bu madde hakkında not ekleyin...',
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppTheme.primaryColor),
+                ),
+                contentPadding: const EdgeInsets.all(12),
+              ),
+              style: const TextStyle(fontSize: 13),
+            ),
+          ],
         ),
-        icon: const Icon(Icons.check),
-        label: Text(label, style: const TextStyle(fontSize: 12)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final yeniNot = notController.text.trim();
+              setState(() {
+                if (yeniNot.isEmpty) {
+                  _ruhsatNotlari.remove(sira);
+                } else {
+                  _ruhsatNotlari[sira] = yeniNot;
+                }
+              });
+              await FirebaseFirestore.instance
+                  .collection('ruhsat')
+                  .doc(widget.projectId)
+                  .collection('islemler')
+                  .doc('madde_$sira')
+                  .set({
+                    'sira': sira,
+                    'madde': madde,
+                    'not': yeniNot,
+                  }, SetOptions(merge: true));
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Not kaydedildi')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Notu Kaydet'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusOption(int index, String label, Color bgColor, Color accentColor, int sira, String madde, TextEditingController notController) {
+    final isSelected = (_ruhsatDurumlari[sira] ?? 0) == index;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
+        color: isSelected ? accentColor.withValues(alpha: 0.15) : bgColor.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () async {
+            setState(() {
+              _ruhsatDurumlari[sira] = index;
+            });
+            
+            final yeniNot = notController.text.trim();
+            if (yeniNot.isNotEmpty) {
+              _ruhsatNotlari[sira] = yeniNot;
+            }
+            
+            await FirebaseFirestore.instance
+                .collection('ruhsat')
+                .doc(widget.projectId)
+                .collection('islemler')
+                .doc('madde_$sira')
+                .set({
+                  'sira': sira,
+                  'madde': madde,
+                  'durum': index,
+                  'label': label,
+                  'not': yeniNot,
+                  'guncellendiTarihi': DateTime.now(),
+                }, SetOptions(merge: true));
+            
+            final projeDoc = await FirebaseFirestore.instance
+                .collection('projects')
+                .doc(widget.projectId)
+                .get();
+            final projeAdi = projeDoc.data()?['name'] ?? 'Proje';
+            
+            await BildirimServisi.bildirimGonder(
+              baslik: 'Ruhsat Durumu Güncellendi',
+              mesaj: '$projeAdi - $madde: $label',
+              projeId: widget.projectId,
+            );
+            
+            developer.log('✅ Bildirim gönderildi: $projeAdi - $madde: $label');
+            
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('$madde → $label')),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            child: Row(
+              children: [
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  size: 20,
+                  color: isSelected ? accentColor : Colors.grey.shade400,
+                ),
+                const SizedBox(width: 10),
+                Text(label, style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected ? accentColor : Colors.grey.shade700,
+                )),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

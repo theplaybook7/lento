@@ -7,7 +7,8 @@ class BildirimServisi {
   static Future<void> bildirimGonder({
     required String baslik,
     required String mesaj,
-    required String projeId, 
+    required String projeId,
+    String? modul,
   }) async {
     if (SistemYoneticisi().aktifSirket == null) {
       developer.log('⚠️ Bildirim gönderilemedi: Aktif şirket yok');
@@ -26,14 +27,22 @@ class BildirimServisi {
         'mesaj': mesaj,
         'projeId': projeId,
         'gonderen': gonderenEmail,
+        'modul': modul,
         'tarih': FieldValue.serverTimestamp(),
         'okuyanlar': gonderenEmail == "Sistem" ? [] : [gonderenEmail]
       });
       
-      developer.log('✅ Bildirim Firestore\'a kaydedildi: $baslik - $mesaj (Şirket: $sirketId)');
+      developer.log('✅ Bildirim Firestore\'a kaydedildi: $baslik - $mesaj (Şirket: $sirketId, Modül: $modul)');
     } catch (e) {
       developer.log('❌ Bildirim gönderme hatası: $e');
     }
+  }
+
+  /// Kullanıcının yetkisi olan bildirimleri filtreler
+  static bool _yetkisiVarMi(Map<String, dynamic> bildirim) {
+    final modul = bildirim['modul'] as String?;
+    if (modul == null || modul.isEmpty) return true; // modül yoksa herkese göster
+    return SistemYoneticisi().yetkiVarMi(modul);
   }
 
   static Stream<QuerySnapshot> bildirimleriDinle() {
@@ -44,7 +53,17 @@ class BildirimServisi {
         .doc(SistemYoneticisi().aktifSirket!.id)
         .collection('bildirimler')
         .orderBy('tarih', descending: true)
-        .limit(20)
+        .limit(50)
         .snapshots();
+  }
+
+  /// Yetkiye göre filtrelenmiş okunmamış bildirimleri döndürür
+  static List<QueryDocumentSnapshot> okunmamisBildirimler(QuerySnapshot snapshot) {
+    final email = SistemYoneticisi().girisYapanEmail;
+    return snapshot.docs.where((doc) {
+      final b = doc.data() as Map<String, dynamic>;
+      final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
+      return !okuyanlar.contains(email) && _yetkisiVarMi(b);
+    }).toList();
   }
 }

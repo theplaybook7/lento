@@ -238,11 +238,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
             builder: (context, snapshot) {
               int okunmayanSayisi = 0;
               if (snapshot.hasData && !snapshot.hasError) {
-                okunmayanSayisi = snapshot.data!.docs.where((doc) {
-                  final b = doc.data() as Map<String, dynamic>;
-                  final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
-                  return !okuyanlar.contains(SistemYoneticisi().girisYapanEmail);
-                }).length;
+                okunmayanSayisi = BildirimServisi.okunmamisBildirimler(snapshot.data!).length;
               }
               return Stack(
                 children: [
@@ -760,11 +756,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                   );
                 }
 
-                final okunmamis = snap.data!.docs.where((doc) {
-                  final b = doc.data() as Map<String, dynamic>;
-                  final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
-                  return !okuyanlar.contains(SistemYoneticisi().girisYapanEmail);
-                }).toList();
+                final okunmamis = BildirimServisi.okunmamisBildirimler(snap.data!);
 
                 if (okunmamis.isEmpty) {
                   return const Padding(

@@ -404,11 +404,12 @@ class _RuhsatTabState extends State<_RuhsatTab> {
       await BildirimServisi.bildirimGonder(
         baslik: "Şantiye Başladı!", 
         mesaj: "Ruhsat alındı, şantiye aşamasına geçildi.", 
-        projeId: widget.docId
+        projeId: widget.docId,
+        modul: 'santiye',
       );
     } else {
       if (isAdding) {
-         await BildirimServisi.bildirimGonder(baslik: "Ruhsat İlerlemesi", mesaj: "$asama tamamlandı.", projeId: widget.docId);
+         await BildirimServisi.bildirimGonder(baslik: "Ruhsat İlerlemesi", mesaj: "$asama tamamlandı.", projeId: widget.docId, modul: 'ruhsat');
       }
     }
 
@@ -486,7 +487,7 @@ class _SantiyeTabState extends State<_SantiyeTab> {
     double yuzde = liste.length / _asamalar.length;
     
     if (isAdding) {
-       await BildirimServisi.bildirimGonder(baslik: "Şantiye İlerlemesi", mesaj: "$asama tamamlandı.", projeId: widget.docId);
+       await BildirimServisi.bildirimGonder(baslik: "Şantiye İlerlemesi", mesaj: "$asama tamamlandı.", projeId: widget.docId, modul: 'santiye');
     }
 
     await FirebaseFirestore.instance.collection('teklifler').doc(widget.docId).update({'tamamlanmisAsamalar': liste, 'yuzde': yuzde, 'sonIslem': asama});
@@ -935,7 +936,7 @@ class _GenelAsamaDetaySayfasiState extends State<_GenelAsamaDetaySayfasi> {
           });
           
           if(!context.mounted) return;
-          await BildirimServisi.bildirimGonder(baslik: "Yeni Detay Eklendi", mesaj: "${widget.asamaBasligi} için yeni fotoğraf/not.", projeId: widget.docId);
+          await BildirimServisi.bildirimGonder(baslik: "Yeni Detay Eklendi", mesaj: "${widget.asamaBasligi} için yeni fotoğraf/not.", projeId: widget.docId, modul: 'santiye');
           if(!context.mounted) return;
           Navigator.pop(context);
         }, child: _loading ? const CircularProgressIndicator() : const Text("KAYDET"))

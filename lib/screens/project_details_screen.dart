@@ -1089,6 +1089,20 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     'madde': madde,
                     'not': yeniNot,
                   }, SetOptions(merge: true));
+              // Not değiştiyse bildirim gönder
+              if (yeniNot.isNotEmpty) {
+                final projeDoc = await FirebaseFirestore.instance
+                    .collection('projects')
+                    .doc(widget.projectId)
+                    .get();
+                final projeAdi = projeDoc.data()?['name'] ?? 'Proje';
+                await BildirimServisi.bildirimGonder(
+                  baslik: 'Ruhsat Notu Eklendi',
+                  mesaj: '$projeAdi - Madde $sira: $yeniNot',
+                  projeId: widget.projectId,
+                  modul: 'ruhsat',
+                );
+              }
               if (ctx.mounted) Navigator.pop(ctx);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1151,6 +1165,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               baslik: 'Ruhsat Durumu Güncellendi',
               mesaj: '$projeAdi - $madde: $label',
               projeId: widget.projectId,
+              modul: 'ruhsat',
             );
             
             developer.log('✅ Bildirim gönderildi: $projeAdi - $madde: $label');
@@ -2171,6 +2186,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           baslik: 'Şantiye Durumu Güncellendi',
           mesaj: '$projeAdi - $islemAdi: $label',
           projeId: widget.projectId,
+          modul: 'santiye',
         );
         
         developer.log('✅ Bildirim gönderildi: $projeAdi - $islemAdi: $label');

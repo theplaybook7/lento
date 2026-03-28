@@ -264,8 +264,24 @@ Future<Uint8List> generateSimplePdf({
     }
   }
 
-  const int satirPerPage = 15;
-  final int toplamSayfaSayisi = (tumSatirlar.length / satirPerPage).ceil().clamp(1, 9999);
+  // İlk sayfa: başlık + özet bölümü yer kapladığı için daha az satır
+  const int ilkSayfaSatirSayisi = 10;
+  const int digerSayfaSatirSayisi = 18;
+
+  // Sayfa başına satır gruplarını hesapla
+  final sayfaGruplari = <List<pw.TableRow>>[];
+  {
+    int idx = 0;
+    final ilkLimit = ilkSayfaSatirSayisi.clamp(0, tumSatirlar.length);
+    sayfaGruplari.add(tumSatirlar.sublist(0, ilkLimit));
+    idx = ilkLimit;
+    while (idx < tumSatirlar.length) {
+      final bitis = (idx + digerSayfaSatirSayisi).clamp(0, tumSatirlar.length);
+      sayfaGruplari.add(tumSatirlar.sublist(idx, bitis));
+      idx = bitis;
+    }
+  }
+  final int toplamSayfaSayisi = sayfaGruplari.length;
 
   pw.Widget ozetSatir(String baslik, String deger) {
     return pw.Column(
@@ -279,9 +295,7 @@ Future<Uint8List> generateSimplePdf({
   developer.log('Basit PDF oluşturma başladı', name: 'pdf_service_simple');
 
   for (int sayfaNo = 0; sayfaNo < toplamSayfaSayisi; sayfaNo++) {
-    final baslangic = sayfaNo * satirPerPage;
-    final bitis = (baslangic + satirPerPage).clamp(0, tumSatirlar.length);
-    final sayfaSatirlari = tumSatirlar.sublist(baslangic, bitis);
+    final sayfaSatirlari = sayfaGruplari[sayfaNo];
 
     final ilkSayfa = sayfaNo == 0;
     final sonSayfa = sayfaNo == toplamSayfaSayisi - 1;
@@ -289,7 +303,7 @@ Future<Uint8List> generateSimplePdf({
     developer.log('Sayfa oluşturuluyor', name: 'pdf_service_simple', error: {
       'sayfa': sayfaNo + 1,
       'toplam': toplamSayfaSayisi,
-      'satir_araligi': '$baslangic-$bitis'
+      'satir_sayisi': sayfaSatirlari.length,
     });
 
     pdf.addPage(

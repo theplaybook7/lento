@@ -441,31 +441,7 @@ Future<Uint8List> generateSimplePdf({
                   ],
                 ),
               ),
-              pw.SizedBox(height: 5),
-              pw.Container(
-                padding: const pw.EdgeInsets.all(5),
-                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blueGrey200), color: PdfColors.blue50),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text('FİNANSAL VE TEKNİK AÇIKLAMA:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, decoration: pw.TextDecoration.underline, font: fontBold)),
-                    bulletText('m²: Bağımsız bölümün toplam brüt metrekaresidir (Dubleks/Ters Dubleks/Depolu Dükkan tiplerinde tüm katlar dahildir).', PdfColors.black),
-                    bulletText('BB Maliyeti (Bağımsız Bölüm Maliyeti): Her bağımsız bölümün toplam m² x birim inşaat maliyeti ile hesaplanan yapım bedelidir.', PdfColors.black),
-                    bulletText('Ortak Alan Maliyeti: Asansör, sığınak, otopark vb. ortak alanların bağımsız bölümlere eşit dağıtılmış payıdır.', PdfColors.black),
-                    bulletText('Hibe: Devlet tarafından karşılanan hibe tutarıdır (varsa daire ve/veya dükkan hibesi).', PdfColors.black),
-                    bulletText('Kredi: Devlet destekli kredi tutarıdır (varsa daire ve/veya dükkan kredisi).', PdfColors.black),
-                    if (toprakSutunuVar) bulletText('Top. İade: Müteahhitin ödediği toprak parasının mal sahiplerine eşit dağıtılmış iadesidir.', PdfColors.black),
-                    bulletText('NET: BB Maliyeti + Ortak Alan Maliyeti - Hibe - Kredi - Toprak İadesi = Mal sahibinin ödemesi gereken net tutardır.', PdfColors.black),
-                    pw.SizedBox(height: 4),
-                    bulletText('Dahil edilen ortak alanlar: $ortakAlanAciklamasi.', PdfColors.black),
-                    if (muteahhitVar)
-                      bulletText('Müteahhit, kendi dairelerinin maliyeti olan ${_formatNumber(muteahhitToplamMaliyet)} TL tutarını kendi karşılayacaktır.', PdfColors.red),
-                    if (toprakSutunuVar)
-                      bulletText('Müteahhit tarafından ödenen ${_formatNumber(toplamToprakParasi)} TL toprak parası, mal sahiplerinden düşülmüştür.', PdfColors.red),
-                    if (binaAyriSayfa) bulletText('Bina kesit görünümü bir sonraki sayfada.', PdfColors.blue),
-                  ],
-                ),
-              ),
+
             ],
           ],
         ),
@@ -556,6 +532,30 @@ Future<Uint8List> generateSimplePdf({
                 pw.SizedBox(width: 20),
                 pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.grey300, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('ORTAK ALAN', style: pw.TextStyle(fontSize: 10, font: font))]),
               ],
+            ),
+            pw.SizedBox(height: 10),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(5),
+              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blueGrey200), color: PdfColors.blue50),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('FİNANSAL VE TEKNİK AÇIKLAMA:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, decoration: pw.TextDecoration.underline, font: fontBold)),
+                  bulletText('m²: Bağımsız bölümün toplam brüt metrekaresidir (Dubleks/Ters Dubleks/Depolu Dükkan tiplerinde tüm katlar dahildir).', PdfColors.black),
+                  bulletText('BB Maliyeti (Bağımsız Bölüm Maliyeti): Her bağımsız bölümün toplam m² x birim inşaat maliyeti ile hesaplanan yapım bedelidir.', PdfColors.black),
+                  bulletText('Ortak Alan Maliyeti: Asansör, sığınak, otopark vb. ortak alanların bağımsız bölümlere eşit dağıtılmış payıdır.', PdfColors.black),
+                  bulletText('Hibe: Devlet tarafından karşılanan hibe tutarıdır (varsa daire ve/veya dükkan hibesi).', PdfColors.black),
+                  bulletText('Kredi: Devlet destekli kredi tutarıdır (varsa daire ve/veya dükkan kredisi).', PdfColors.black),
+                  if (toprakSutunuVar) bulletText('Top. İade: Müteahhitin ödediği toprak parasının mal sahiplerine eşit dağıtılmış iadesidir.', PdfColors.black),
+                  bulletText('NET: BB Maliyeti + Ortak Alan Maliyeti - Hibe - Kredi - Toprak İadesi = Mal sahibinin ödemesi gereken net tutardır.', PdfColors.black),
+                  pw.SizedBox(height: 4),
+                  bulletText('Dahil edilen ortak alanlar: $ortakAlanAciklamasi.', PdfColors.black),
+                  if (muteahhitVar)
+                    bulletText('Müteahhit, kendi dairelerinin maliyeti olan ${_formatNumber(muteahhitToplamMaliyet)} TL tutarını kendi karşılayacaktır.', PdfColors.red),
+                  if (toprakSutunuVar)
+                    bulletText('Müteahhit tarafından ödenen ${_formatNumber(toplamToprakParasi)} TL toprak parası, mal sahiplerinden düşülmüştür.', PdfColors.red),
+                ],
+              ),
             ),
           ],
         ),

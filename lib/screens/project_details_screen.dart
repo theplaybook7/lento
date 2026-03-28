@@ -51,6 +51,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     super.initState();
     _firebase = FirebaseService();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() { if (mounted) setState(() {}); });
     _ruhsatVerileriniYukle();
     _belgeleriYukle();
     _santiyeVerileriniYukle();
@@ -195,19 +196,44 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 1,
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: resp.isMobile(context),
-          tabAlignment: resp.isMobile(context) ? TabAlignment.start : null,
-          tabs: [
-            Tab(text: 'Muhasebe', icon: Icon(Icons.info_outline, size: resp.isMobile(context) ? 18 : 20)),
-            Tab(text: 'Ruhsat', icon: Icon(Icons.description_outlined, size: resp.isMobile(context) ? 18 : 20)),
-            Tab(text: 'Şantiye', icon: Icon(Icons.construction_outlined, size: resp.isMobile(context) ? 18 : 20)),
-          ],
-          indicatorColor: Colors.white,
-          indicatorSize: TabBarIndicatorSize.tab,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Row(
+            children: List.generate(3, (i) {
+              final isSelected = _tabController.index == i;
+              final labels = ['Muhasebe', 'Ruhsat', 'Şantiye'];
+              final icons = [Icons.info_outline, Icons.description_outlined, Icons.construction_outlined];
+              final activeColors = [Colors.blue.shade700, Colors.red.shade700, Colors.orange.shade800];
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => _tabController.animateTo(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.white : Colors.transparent,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(10),
+                        topRight: Radius.circular(10),
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icons[i], size: resp.isMobile(context) ? 18 : 20, color: isSelected ? activeColors[i] : Colors.white70),
+                        const SizedBox(height: 2),
+                        Text(labels[i], style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? activeColors[i] : Colors.white70,
+                        )),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
         ),
         actions: [
           if (SistemYoneticisi().isAdminKullanici)

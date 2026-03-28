@@ -264,21 +264,48 @@ Future<Uint8List> generateSimplePdf({
     }
   }
 
-  // İlk sayfa: başlık + özet bölümü yer kapladığı için daha az satır
-  const int ilkSayfaSatirSayisi = 10;
-  const int digerSayfaSatirSayisi = 18;
+  // Dinamik sayfalama - sayfa yüksekliğine göre satır sayısı hesapla
+  final sayfaIcYukseklik = format.height - 30; // 15+15 margin
+  const satirTahminiYukseklik = 35.0;
+  const tabloBaslikYukseklik = 28.0;
+  const ilkSayfaUstBolumYukseklik = 135.0;
+  const devamSayfaUstBolumYukseklik = 30.0;
+  const ozetBolumYukseklik = 130.0;
 
-  // Sayfa başına satır gruplarını hesapla
+  final ilkSayfaKullanilabilir = sayfaIcYukseklik - ilkSayfaUstBolumYukseklik - tabloBaslikYukseklik;
+  final int ilkSayfaMaxOzetsiz = (ilkSayfaKullanilabilir / satirTahminiYukseklik).floor();
+  final int ilkSayfaMaxOzetli = ((ilkSayfaKullanilabilir - ozetBolumYukseklik) / satirTahminiYukseklik).floor();
+
+  final devamKullanilabilir = sayfaIcYukseklik - devamSayfaUstBolumYukseklik - tabloBaslikYukseklik;
+  final int devamMaxOzetsiz = (devamKullanilabilir / satirTahminiYukseklik).floor();
+  final int devamMaxOzetli = ((devamKullanilabilir - ozetBolumYukseklik) / satirTahminiYukseklik).floor();
+
   final sayfaGruplari = <List<pw.TableRow>>[];
   {
     int idx = 0;
-    final ilkLimit = ilkSayfaSatirSayisi.clamp(0, tumSatirlar.length);
-    sayfaGruplari.add(tumSatirlar.sublist(0, ilkLimit));
-    idx = ilkLimit;
-    while (idx < tumSatirlar.length) {
-      final bitis = (idx + digerSayfaSatirSayisi).clamp(0, tumSatirlar.length);
-      sayfaGruplari.add(tumSatirlar.sublist(idx, bitis));
-      idx = bitis;
+    if (tumSatirlar.length <= ilkSayfaMaxOzetli) {
+      // Tek sayfaya sığıyor (özet dahil)
+      sayfaGruplari.add(tumSatirlar);
+    } else {
+      // İlk sayfada kaç satır koyacağız
+      int ilkSayfaSatir = ilkSayfaMaxOzetsiz;
+      if (ilkSayfaSatir >= tumSatirlar.length) {
+        ilkSayfaSatir = ilkSayfaMaxOzetli;
+      }
+      sayfaGruplari.add(tumSatirlar.sublist(0, ilkSayfaSatir));
+      idx = ilkSayfaSatir;
+
+      while (idx < tumSatirlar.length) {
+        final kalan = tumSatirlar.length - idx;
+        if (kalan <= devamMaxOzetli) {
+          sayfaGruplari.add(tumSatirlar.sublist(idx));
+          idx = tumSatirlar.length;
+        } else {
+          final bitis = (idx + devamMaxOzetsiz).clamp(idx + 1, tumSatirlar.length);
+          sayfaGruplari.add(tumSatirlar.sublist(idx, bitis));
+          idx = bitis;
+        }
+      }
     }
   }
   final int toplamSayfaSayisi = sayfaGruplari.length;
@@ -453,6 +480,27 @@ Future<Uint8List> generateSimplePdf({
 
   if (binaAyriSayfa) {
     final reversedIndices = List.generate(katListesi.length, (index) => index).reversed.toList();
+    final gercekKatlar = reversedIndices.where((idx) => (visualFloors[idx] ?? []).isNotEmpty).toList();
+
+    // Dinamik kat yüksekliği hesapla
+    final kesitSayfaYukseklik = format.height - 30;
+    const kesitBaslik = 30.0; // başlık + boşluk
+    const catiYuksekligi = 30.0;
+    const zeminCizgisi = 3.0;
+    const lejantAlani = 45.0; // legend + spacing
+    const katMarjin = 2.0;
+
+    final sabitBolumler = kesitBaslik + catiYuksekligi + zeminCizgisi + lejantAlani;
+    final katlarIcinKalan = kesitSayfaYukseklik - sabitBolumler;
+    final katSayisi = gercekKatlar.length;
+    final katHucresiYukseklik = katSayisi > 0
+        ? ((katlarIcinKalan - (katSayisi * katMarjin)) / katSayisi).clamp(25.0, 60.0)
+        : 55.0;
+
+    // Kat fontunu kat sayısına göre ayarla
+    final katLabelFont = katSayisi > 10 ? 6.0 : 8.0;
+    final katM2Font = katSayisi > 10 ? 6.0 : 8.0;
+    final katSubFont = katSayisi > 10 ? 5.0 : 6.0;
 
     pdf.addPage(
       pw.Page(
@@ -462,66 +510,58 @@ Future<Uint8List> generateSimplePdf({
           children: [
             pw.Text('BİNA KESİT GÖRÜNÜMÜ', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, font: fontBold)),
             pw.SizedBox(height: 10),
-            pw.Expanded(
-              child: pw.Column(
-                mainAxisAlignment: pw.MainAxisAlignment.center,
-                children: [
-                  pw.CustomPaint(
-                    size: const PdfPoint(400, 30),
-                    painter: (canvas, size) {
-                      canvas
-                        ..setFillColor(PdfColors.red700)
-                        ..moveTo(0, 0)
-                        ..lineTo(size.x * 0.5, size.y)
-                        ..lineTo(size.x, 0)
-                        ..closePath()
-                        ..fillPath();
-                    },
-                  ),
-                  ...reversedIndices.map((idx) {
-                    final floor = visualFloors[idx] ?? [];
-                    if (floor.isEmpty) return pw.SizedBox();
-
-                    return pw.Container(
-                      margin: const pw.EdgeInsets.symmetric(vertical: 1),
-                      child: pw.Row(
-                        children: [
-                          pw.Container(
-                            width: 60,
-                            padding: const pw.EdgeInsets.all(3),
-                            decoration: pw.BoxDecoration(border: pw.Border.all(), color: PdfColors.grey200),
-                            child: pw.Center(child: pw.Text(katListesi[idx].ad, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, font: fontBold))),
-                          ),
-                          pw.SizedBox(width: 5),
-                          pw.Expanded(
-                            child: pw.Row(
-                              children: floor.map<pw.Widget>((room) {
-                                return pw.Expanded(
-                                  flex: room['flex'] as int,
-                                  child: pw.Container(
-                                    height: 55,
-                                    decoration: pw.BoxDecoration(color: room['bg'] as PdfColor, border: pw.Border.all(color: room['border'] as PdfColor, width: 1)),
-                                    child: pw.Column(
-                                      mainAxisAlignment: pw.MainAxisAlignment.center,
-                                      children: [
-                                        pw.Text(room['label'] as String, style: pw.TextStyle(fontSize: 8, color: room['textCol'] as PdfColor, font: font), textAlign: pw.TextAlign.center),
-                                        pw.Text('${_formatNumber(room['m2'] as double)} m²', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: room['textCol'] as PdfColor, font: fontBold)),
-                                        pw.Text(room['sub'] as String, style: pw.TextStyle(fontSize: 6, color: room['textCol'] as PdfColor, font: font)),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                  pw.Container(height: 3, color: PdfColors.brown),
-                ],
-              ),
+            pw.CustomPaint(
+              size: const PdfPoint(400, 30),
+              painter: (canvas, size) {
+                canvas
+                  ..setFillColor(PdfColors.red700)
+                  ..moveTo(0, 0)
+                  ..lineTo(size.x * 0.5, size.y)
+                  ..lineTo(size.x, 0)
+                  ..closePath()
+                  ..fillPath();
+              },
             ),
+            ...gercekKatlar.map((idx) {
+              final floor = visualFloors[idx] ?? [];
+              return pw.Container(
+                margin: const pw.EdgeInsets.symmetric(vertical: 1),
+                child: pw.Row(
+                  children: [
+                    pw.Container(
+                      width: 60,
+                      height: katHucresiYukseklik,
+                      padding: const pw.EdgeInsets.all(2),
+                      decoration: pw.BoxDecoration(border: pw.Border.all(), color: PdfColors.grey200),
+                      child: pw.Center(child: pw.Text(katListesi[idx].ad, style: pw.TextStyle(fontSize: katLabelFont, fontWeight: pw.FontWeight.bold, font: fontBold))),
+                    ),
+                    pw.SizedBox(width: 5),
+                    pw.Expanded(
+                      child: pw.Row(
+                        children: floor.map<pw.Widget>((room) {
+                          return pw.Expanded(
+                            flex: room['flex'] as int,
+                            child: pw.Container(
+                              height: katHucresiYukseklik,
+                              decoration: pw.BoxDecoration(color: room['bg'] as PdfColor, border: pw.Border.all(color: room['border'] as PdfColor, width: 1)),
+                              child: pw.Column(
+                                mainAxisAlignment: pw.MainAxisAlignment.center,
+                                children: [
+                                  pw.Text(room['label'] as String, style: pw.TextStyle(fontSize: katLabelFont, color: room['textCol'] as PdfColor, font: font), textAlign: pw.TextAlign.center),
+                                  pw.Text('${_formatNumber(room['m2'] as double)} m²', style: pw.TextStyle(fontSize: katM2Font, fontWeight: pw.FontWeight.bold, color: room['textCol'] as PdfColor, font: fontBold)),
+                                  pw.Text(room['sub'] as String, style: pw.TextStyle(fontSize: katSubFont, color: room['textCol'] as PdfColor, font: font)),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            pw.Container(height: 3, color: PdfColors.brown),
             pw.SizedBox(height: 10),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.center,
@@ -533,37 +573,52 @@ Future<Uint8List> generateSimplePdf({
                 pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.grey300, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('ORTAK ALAN', style: pw.TextStyle(fontSize: 10, font: font))]),
               ],
             ),
-            pw.SizedBox(height: 10),
-            pw.Container(
-              padding: const pw.EdgeInsets.all(5),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blueGrey200), color: PdfColors.blue50),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('FİNANSAL VE TEKNİK AÇIKLAMA:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, decoration: pw.TextDecoration.underline, font: fontBold)),
-                  bulletText('m²: Bağımsız bölümün toplam brüt metrekaresidir (Dubleks/Ters Dubleks/Depolu Dükkan tiplerinde tüm katlar dahildir).', PdfColors.black),
-                  bulletText('BB Maliyeti (Bağımsız Bölüm Maliyeti): Her bağımsız bölümün toplam m² x birim inşaat maliyeti ile hesaplanan yapım bedelidir.', PdfColors.black),
-                  bulletText('Ortak Alan Maliyeti: Asansör, sığınak, otopark vb. ortak alanların bağımsız bölümlere eşit dağıtılmış payıdır.', PdfColors.black),
-                  bulletText('Hibe: Devlet tarafından karşılanan hibe tutarıdır (varsa daire ve/veya dükkan hibesi).', PdfColors.black),
-                  bulletText('Kredi: Devlet destekli kredi tutarıdır (varsa daire ve/veya dükkan kredisi).', PdfColors.black),
-                  if (toprakSutunuVar) bulletText('Top. İade: Müteahhitin ödediği toprak parasının mal sahiplerine eşit dağıtılmış iadesidir.', PdfColors.black),
-                  bulletText('NET: BB Maliyeti + Ortak Alan Maliyeti - Hibe - Kredi - Toprak İadesi = Mal sahibinin ödemesi gereken net tutardır.', PdfColors.black),
-                  pw.SizedBox(height: 4),
-                  bulletText('Dahil edilen ortak alanlar: $ortakAlanAciklamasi.', PdfColors.black),
-                  if (muteahhitVar)
-                    bulletText('Müteahhit, kendi dairelerinin maliyeti olan ${_formatNumber(muteahhitToplamMaliyet)} TL tutarını kendi karşılayacaktır.', PdfColors.red),
-                  if (toprakSutunuVar)
-                    bulletText('Müteahhit tarafından ödenen ${_formatNumber(toplamToprakParasi)} TL toprak parası, mal sahiplerinden düşülmüştür.', PdfColors.red),
-                ],
-              ),
-            ),
           ],
         ),
       ),
     );
 
-    developer.log('İkinci sayfa (bina krokisi) eklendi', name: 'pdf_service_simple');
+    developer.log('Bina krokisi sayfası eklendi', name: 'pdf_service_simple');
   }
+
+  // Finansal ve Teknik Açıklama - son sayfa
+  pdf.addPage(
+    pw.Page(
+      pageFormat: format,
+      margin: const pw.EdgeInsets.all(15),
+      build: (context) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.blueGrey200), color: PdfColors.blue50, borderRadius: pw.BorderRadius.circular(4)),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('FİNANSAL VE TEKNİK AÇIKLAMA:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, decoration: pw.TextDecoration.underline, font: fontBold)),
+                pw.SizedBox(height: 6),
+                bulletText('m²: Bağımsız bölümün toplam brüt metrekaresidir (Dubleks/Ters Dubleks/Depolu Dükkan tiplerinde tüm katlar dahildir).', PdfColors.black),
+                bulletText('BB Maliyeti (Bağımsız Bölüm Maliyeti): Her bağımsız bölümün toplam m² x birim inşaat maliyeti ile hesaplanan yapım bedelidir.', PdfColors.black),
+                bulletText('Ortak Alan Maliyeti: Asansör, sığınak, otopark vb. ortak alanların bağımsız bölümlere eşit dağıtılmış payıdır.', PdfColors.black),
+                bulletText('Hibe: Devlet tarafından karşılanan hibe tutarıdır (varsa daire ve/veya dükkan hibesi).', PdfColors.black),
+                bulletText('Kredi: Devlet destekli kredi tutarıdır (varsa daire ve/veya dükkan kredisi).', PdfColors.black),
+                if (toprakSutunuVar) bulletText('Top. İade: Müteahhitin ödediği toprak parasının mal sahiplerine eşit dağıtılmış iadesidir.', PdfColors.black),
+                bulletText('NET: BB Maliyeti + Ortak Alan Maliyeti - Hibe - Kredi - Toprak İadesi = Mal sahibinin ödemesi gereken net tutardır.', PdfColors.black),
+                pw.SizedBox(height: 6),
+                bulletText('Dahil edilen ortak alanlar: $ortakAlanAciklamasi.', PdfColors.black),
+                if (muteahhitVar)
+                  bulletText('Müteahhit, kendi dairelerinin maliyeti olan ${_formatNumber(muteahhitToplamMaliyet)} TL tutarını kendi karşılayacaktır.', PdfColors.red),
+                if (toprakSutunuVar)
+                  bulletText('Müteahhit tarafından ödenen ${_formatNumber(toplamToprakParasi)} TL toprak parası, mal sahiplerinden düşülmüştür.', PdfColors.red),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  developer.log('Finansal açıklama sayfası eklendi', name: 'pdf_service_simple');
 
   final bytes = await pdf.save();
   developer.log('PDF kaydedildi #$callNo', name: 'pdf_service_simple', error: bytes.length);

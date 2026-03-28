@@ -795,22 +795,60 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
               stream: BildirimServisi.bildirimleriDinle(),
               builder: (ctx, snap) {
                 if (snap.hasError || !snap.hasData || snap.data!.docs.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('Bildirim yok'),
+                  return Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.notifications_off_outlined, size: 40, color: Colors.grey.shade300),
+                        const SizedBox(height: 8),
+                        Text('Bildirim yok', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                      ],
+                    ),
                   );
                 }
 
                 final okunmamis = BildirimServisi.okunmamisBildirimler(snap.data!);
 
                 if (okunmamis.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('Bildirim yok'),
+                  return Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_circle_outline, size: 40, color: Colors.green.shade300),
+                        const SizedBox(height: 8),
+                        Text('Tüm bildirimler okundu', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                      ],
+                    ),
                   );
                 }
 
-                return ListView.builder(
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.notifications_active, size: 18, color: Colors.deepOrange),
+                          const SizedBox(width: 6),
+                          Text('Bildirimler', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.deepOrange,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text('${okunmamis.length}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: Colors.grey.shade200),
+                    const SizedBox(height: 4),
+                    ListView.builder(
                   shrinkWrap: true,
                   itemCount: okunmamis.length,
                   itemBuilder: (ctx, i) {
@@ -820,6 +858,44 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     final mesaj = b['mesaj'] ?? '';
                     final gonderen = b['gonderen'] ?? '';
                     final projeId = b['projeId'] ?? '';
+                    final modul = b['modul'] ?? '';
+                    final tarih = b['tarih'] as Timestamp?;
+
+                    // Modüle göre renk ve ikon
+                    Color modulRenk;
+                    IconData modulIkon;
+                    switch (modul) {
+                      case 'ruhsat':
+                        modulRenk = Colors.red;
+                        modulIkon = Icons.description_outlined;
+                        break;
+                      case 'santiye':
+                        modulRenk = Colors.orange;
+                        modulIkon = Icons.construction;
+                        break;
+                      case 'muhasebe':
+                        modulRenk = Colors.blue;
+                        modulIkon = Icons.account_balance_wallet;
+                        break;
+                      default:
+                        modulRenk = Colors.teal;
+                        modulIkon = Icons.notifications_active;
+                    }
+
+                    // Zaman farkı
+                    String zamanStr = '';
+                    if (tarih != null) {
+                      final fark = DateTime.now().difference(tarih.toDate());
+                      if (fark.inMinutes < 1) {
+                        zamanStr = 'Az önce';
+                      } else if (fark.inMinutes < 60) {
+                        zamanStr = '${fark.inMinutes} dk önce';
+                      } else if (fark.inHours < 24) {
+                        zamanStr = '${fark.inHours} saat önce';
+                      } else {
+                        zamanStr = '${fark.inDays} gün önce';
+                      }
+                    }
 
                     return InkWell(
                       onTap: () async {
@@ -841,29 +917,61 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         );
                       },
                       child: Container(
-                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.symmetric(vertical: 3),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                          color: modulRenk.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border(left: BorderSide(color: modulRenk, width: 3)),
                         ),
-                        child: Column(
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(baslik, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            const SizedBox(height: 6),
-                            Text(mesaj, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                            if (gonderen.toString().isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Text(
-                                  'Yapan: $gonderen',
-                                  style: const TextStyle(fontSize: 11, color: Colors.black54),
-                                ),
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: modulRenk.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
                               ),
+                              child: Icon(modulIkon, size: 16, color: modulRenk),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(baslik, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: modulRenk)),
+                                      ),
+                                      if (zamanStr.isNotEmpty)
+                                        Text(zamanStr, style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(mesaj, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+                                  if (gonderen.toString().isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.person_outline, size: 12, color: Colors.grey.shade500),
+                                          const SizedBox(width: 3),
+                                          Text(gonderen.toString(), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     );
                   },
+                ),
+                  ],
                 );
               },
             ),

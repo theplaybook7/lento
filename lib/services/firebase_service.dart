@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/project_model.dart';
 import '../models/payment_model.dart';
+import '../project_core.dart';
 import 'dart:developer' as developer;
 
 class FirebaseService {
@@ -295,40 +296,49 @@ class FirebaseService {
     }
   }
 
-  /// Proje finansmanı özetini al (transactions'dan canlı hesapla)
+  /// Proje finansmanı özetini al (gerçek cari hareketlerinden hesapla)
   Future<ProjectFinance> getProjectFinanceSummary(String projectId) async {
     try {
-      final docFuture = _db.collection('project_finance').doc(projectId).get();
-      final txFuture = _db
-          .collection('project_finance')
-          .doc(projectId)
-          .collection('transactions')
-          .get();
-      
-      final results = await Future.wait([docFuture, txFuture]);
-      final doc = results[0] as DocumentSnapshot;
-      final txSnapshot = results[1] as QuerySnapshot;
-
-      if (!doc.exists && txSnapshot.docs.isEmpty) {
-        return ProjectFinance(projectId: projectId);
-      }
-
+      final doc = await _db.collection('project_finance').doc(projectId).get();
       final data = (doc.data() as Map<String, dynamic>?) ?? {};
 
-      // Transactions alt koleksiyonundan canlı hesapla
+      // Bu projeye bağlı tüm carileri bul
+      final sirketId = SistemYoneticisi().aktifSirket?.id ?? '';
+      final cariSnap = await _db
+          .collection('cari_hesaplar')
+          .where('sirketId', isEqualTo: sirketId)
+          .get();
+
       double totalIncome = 0;
       double totalExpenses = 0;
-      for (var txDoc in txSnapshot.docs) {
-        final txData = txDoc.data() as Map<String, dynamic>;
-        final amount = (txData['amount'] ?? 0).toDouble();
-        if (txData['type'] == 'income') {
-          totalIncome += amount;
-        } else {
-          totalExpenses += amount;
+
+      // Her carinin bu projeye ait hareketlerini say
+      for (final cariDoc in cariSnap.docs) {
+        final cariData = cariDoc.data();
+        final pids = List<String>.from(cariData['projectIds'] ?? []);
+        final pid = cariData['projectId'] ?? '';
+        if (!pids.contains(projectId) && pid != projectId) continue;
+
+        final hareketSnap = await _db
+            .collection('cari_hesaplar')
+            .doc(cariDoc.id)
+            .collection('hareketler')
+            .where('projeId', isEqualTo: projectId)
+            .get();
+
+        for (final hDoc in hareketSnap.docs) {
+          final hData = hDoc.data();
+          final tutarTL = ((hData['tutarTL'] ?? hData['tutar'] ?? 0.0) as num).toDouble();
+          final tip = hData['tip'] ?? 'borc';
+          if (tip == 'alacak') {
+            totalIncome += tutarTL;
+          } else if (tip == 'borc') {
+            totalExpenses += tutarTL;
+          }
         }
       }
 
-      // Eğer cached değerlerle uyuşmuyorsa düzelt
+      // Cached değerleri güncelle
       final cachedIncome = (data['totalIncome'] ?? 0).toDouble();
       final cachedExpenses = (data['totalExpenses'] ?? 0).toDouble();
       if ((cachedIncome - totalIncome).abs() > 0.01 || (cachedExpenses - totalExpenses).abs() > 0.01) {

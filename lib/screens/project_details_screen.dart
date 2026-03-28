@@ -37,6 +37,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   // Belgeler
   final List<Map<String, String>> _yuklenenBelgeler = []; // {başlık, tarih, type}
   
+  // Ruhsat arama
+  String _ruhsatArama = '';
+  String _belgeArama = '';
+
   // Şantiye durum yönetimi
   int _santiyeKatSayisi = 0; // Kullanıcının girdiği kat sayısı
   final Map<int, int> _santiyeDurumlari = {}; // sıra -> durum (0: başlamadı, 1: devam ediyor, 2: tamamlandı)
@@ -772,6 +776,40 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             indicatorColor: AppTheme.primaryColor,
             labelColor: AppTheme.primaryColor,
           ),
+          // Arama alanı
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Ara...',
+                prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
+                suffixIcon: (_ruhsatArama.isNotEmpty || _belgeArama.isNotEmpty)
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () => setState(() {
+                          _ruhsatArama = '';
+                          _belgeArama = '';
+                        }),
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              onChanged: (val) => setState(() {
+                _ruhsatArama = val.toLowerCase();
+                _belgeArama = val.toLowerCase();
+              }),
+            ),
+          ),
           // Tab Content
           Expanded(
             child: TabBarView(
@@ -843,12 +881,39 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         ),
         // Kanban Kartları
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            itemCount: ruhsatMaddeleri.length,
-            itemBuilder: (context, index) {
-              final madde = ruhsatMaddeleri[index];
-              return _buildKanbanCard(madde, index + 1);
+          child: Builder(
+            builder: (context) {
+              final filtrelenmis = <MapEntry<int, String>>[];
+              for (int i = 0; i < ruhsatMaddeleri.length; i++) {
+                final madde = ruhsatMaddeleri[i];
+                final sira = i + 1;
+                if (_ruhsatArama.isEmpty ||
+                    madde.toLowerCase().contains(_ruhsatArama) ||
+                    (_ruhsatNotlari[sira]?.toLowerCase().contains(_ruhsatArama) ?? false) ||
+                    sira.toString() == _ruhsatArama) {
+                  filtrelenmis.add(MapEntry(sira, madde));
+                }
+              }
+              if (filtrelenmis.isEmpty && _ruhsatArama.isNotEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: Colors.grey.shade300),
+                      const SizedBox(height: 12),
+                      Text('"$_ruhsatArama" için sonuç bulunamadı', style: TextStyle(color: Colors.grey.shade500)),
+                    ],
+                  ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                itemCount: filtrelenmis.length,
+                itemBuilder: (context, index) {
+                  final entry = filtrelenmis[index];
+                  return _buildKanbanCard(entry.value, entry.key);
+                },
+              );
             },
           ),
         ),
@@ -1243,12 +1308,37 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           )
         else
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _yuklenenBelgeler.length,
-              itemBuilder: (context, index) {
-                final belge = _yuklenenBelgeler[index];
-                return _buildBelgeKarti(belge, index);
+            child: Builder(
+              builder: (context) {
+                final filtrelenmis = <MapEntry<int, Map<String, String>>>[];
+                for (int i = 0; i < _yuklenenBelgeler.length; i++) {
+                  final belge = _yuklenenBelgeler[i];
+                  if (_belgeArama.isEmpty ||
+                      (belge['başlık']?.toLowerCase().contains(_belgeArama) ?? false) ||
+                      (belge['tarih']?.toLowerCase().contains(_belgeArama) ?? false)) {
+                    filtrelenmis.add(MapEntry(i, belge));
+                  }
+                }
+                if (filtrelenmis.isEmpty && _belgeArama.isNotEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 48, color: Colors.grey.shade300),
+                        const SizedBox(height: 12),
+                        Text('"$_belgeArama" için belge bulunamadı', style: TextStyle(color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: filtrelenmis.length,
+                  itemBuilder: (context, index) {
+                    final entry = filtrelenmis[index];
+                    return _buildBelgeKarti(entry.value, entry.key);
+                  },
+                );
               },
             ),
           ),

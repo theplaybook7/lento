@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -1450,6 +1451,92 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   final _firebase = FirebaseService();
   final _searchController = TextEditingController();
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _ruhsatPasifBildirimKontrol();
+  }
+
+  /// Tüm projeleri kontrol edip 10+ gün pasif olanlar için bildirim gönderir.
+  /// Günde bir kez çalışır (Firestore'da son kontrol tarihini tutar).
+  Future<void> _ruhsatPasifBildirimKontrol() async {
+    if (!SistemYoneticisi().yetkiVarMi('ruhsat')) return;
+    final sirketId = SistemYoneticisi().aktifSirket?.id;
+    if (sirketId == null) return;
+
+    try {
+      // Günde bir kez kontrol et
+      final kontrolRef = FirebaseFirestore.instance
+          .collection('sirketler').doc(sirketId)
+          .collection('sistem').doc('ruhsat_pasif_kontrol');
+      final kontrolDoc = await kontrolRef.get();
+      if (kontrolDoc.exists) {
+        final sonKontrol = kontrolDoc.data()?['sonKontrol'];
+        if (sonKontrol != null) {
+          final sonTarih = sonKontrol is Timestamp ? sonKontrol.toDate() : (sonKontrol is DateTime ? sonKontrol : null);
+          if (sonTarih != null && DateTime.now().difference(sonTarih).inHours < 24) {
+            return; // Son 24 saatte zaten kontrol edilmiş
+          }
+        }
+      }
+
+      // Tüm projeleri al
+      final projeler = await FirebaseFirestore.instance
+          .collection('projects')
+          .where('companyId', isEqualTo: sirketId)
+          .get();
+
+      for (final proje in projeler.docs) {
+        final projeData = proje.data();
+        if (projeData['isArchived'] == true) continue;
+        final projeAdi = projeData['name'] ?? 'Proje';
+
+        final islemler = await FirebaseFirestore.instance
+            .collection('ruhsat').doc(proje.id)
+            .collection('islemler').get();
+
+        if (islemler.docs.isEmpty) continue;
+
+        int tamamlanan = 0;
+        DateTime? sonIslem;
+        for (final doc in islemler.docs) {
+          final d = doc.data();
+          if ((d['durum'] as int? ?? 0) == 2) tamamlanan++;
+          final gt = d['guncellendiTarihi'];
+          if (gt != null) {
+            DateTime? t;
+            if (gt is Timestamp) {
+              t = gt.toDate();
+            } else if (gt is DateTime) {
+              t = gt;
+            }
+            if (t != null && (sonIslem == null || t.isAfter(sonIslem))) sonIslem = t;
+          }
+        }
+
+        // Tümü tamamlandıysa bildirim gerekmez
+        if (tamamlanan >= _ruhsatMaddeleri.length) continue;
+
+        if (sonIslem != null) {
+          final pasifGun = DateTime.now().difference(sonIslem).inDays;
+          if (pasifGun >= 10) {
+            await BildirimServisi.bildirimGonder(
+              baslik: '⚠️ Ruhsat İşlem Uyarısı',
+              mesaj: '$projeAdi projesinde $pasifGun gündür ruhsat işlemi yapılmadı!',
+              projeId: proje.id,
+              modul: 'ruhsat',
+            );
+          }
+        }
+      }
+
+      // Son kontrol tarihini güncelle
+      await kontrolRef.set({'sonKontrol': FieldValue.serverTimestamp()});
+    } catch (e) {
+      developer.log('Ruhsat pasif bildirim kontrol hatası: $e', name: 'dashboard');
+    }
+  }
 
   static const _ruhsatMaddeleri = [
     'LİHKAB BAŞVURU',

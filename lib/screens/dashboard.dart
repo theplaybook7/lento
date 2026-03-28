@@ -1512,6 +1512,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
     int tamamlanan = 0;
     int devamEden = 0;
     int sonTamamlananSira = 0;
+    DateTime? sonIslemTarihi;
 
     for (var doc in snapshot.docs) {
       final data = doc.data();
@@ -1522,6 +1523,20 @@ class _ProjectsTabState extends State<_ProjectsTab> {
         if (sira > sonTamamlananSira) sonTamamlananSira = sira;
       }
       if (durum == 1) devamEden++;
+
+      // En son işlem tarihini bul
+      final gt = data['guncellendiTarihi'];
+      if (gt != null) {
+        DateTime? t;
+        if (gt is Timestamp) {
+          t = gt.toDate();
+        } else if (gt is DateTime) {
+          t = gt;
+        }
+        if (t != null && (sonIslemTarihi == null || t.isAfter(sonIslemTarihi))) {
+          sonIslemTarihi = t;
+        }
+      }
     }
 
     // Şu anki aşama: devam eden varsa onu göster, yoksa son tamamlananın sonraki adımı
@@ -1542,6 +1557,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
       'devamEden': devamEden,
       'toplam': _ruhsatMaddeleri.length,
       'aktifSira': aktifSira,
+      'sonIslemTarihi': sonIslemTarihi,
     };
   }
 
@@ -1750,6 +1766,12 @@ class _ProjectsTabState extends State<_ProjectsTab> {
 
                                 if (tamamlanan == 0 && devamEden == 0) return const SizedBox.shrink();
 
+                                final sonIslemTarihi = r['sonIslemTarihi'] as DateTime?;
+                                int pasifGunSayisi = 0;
+                                if (sonIslemTarihi != null && tamamlanan < toplam) {
+                                  pasifGunSayisi = DateTime.now().difference(sonIslemTarihi).inDays;
+                                }
+
                                 final aktifMadde = aktifSira > 0 && aktifSira <= _ruhsatMaddeleri.length
                                     ? _ruhsatMaddeleri[aktifSira - 1]
                                     : null;
@@ -1810,6 +1832,27 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                             minHeight: 5,
                                           ),
                                         ),
+                                        if (pasifGunSayisi >= 10 && !tamamlandi) ...[
+                                          const SizedBox(height: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.red),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '$pasifGunSayisi gündür işlem yapılmadı!',
+                                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                         if (aktifMadde != null && !tamamlandi) ...[
                                           const SizedBox(height: 6),
                                           Text(

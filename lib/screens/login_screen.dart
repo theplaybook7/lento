@@ -621,6 +621,11 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                         hataMetni = null;
                       });
 
+                      // Auth state değişikliğini bypass et —
+                      // createUserWithEmailAndPassword otomatik giriş yapar,
+                      // AuthGate'in VeriYuklemeEkrani'na geçmesini engelle.
+                      companyCreationInProgress.value = true;
+
                       try {
                         // Firebase Auth'ta kullanıcı oluştur
                         final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -646,6 +651,11 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           // Şirket eşleşmesi opsiyonel — login'de de yapılır
                         }
 
+                        // Kullanıcıyı çıkış yaptır (giriş ekranından girmesi için)
+                        await FirebaseAuth.instance.signOut();
+
+                        companyCreationInProgress.value = false;
+
                         if (!ctx.mounted || !mounted) return;
                         Navigator.pop(ctx);
 
@@ -658,10 +668,8 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                             ),
                           );
                         }
-
-                        // Kullanıcıyı çıkış yaptır (giriş ekranından girmesi için)
-                        await FirebaseAuth.instance.signOut();
                       } catch (e) {
+                        companyCreationInProgress.value = false;
                         setDialogState(() {
                           kayitLoading = false;
                           hataMetni = hataCevir(e);

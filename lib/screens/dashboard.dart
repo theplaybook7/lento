@@ -1768,7 +1768,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
 
                                 final sonIslemTarihi = r['sonIslemTarihi'] as DateTime?;
                                 int pasifGunSayisi = 0;
-                                if (sonIslemTarihi != null && tamamlanan < toplam) {
+                                if (sonIslemTarihi != null) {
                                   pasifGunSayisi = DateTime.now().difference(sonIslemTarihi).inDays;
                                 }
 
@@ -1832,7 +1832,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                             minHeight: 5,
                                           ),
                                         ),
-                                        if (pasifGunSayisi >= 10 && !tamamlandi) ...[
+                                        if (pasifGunSayisi >= 10) ...[
                                           const SizedBox(height: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

@@ -1832,7 +1832,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                             minHeight: 5,
                                           ),
                                         ),
-                                        if (pasifGunSayisi >= 10) ...[
+                                        if (pasifGunSayisi >= 10 && !tamamlandi) ...[
                                           const SizedBox(height: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

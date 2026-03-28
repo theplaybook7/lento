@@ -128,7 +128,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                     }
                   }
                   
-                  print('DEBUG: Taksit ${inst.installmentNumber} - Toplam Ödenmiş: $totalPaid / ${inst.amount}');
+                  // Debug removed for production
                   
                   final isPartiallyPaid = totalPaid > 0 && totalPaid < inst.amount && !inst.isPaid;
                   
@@ -998,8 +998,9 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                   if (paraBirimi != 'TL') ...[Builder(builder: (context) {
                     final tutar = _parseFormattedAmount(paidAmountCtrl.text);
                     double kur = 0;
-                    if (paraBirimi == 'USD') kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
-                    else if (paraBirimi == 'EUR') kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
+                    if (paraBirimi == 'USD') {
+                      kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
+                    } else if (paraBirimi == 'EUR') kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
                     else if (paraBirimi == 'GBP') kur = double.tryParse(kurGBPCtrl.text.replaceAll(',', '.')) ?? 0;
                     else if (paraBirimi == 'ALTIN') kur = double.tryParse(altinKurCtrl.text.replaceAll(',', '.')) ?? 0;
                     if (tutar > 0 && kur > 0) {
@@ -1048,8 +1049,9 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
                   double tlTutar = paidAmount;
                   if (paraBirimi != 'TL') {
                     double kur = 0;
-                    if (paraBirimi == 'USD') kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
-                    else if (paraBirimi == 'EUR') kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
+                    if (paraBirimi == 'USD') {
+                      kur = double.tryParse(kurUSDCtrl.text.replaceAll(',', '.')) ?? 0;
+                    } else if (paraBirimi == 'EUR') kur = double.tryParse(kurEURCtrl.text.replaceAll(',', '.')) ?? 0;
                     else if (paraBirimi == 'GBP') kur = double.tryParse(kurGBPCtrl.text.replaceAll(',', '.')) ?? 0;
                     else if (paraBirimi == 'ALTIN') kur = double.tryParse(altinKurCtrl.text.replaceAll(',', '.')) ?? 0;
                     if (kur <= 0) {

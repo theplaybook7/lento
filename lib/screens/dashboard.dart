@@ -1178,11 +1178,6 @@ class _TekliflerListesiState extends State<_TekliflerListesi> {
                     checkmarkColor: AppTheme.primaryColor,
                   ),
                   FilterChip(
-                    label: const Text("Tamamlandı"),
-                    selected: _durumFiltre == 'tamamlandi',
-                    onSelected: (v) => setState(() => _durumFiltre = 'tamamlandi'),
-                  ),
-                  FilterChip(
                     label: const Text("Tümü"),
                     selected: _durumFiltre == 'all',
                     onSelected: (v) => setState(() => _durumFiltre = 'all'),

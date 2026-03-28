@@ -186,12 +186,13 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
             color: AppTheme.primaryColor,
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: yeniSifre1Ctrl,
-              obscureText: true,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: yeniSifre1Ctrl,
+                obscureText: true,
               decoration: InputDecoration(
                 labelText: "Yeni Şifre",
                 prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryColor),
@@ -229,6 +230,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
               ),
             ),
           ],
+          ),
         ),
         actions: [
           TextButton(
@@ -343,19 +345,21 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Onay"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Silme işlemini onaylamak için email adresinizi yazın:"),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailCtrl,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Silme işlemini onaylamak için email adresinizi yazın:"),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailCtrl,
               decoration: InputDecoration(
                 hintText: userEmail,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
             ),
           ],
+          ),
         ),
         actions: [
           TextButton(
@@ -1316,6 +1320,22 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     ),
                   ),
                   const SizedBox(height: 32),
+                  // Yasal Bilgiler
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () => launchUrl(Uri.parse('https://insaat-yonetim-takip.web.app/privacy.html'), mode: LaunchMode.externalApplication),
+                        child: Text('Gizlilik Politikası', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, decoration: TextDecoration.underline)),
+                      ),
+                      Text(' | ', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                      TextButton(
+                        onPressed: () => launchUrl(Uri.parse('https://insaat-yonetim-takip.web.app/terms.html'), mode: LaunchMode.externalApplication),
+                        child: Text('Kullanım Koşulları', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, decoration: TextDecoration.underline)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),

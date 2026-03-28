@@ -1666,7 +1666,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         ),
       );
     } catch (e) {
-      print('_buildWebPreview hatasi: $e');
+      developer.log('_buildWebPreview hatasi: $e');
       return _buildPreviewError(message: e.toString());
     }
   }

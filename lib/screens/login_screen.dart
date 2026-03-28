@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:typed_data';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
@@ -878,6 +879,21 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                         ),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () => launchUrl(Uri.parse('https://insaat-yonetim-takip.web.app/privacy.html'), mode: LaunchMode.externalApplication),
+                        child: Text('Gizlilik Politikası', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, decoration: TextDecoration.underline)),
+                      ),
+                      Text(' | ', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                      TextButton(
+                        onPressed: () => launchUrl(Uri.parse('https://insaat-yonetim-takip.web.app/terms.html'), mode: LaunchMode.externalApplication),
+                        child: Text('Kullanım Koşulları', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, decoration: TextDecoration.underline)),
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -267,6 +267,16 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
         }
 
         if (bulunanSirket == null) {
+          // User doc yoksa oluştur (Firestore security rules hasUserSirketId için gerekli)
+          if (!userDoc.exists) {
+            try {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .set({'email': email}, SetOptions(merge: true));
+            } catch (_) {}
+          }
+
           // sirketId yoksa veya şirket bulunamadıysa, email ile tüm şirketlerde ara
           try {
             final emailQuery = await FirebaseFirestore.instance

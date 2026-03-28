@@ -18,10 +18,13 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId;
     }
 
-    // Kullanıcının sirketId'si var mı kontrol et (yoksa null döner)
+    // Kullanıcının sirketId'si var mı kontrol et
+    // exists() kontrolü ile yeni kayıt olan kullanıcıların doc'u yoksa hata vermesini engeller
     function hasUserSirketId() {
-      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return 'sirketId' in userData && userData.sirketId != null && userData.sirketId != '';
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && 'sirketId' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId != '';
     }
 
     // Users koleksiyonu

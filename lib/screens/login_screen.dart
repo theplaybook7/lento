@@ -633,6 +633,14 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           password: passCtrl.text.trim(),
                         );
 
+                        // Önce user doc oluştur (Firestore security rules için gerekli)
+                        if (credential.user != null) {
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(credential.user!.uid)
+                              .set({'email': emailCtrl.text.trim().toLowerCase()}, SetOptions(merge: true));
+                        }
+
                         // Email ile eşleşen şirketi bul ve sirketId'yi kaydet
                         final normalizedEmail = emailCtrl.text.trim().toLowerCase();
                         try {

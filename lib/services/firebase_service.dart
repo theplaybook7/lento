@@ -295,19 +295,54 @@ class FirebaseService {
     }
   }
 
-  /// Proje finansmanı özetini al (işlemleri çekmez)
+  /// Proje finansmanı özetini al (transactions'dan canlı hesapla)
   Future<ProjectFinance> getProjectFinanceSummary(String projectId) async {
     try {
-      final doc = await _db.collection('project_finance').doc(projectId).get();
-      if (!doc.exists) {
+      final docFuture = _db.collection('project_finance').doc(projectId).get();
+      final txFuture = _db
+          .collection('project_finance')
+          .doc(projectId)
+          .collection('transactions')
+          .get();
+      
+      final results = await Future.wait([docFuture, txFuture]);
+      final doc = results[0] as DocumentSnapshot;
+      final txSnapshot = results[1] as QuerySnapshot;
+
+      if (!doc.exists && txSnapshot.docs.isEmpty) {
         return ProjectFinance(projectId: projectId);
       }
 
-      final data = doc.data() as Map<String, dynamic>;
+      final data = (doc.data() as Map<String, dynamic>?) ?? {};
+
+      // Transactions alt koleksiyonundan canlı hesapla
+      double totalIncome = 0;
+      double totalExpenses = 0;
+      for (var txDoc in txSnapshot.docs) {
+        final txData = txDoc.data() as Map<String, dynamic>;
+        final amount = (txData['amount'] ?? 0).toDouble();
+        if (txData['type'] == 'income') {
+          totalIncome += amount;
+        } else {
+          totalExpenses += amount;
+        }
+      }
+
+      // Eğer cached değerlerle uyuşmuyorsa düzelt
+      final cachedIncome = (data['totalIncome'] ?? 0).toDouble();
+      final cachedExpenses = (data['totalExpenses'] ?? 0).toDouble();
+      if ((cachedIncome - totalIncome).abs() > 0.01 || (cachedExpenses - totalExpenses).abs() > 0.01) {
+        _db.collection('project_finance').doc(projectId).set({
+          'totalIncome': totalIncome,
+          'totalExpenses': totalExpenses,
+          'budgetedAmount': data['budgetedAmount'] ?? 0,
+        }, SetOptions(merge: true));
+      }
+
       return ProjectFinance(
         projectId: projectId,
-        totalIncome: (data['totalIncome'] ?? 0).toDouble(),
-        totalExpenses: (data['totalExpenses'] ?? 0).toDouble(),
+        totalIncome: totalIncome,
+        totalExpenses: totalExpenses,
         budgetedAmount: (data['budgetedAmount'] ?? 0).toDouble(),
       );
     } catch (e) {

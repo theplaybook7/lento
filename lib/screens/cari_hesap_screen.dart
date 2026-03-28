@@ -1320,6 +1320,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                   }
 
                   String? giderId;
+                  String? financeTransactionId;
                   String projeId = '';
                   String projeAd = '';
                   
@@ -1461,6 +1462,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           .doc(projectId)
                           .collection('transactions')
                           .doc();
+                      financeTransactionId = transactionRef.id;
                       
                       await transactionRef.set({
                         'id': transactionRef.id,
@@ -1527,6 +1529,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                     'tarih': selectedDate,
                     'fotoUrls': photoUrls,
                     'giderId': giderId,
+                    'financeTransactionId': financeTransactionId,
                     'projeId': projeId.isNotEmpty ? projeId : 'manuel',
                     'projeAd': projeAd,
                   });
@@ -2019,15 +2022,24 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
 
     if (onay == true) {
       try {
-        // Cari dokümantasyonunu paralel al
+        // Hareket dokümanını ve cari dokümanını paralel al
+        final hareketDocFuture = FirebaseFirestore.instance
+            .collection('cari_hesaplar')
+            .doc(widget.cariId)
+            .collection('hareketler')
+            .doc(hareketId)
+            .get();
         final cariDocFuture = FirebaseFirestore.instance
             .collection('cari_hesaplar')
             .doc(widget.cariId)
             .get();
         
-        final cariDoc = await cariDocFuture;
+        final results = await Future.wait([hareketDocFuture, cariDocFuture]);
+        final hareketDoc = results[0] as DocumentSnapshot;
+        final cariDoc = results[1] as DocumentSnapshot;
+        final hareketData = hareketDoc.data() as Map<String, dynamic>?;
         
-        final mevcutBakiye = (cariDoc.data()?['bakiye'] ?? 0.0) as double;
+        final mevcutBakiye = (cariDoc.data() as Map<String, dynamic>?)?['bakiye'] as double? ?? 0.0;
         final yeniBakiye = tip == 'alacak' 
             ? mevcutBakiye - tutarTL 
             : mevcutBakiye + tutarTL;
@@ -2035,9 +2047,13 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
         // Silme ve güncelleme işlemlerini hazırla
         final List<Future<void>> deleteList = [];
         
-        // Gider kaydını silinecek listesine ekle
+        // Gelir/Gider kaydını sil (tip'e göre doğru koleksiyon)
         if (giderId != null) {
-          deleteList.add(FirebaseFirestore.instance.collection('giderler').doc(giderId).delete());
+          if (tip == 'alacak') {
+            deleteList.add(FirebaseFirestore.instance.collection('gelirler').doc(giderId).delete());
+          } else {
+            deleteList.add(FirebaseFirestore.instance.collection('giderler').doc(giderId).delete());
+          }
         }
         
         // Hareketi sil
@@ -2055,9 +2071,37 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
             .update({'bakiye': yeniBakiye}));
 
         // Project Finance'ı güncelle (eğer cariye proje atanmışsa)
-        final projectId = cariDoc.data()?['projectId'] as String?;
+        final cariData = cariDoc.data() as Map<String, dynamic>?;
+        final projectId = cariData?['projectId'] as String?;
         
         if (projectId != null && projectId.isNotEmpty) {
+          // project_finance/transactions alt koleksiyonundan sil
+          final financeTransactionId = hareketData?['financeTransactionId'] as String?;
+          if (financeTransactionId != null) {
+            // Yeni hareketler: doğrudan ID ile sil
+            deleteList.add(FirebaseFirestore.instance
+                .collection('project_finance')
+                .doc(projectId)
+                .collection('transactions')
+                .doc(financeTransactionId)
+                .delete());
+          } else {
+            // Eski hareketler: amount + type ile bul ve sil
+            final queryType = tip == 'borc' ? 'expense' : 'income';
+            final matchingTx = await FirebaseFirestore.instance
+                .collection('project_finance')
+                .doc(projectId)
+                .collection('transactions')
+                .where('amount', isEqualTo: tutarTL)
+                .where('type', isEqualTo: queryType)
+                .limit(1)
+                .get();
+            for (final doc in matchingTx.docs) {
+              deleteList.add(doc.reference.delete());
+            }
+          }
+
+          // Toplam gelir/gider güncelle
           final financeDoc = await FirebaseFirestore.instance
               .collection('project_finance')
               .doc(projectId)
@@ -2066,11 +2110,10 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
           var currentIncome = (financeDoc.data()?['totalIncome'] ?? 0.0) as double;
           var currentExpenses = (financeDoc.data()?['totalExpenses'] ?? 0.0) as double;
           
-          // Hareketi reverse et
           if (tip == 'alacak') {
-            currentIncome -= tutarTL;
+            currentIncome = (currentIncome - tutarTL).clamp(0, double.infinity);
           } else if (tip == 'borc') {
-            currentExpenses -= tutarTL;
+            currentExpenses = (currentExpenses - tutarTL).clamp(0, double.infinity);
           }
           
           deleteList.add(FirebaseFirestore.instance
@@ -2184,12 +2227,82 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
     );
 
     if (onay == true) {
+      // Cari dokümanını al (proje bilgisi için)
+      final cariDoc = await FirebaseFirestore.instance
+          .collection('cari_hesaplar')
+          .doc(widget.cariId)
+          .get();
+      final cariData = cariDoc.data();
+      final projectId = cariData?['projectId'] as String?;
+
       final hareketler = await FirebaseFirestore.instance
           .collection('cari_hesaplar')
           .doc(widget.cariId)
           .collection('hareketler')
           .get();
 
+      // Project finance'ı güncelle (toplam gelir/gider düş + transactions sil)
+      if (projectId != null && projectId.isNotEmpty) {
+        double gelirDusulecek = 0;
+        double giderDusulecek = 0;
+
+        for (var doc in hareketler.docs) {
+          final data = doc.data();
+          final tip = data['tip'] as String?;
+          final tutarTL = (data['tutarTL'] ?? 0.0) as double;
+
+          if (tip == 'alacak') {
+            gelirDusulecek += tutarTL;
+          } else if (tip == 'borc') {
+            giderDusulecek += tutarTL;
+          }
+
+          // Finance transaction sil
+          final ftId = data['financeTransactionId'] as String?;
+          if (ftId != null) {
+            await FirebaseFirestore.instance
+                .collection('project_finance')
+                .doc(projectId)
+                .collection('transactions')
+                .doc(ftId)
+                .delete();
+          } else {
+            final queryType = tip == 'borc' ? 'expense' : 'income';
+            final matchingTx = await FirebaseFirestore.instance
+                .collection('project_finance')
+                .doc(projectId)
+                .collection('transactions')
+                .where('amount', isEqualTo: tutarTL)
+                .where('type', isEqualTo: queryType)
+                .limit(1)
+                .get();
+            for (final txDoc in matchingTx.docs) {
+              await txDoc.reference.delete();
+            }
+          }
+        }
+
+        // Toplam gelir/gider güncelle
+        if (gelirDusulecek > 0 || giderDusulecek > 0) {
+          final financeDoc = await FirebaseFirestore.instance
+              .collection('project_finance')
+              .doc(projectId)
+              .get();
+          if (financeDoc.exists) {
+            final curIncome = (financeDoc.data()?['totalIncome'] ?? 0.0) as double;
+            final curExpenses = (financeDoc.data()?['totalExpenses'] ?? 0.0) as double;
+            await FirebaseFirestore.instance
+                .collection('project_finance')
+                .doc(projectId)
+                .update({
+                  'totalIncome': (curIncome - gelirDusulecek).clamp(0, double.infinity),
+                  'totalExpenses': (curExpenses - giderDusulecek).clamp(0, double.infinity),
+                });
+          }
+        }
+      }
+
+      // Hareketleri sil
       for (var doc in hareketler.docs) {
         await doc.reference.delete();
       }

@@ -659,13 +659,9 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           // Şirket eşleşmesi opsiyonel — login'de de yapılır
                         }
 
-                        // Kullanıcıyı çıkış yaptır (giriş ekranından girmesi için)
-                        await FirebaseAuth.instance.signOut();
-
-                        companyCreationInProgress.value = false;
-
-                        if (!ctx.mounted || !mounted) return;
-                        Navigator.pop(ctx);
+                        // ÖNEMLİ: Önce dialog'u kapat (widget tree stabil iken),
+                        // sonra signOut yap, sonra flag'i sıfırla.
+                        if (ctx.mounted) Navigator.pop(ctx);
 
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -676,12 +672,19 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                             ),
                           );
                         }
-                      } catch (e) {
+
+                        // Kullanıcıyı çıkış yaptır (giriş ekranından girmesi için)
+                        await FirebaseAuth.instance.signOut();
                         companyCreationInProgress.value = false;
-                        setDialogState(() {
-                          kayitLoading = false;
-                          hataMetni = hataCevir(e);
-                        });
+                      } catch (e) {
+                        // Hata durumunda flag'i sıfırla ve hata göster
+                        companyCreationInProgress.value = false;
+                        if (ctx.mounted) {
+                          setDialogState(() {
+                            kayitLoading = false;
+                            hataMetni = hataCevir(e);
+                          });
+                        }
                       }
                     },
               style: ElevatedButton.styleFrom(

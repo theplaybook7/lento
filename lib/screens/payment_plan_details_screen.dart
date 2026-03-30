@@ -9,7 +9,6 @@ import '../services/firebase_service.dart';
 import '../utils/image_utils.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
-import '../utils/responsive_utils.dart' as resp;
 
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override

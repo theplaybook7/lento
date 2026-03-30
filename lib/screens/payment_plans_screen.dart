@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/payment_model.dart';
 import '../services/firebase_service.dart';
-import '../services/payment_notification_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
 import 'payment_plan_details_screen.dart';
@@ -24,7 +23,6 @@ class PaymentPlansScreen extends StatefulWidget {
 
 class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
   final _firebase = FirebaseService();
-  final _notificationService = PaymentNotificationService();
 
   @override
   Widget build(BuildContext context) {
@@ -35,18 +33,7 @@ class _PaymentPlansScreenState extends State<PaymentPlansScreen> {
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 1,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_active),
-            tooltip: 'Bildirim Kontrolü (Test)',
-            onPressed: () {
-              _notificationService.checkAndNotifyUpcomingInstallments(widget.projectId);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Yaklaşan taksitler kontrol edildi')),
-              );
-            },
-          ),
-        ],
+        actions: const [],
       ),
       body: FutureBuilder<List<PaymentPlan>>(
         future: _firebase.getProjectPaymentPlans(widget.projectId),

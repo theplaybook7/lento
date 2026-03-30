@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 
@@ -25,11 +26,11 @@ Future<List<int>> compressImage(XFile imageFile, {int quality = 85, int maxWidth
     
     // Sıkıştırma oranını log et
     final ratio = (1 - (compressed.length / bytes.length)) * 100;
-    print('Resim sıkıştırıldı: %${ratio.toStringAsFixed(1)} küçültüldü (${bytes.length} → ${compressed.length} bytes)');
+    developer.log('Resim sıkıştırıldı: %${ratio.toStringAsFixed(1)} küçültüldü (${bytes.length} → ${compressed.length} bytes)', name: 'image_utils');
     
     return compressed;
   } catch (e) {
-    print('Resim sıkıştırma hatası: $e - orijinal kullanılacak');
+    developer.log('Resim sıkıştırma hatası: $e - orijinal kullanılacak', name: 'image_utils');
     final bytes = await imageFile.readAsBytes();
     return bytes.toList();
   }

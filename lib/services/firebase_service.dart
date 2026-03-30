@@ -300,7 +300,7 @@ class FirebaseService {
   Future<ProjectFinance> getProjectFinanceSummary(String projectId) async {
     try {
       final doc = await _db.collection('project_finance').doc(projectId).get();
-      final data = (doc.data() as Map<String, dynamic>?) ?? {};
+      final data = doc.data() ?? {};
 
       // Bu projeye bağlı tüm carileri bul
       final sirketId = SistemYoneticisi().aktifSirket?.id ?? '';

@@ -181,6 +181,65 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     }
   }
 
+  Future<void> _projeIsimDuzenle() async {
+    final project = await _firebase.getProject(widget.projectId);
+    if (project == null || !mounted) return;
+    final controller = TextEditingController(text: project.name);
+    final yeniIsim = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Proje İsmini Düzenle',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primaryColor,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Proje Adı',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) Navigator.pop(context, text);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (yeniIsim != null && yeniIsim != project.name && mounted) {
+      try {
+        await _firebase.updateProject(widget.projectId, {'name': yeniIsim});
+        if (!mounted) return;
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Proje ismi güncellendi')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -239,7 +298,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           if (SistemYoneticisi().isAdminKullanici)
             PopupMenuButton<String>(
             onSelected: (value) async {
-              if (value == 'archive') {
+              if (value == 'rename') {
+                await _projeIsimDuzenle();
+              } else if (value == 'archive') {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -319,6 +380,16 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'rename',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('İsim Düzenle'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'archive',
                 child: Row(
@@ -447,9 +518,23 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  project.name,
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                GestureDetector(
+                                  onTap: SistemYoneticisi().isAdminKullanici ? _projeIsimDuzenle : null,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          project.name,
+                                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      if (SistemYoneticisi().isAdminKullanici) ...[
+                                        const SizedBox(width: 6),
+                                        Icon(Icons.edit, size: 16, color: Colors.grey.shade500),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 if (project.description != null)

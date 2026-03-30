@@ -1,4 +1,4 @@
-/**
+"/**
  * Mevcut şirketlere 'emailler' array field ekler.
  * yoneticiEposta + personelListesi'ndeki tüm emailleri toplar.
  * 

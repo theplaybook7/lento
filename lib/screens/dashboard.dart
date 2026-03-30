@@ -1458,6 +1458,63 @@ class _ProjectsTabState extends State<_ProjectsTab> {
     _ruhsatPasifBildirimKontrol();
   }
 
+  Future<void> _projeIsimDuzenle(Project project) async {
+    final controller = TextEditingController(text: project.name);
+    final yeniIsim = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Proje İsmini Düzenle',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primaryColor,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Proje Adı',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) Navigator.pop(context, text);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (yeniIsim != null && yeniIsim != project.name && mounted) {
+      try {
+        await _firebase.updateProject(project.id, {'name': yeniIsim});
+        if (!mounted) return;
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Proje ismi güncellendi')),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   /// Tüm projeleri kontrol edip 10+ gün pasif olanlar için bildirim gönderir.
   /// Günde bir kez çalışır (Firestore'da son kontrol tarihini tutar).
   Future<void> _ruhsatPasifBildirimKontrol() async {
@@ -1744,6 +1801,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                   ),
                   child: InkWell(
                     onTap: () => widget.onProjectTap(project.id),
+                    onLongPress: SistemYoneticisi().isAdminKullanici ? () => _projeIsimDuzenle(project) : null,
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
                       padding: const EdgeInsets.all(16),

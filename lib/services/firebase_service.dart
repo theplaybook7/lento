@@ -190,33 +190,6 @@ class FirebaseService {
 
   // ============== PROJE AŞAMALARI ==============
 
-  /// Proje aşamasını ekle
-  Future<void> addProjectPhase(String projectId, ProjectPhase phase) async {
-    try {
-      final phases = await _getProjectPhases(projectId);
-      phases.add(phase);
-
-      await _db.collection('project_phases').doc(projectId).set({
-        'phases': phases.map((p) => p.toMap()).toList(),
-      });
-
-      developer.log('Aşama eklendi: ${phase.name}');
-    } catch (e) {
-      developer.log('Aşama ekleme hatası: $e');
-      rethrow;
-    }
-  }
-
-  /// Proje aşamalarını al
-  Future<List<ProjectPhase>> getProjectPhases(String projectId) async {
-    try {
-      return await _getProjectPhases(projectId);
-    } catch (e) {
-      developer.log('Aşamalar yükleme hatası: $e');
-      rethrow;
-    }
-  }
-
   Future<List<ProjectPhase>> _getProjectPhases(String projectId) async {
     final doc = await _db.collection('project_phases').doc(projectId).get();
     if (doc.exists) {
@@ -706,33 +679,6 @@ class FirebaseService {
       developer.log('Taksit eklendi: $installmentNumber');
     } catch (e) {
       developer.log('Taksit ekleme hatası: $e');
-      rethrow;
-    }
-  }
-
-  /// Ödeme planını sil
-
-  Future<void> deletePaymentPlan(String paymentPlanId) async {
-    try {
-      // Taksitleri sil - paralel
-      final installments = await _db
-          .collection('payment_installments')
-          .where('paymentPlanId', isEqualTo: paymentPlanId)
-          .get();
-
-      final deleteFutures = [
-        // Taksitleri paralel sil
-        for (var doc in installments.docs)
-          doc.reference.delete(),
-        // Planı sil
-        _db.collection('payment_plans').doc(paymentPlanId).delete(),
-      ];
-
-      await Future.wait(deleteFutures);
-
-      developer.log('Ödeme planı silindi: $paymentPlanId');
-    } catch (e) {
-      developer.log('Ödeme planı silme hatası: $e');
       rethrow;
     }
   }

@@ -638,7 +638,6 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
   Future<void> _pdfOlusturKontrol() async {
     // Çift tıklamayı engelle
     if (_pdfIslemde) {
-      debugPrint('PDF üretimi zaten devam ediyor, istek iptal edildi');
       return;
     }
     
@@ -646,7 +645,6 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
       _pdfIslemde = true;
       setState(() {});
       
-      debugPrint('===== PDF OLUŞTURMA BAŞLIYOR #${DateTime.now().millisecondsSinceEpoch} =====');
       
       // Validasyon kontrolleri
       final hatalar = <String>[];
@@ -757,7 +755,6 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
         ),
       );
 
-      debugPrint('generateSimplePdf çağrılıyor...');
       final pdf = await generateSimplePdf(
         sirket: SistemYoneticisi().aktifSirket?.ad ?? 'Firma',
         ilce: widget.ilce,
@@ -782,12 +779,9 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
       ).timeout(
         const Duration(seconds: 120),
         onTimeout: () {
-          debugPrint('PDF oluşturma timeout! 120 saniyeyi aştı.');
           throw Exception('PDF oluşturma çok uzun sürüyor (120sn+)');
         },
       );
-
-      debugPrint('===== generateSimplePdf RETURN ETTİ, PDF boyutu: ${pdf.length} bytes =====');
 
       if (!mounted) {
         return;
@@ -813,10 +807,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
         ),
       );
 
-      debugPrint('PDF viewer açıldı');
-    } catch (e, st) {
-      debugPrint('PDF hatası: $e');
-      debugPrint('Stack: $st');
+    } catch (e) {
 
       if (mounted) {
         try {
@@ -838,7 +829,6 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
       } else {
         _pdfIslemde = false;
       }
-      debugPrint('===== PDF işlemi bitti, flag reset edildi =====');
     }
   }
 

@@ -1865,6 +1865,18 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   Widget _buildWebPreview(Uint8List bytes, bool isPdf, String fileName) {
     try {
       if (kIsWeb) {
+        // Mobil tarayıcılarda iframe PDF/görsel gösteremiyor,
+        // SfPdfViewer ve Image.memory kullan
+        final isMobile = resp.isMobile(context);
+        if (isMobile) {
+          if (isPdf) {
+            return SfPdfViewer.memory(bytes);
+          }
+          return InteractiveViewer(
+            child: Image.memory(bytes, fit: BoxFit.contain),
+          );
+        }
+        // Masaüstü tarayıcılarda iframe ile önizleme
         return web_utils.buildWebPreview(
           bytes: bytes,
           isPdf: isPdf,

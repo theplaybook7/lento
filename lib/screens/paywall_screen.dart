@@ -35,7 +35,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final paymentService = PaymentService();
     await paymentService.initialize();
 
-    if (!paymentService.isApplePaymentSupported) {
+    if (!paymentService.isPaymentSupported) {
       if (mounted) {
         setState(() {
           _productsLoading = false;
@@ -60,9 +60,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
         ..addEntries(products.map((p) => MapEntry(p.id, p)));
       _productsLoading = false;
       if (_products.isEmpty && _statusMessage.isEmpty) {
+        final storeName = PaymentService().isApplePaymentSupported ? 'App Store' : 'Google Play';
         _statusMessage = paymentService.lastError.isNotEmpty
             ? paymentService.lastError
-            : 'App Store ürünleri yüklenemedi. Lütfen tekrar deneyin.';
+            : '$storeName ürünleri yüklenemedi. Lütfen tekrar deneyin.';
       }
     });
   }
@@ -76,7 +77,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     try {
       final paymentService = PaymentService();
 
-      if (!paymentService.isApplePaymentSupported) {
+      if (!paymentService.isPaymentSupported) {
         setState(() {
           _statusMessage = 'Abonelik satın alma bu cihazda desteklenmiyor.';
         });
@@ -234,7 +235,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        'Ödeme App Store üzerinden güvenli şekilde yapılır',
+                        PaymentService().isApplePaymentSupported
+                            ? 'Ödeme App Store üzerinden güvenli şekilde yapılır'
+                            : 'Ödeme Google Play üzerinden güvenli şekilde yapılır',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppTheme.primaryColor,
                           fontWeight: FontWeight.w600,
@@ -357,24 +360,33 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 child: const Text('Satın Alımları Geri Yükle'),
               ),
 
-              // Abonelik Yönetimi Linki (Apple Guideline 3.1.2)
+              // Abonelik Yönetimi Linki
               const SizedBox(height: 4),
               TextButton.icon(
                 onPressed: () => launchUrl(
-                  Uri.parse('https://apps.apple.com/account/subscriptions'),
+                  Uri.parse(
+                    PaymentService().isApplePaymentSupported
+                        ? 'https://apps.apple.com/account/subscriptions'
+                        : 'https://play.google.com/store/account/subscriptions',
+                  ),
                   mode: LaunchMode.externalApplication,
                 ),
                 icon: const Icon(Icons.settings, size: 16),
                 label: const Text('Aboneliği Yönet'),
               ),
 
-              // Subscription Terms (Apple Guideline 3.1.2)
+              // Subscription Terms
               const SizedBox(height: 8),
               Text(
-                "Ödeme, Apple Kimliğiniz hesabına tahsil edilecektir. "
-                "Abonelik, mevcut dönem sona ermeden en az 24 saat önce iptal edilmedikçe otomatik olarak yenilenir. "
-                "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
-                "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
+                PaymentService().isApplePaymentSupported
+                    ? "Ödeme, Apple Kimliğiniz hesabına tahsil edilecektir. "
+                      "Abonelik, mevcut dönem sona ermeden en az 24 saat önce iptal edilmedikçe otomatik olarak yenilenir. "
+                      "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
+                      "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz."
+                    : "Ödeme, Google hesabınıza tahsil edilecektir. "
+                      "Abonelik, mevcut dönem sona ermeden en az 24 saat önce iptal edilmedikçe otomatik olarak yenilenir. "
+                      "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
+                      "Aboneliğinizi Google Play > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey.shade600,
                   fontSize: 12,

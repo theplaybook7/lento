@@ -42,12 +42,19 @@ class PaymentService {
         defaultTargetPlatform == TargetPlatform.macOS;
   }
 
+  bool get isGooglePaymentSupported {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android;
+  }
+
+  bool get isPaymentSupported => isApplePaymentSupported || isGooglePaymentSupported;
+
   bool get isIOSPaymentSupported => isApplePaymentSupported;
 
   Future<void> initialize() async {
     if (_initialized) return;
 
-    if (!isApplePaymentSupported) {
+    if (!isPaymentSupported) {
       _lastError = 'Abonelik satın alma bu cihazda desteklenmiyor.';
       return;
     }
@@ -214,7 +221,7 @@ class PaymentService {
   /// Subscription ürünlerini yükle
   Future<List<ProductDetails>> fetchSubscriptionProducts() async {
     try {
-      if (!isApplePaymentSupported) {
+      if (!isPaymentSupported) {
         _lastError = 'Abonelik satın alma bu cihazda desteklenmiyor.';
         return [];
       }
@@ -230,7 +237,8 @@ class PaymentService {
       }
 
       if (response.notFoundIDs.isNotEmpty) {
-        _lastError = 'App Store ürünleri bulunamadı: ${response.notFoundIDs.join(', ')}';
+        final storeName = isApplePaymentSupported ? 'App Store' : 'Google Play';
+        _lastError = '$storeName ürünleri bulunamadı: ${response.notFoundIDs.join(', ')}';
       }
 
       return response.productDetails;
@@ -249,7 +257,7 @@ class PaymentService {
       _lastError = '';
       await initialize();
 
-      if (!isApplePaymentSupported) {
+      if (!isPaymentSupported) {
         _lastError = 'Abonelik satın alma bu cihazda desteklenmiyor.';
         return false;
       }
@@ -288,7 +296,8 @@ class PaymentService {
       );
 
       if (productDetails.id.isEmpty) {
-        _lastError = 'Seçilen abonelik ürünü App Store üzerinde bulunamadı.';
+        final storeName = isApplePaymentSupported ? 'App Store' : 'Google Play';
+        _lastError = 'Seçilen abonelik ürünü $storeName üzerinde bulunamadı.';
         return false;
       }
 
@@ -333,7 +342,7 @@ class PaymentService {
   Future<bool> restorePurchases() async {
     try {
       _lastError = '';
-      if (!isApplePaymentSupported) {
+      if (!isPaymentSupported) {
         _lastError = 'Geri yükleme bu cihazda desteklenmiyor.';
         return false;
       }

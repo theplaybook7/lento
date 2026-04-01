@@ -31,10 +31,11 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.android:
+        return android;
       case TargetPlatform.windows:
       case TargetPlatform.linux:
         throw UnsupportedError(
-          'This app supports only web and Apple platforms (iOS/macOS).',
+          'This app supports only web, Apple, and Android platforms.',
         );
       default:
         throw UnsupportedError(
@@ -60,6 +61,16 @@ class DefaultFirebaseOptions {
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
     iosBundleId: 'com.lento.app',
+  );
+
+  static const String _androidApiKey = 'AIzaSyDn7NV-25C7RRbsVmiRUYze_8HSJ0pwGVU';
+
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: _androidApiKey,
+    appId: '1:478876596230:android:f5aac7f793b36281dd6b87',
+    messagingSenderId: '478876596230',
+    projectId: 'insaat-yonetim-takip',
+    storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
   );
 
   static FirebaseOptions get macos => FirebaseOptions(

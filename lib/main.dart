@@ -366,8 +366,8 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
             final isAdmin = kullaniciYetkisi?.adminMi == true ||
                 _normalizeEmail(bulunanSirket.yoneticiEposta) == email;
 
-            if (isAdmin && PaymentService().isApplePaymentSupported) {
-              // iOS/macOS Admin: Direkt PaywallScreen göster
+            if (isAdmin && PaymentService().isPaymentSupported) {
+              // iOS/macOS/Android Admin: Direkt PaywallScreen göster
               if (mounted) {
                 final purchased = await Navigator.push<bool>(
                   context,
@@ -396,10 +396,10 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                 }
               }
             } else if (isAdmin) {
-              // Web/diğer platformlar Admin: iOS'tan satın alınmalı
+              // Web/diğer platformlar Admin: Uygulama üzerinden satın alınmalı
               if (mounted) {
                 setState(() {
-                  _hataMetni = 'Devam etmek için aktif bir abonelik gerekli. Lütfen iOS uygulaması üzerinden abonelik satın alın.';
+                  _hataMetni = 'Devam etmek için aktif bir abonelik gerekli. Lütfen mobil uygulama üzerinden abonelik satın alın.';
                 });
               }
               return;
@@ -447,8 +447,8 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
     final subStatus = await paymentService.getSubscriptionStatus();
 
     if (!(subStatus['active'] as bool)) {
-      if (paymentService.isApplePaymentSupported) {
-        // iOS/macOS: IAP ile satın alma
+      if (paymentService.isPaymentSupported) {
+        // iOS/macOS/Android: IAP ile satın alma
         if (mounted) {
           final purchased = await Navigator.push<bool>(
             context,
@@ -457,7 +457,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
           if (purchased != true) return;
         }
       } else {
-        // Diğer platformlar: Abonelik gerekli — iOS üzerinden satın alınmalı
+        // Diğer platformlar: Abonelik gerekli — Uygulama üzerinden satın alınmalı
         if (mounted) {
           showDialog(
             context: context,
@@ -465,7 +465,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
               title: const Text('Abonelik Gerekli'),
               content: const Text(
                 'Şirket kurmak için aktif bir aboneliğiniz olmalıdır. '
-                'Lütfen iOS uygulaması üzerinden abonelik satın alın.',
+                'Lütfen mobil uygulama üzerinden abonelik satın alın.',
               ),
               actions: [
                 TextButton(
@@ -618,7 +618,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                 const SizedBox(height: 16),
                 Text(_hataMetni!, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
-                if (isSubscriptionError && PaymentService().isApplePaymentSupported && !_hataMetni!.contains('yöneticinize')) ...[
+                if (isSubscriptionError && PaymentService().isPaymentSupported && !_hataMetni!.contains('yöneticinize')) ...[
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -665,7 +665,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                   ),
                   const SizedBox(height: 8),
                 ],
-                if (!isSubscriptionError || !PaymentService().isApplePaymentSupported || _hataMetni!.contains('yöneticinize'))
+                if (!isSubscriptionError || !PaymentService().isPaymentSupported || _hataMetni!.contains('yöneticinize'))
                   ElevatedButton(
                     onPressed: () {
                       setState(() {

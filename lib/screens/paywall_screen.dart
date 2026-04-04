@@ -60,10 +60,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
         ..addEntries(products.map((p) => MapEntry(p.id, p)));
       _productsLoading = false;
       if (_products.isEmpty && _statusMessage.isEmpty) {
+        // StoreKit hatası varsa sadece bilgi olarak göster (kırmızı değil)
         final storeName = PaymentService().isApplePaymentSupported ? 'App Store' : 'Google Play';
         _statusMessage = paymentService.lastError.isNotEmpty
-            ? paymentService.lastError
-            : '$storeName ürünleri yüklenemedi. Lütfen tekrar deneyin.';
+            ? 'ℹ️ ${paymentService.lastError}'
+            : 'ℹ️ $storeName ürün bilgileri yüklenemedi. Fiyatlar tahminidir.';
       }
     });
   }
@@ -151,6 +152,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final product = _products[id];
     if (product != null && product.price.isNotEmpty) {
       return product.price;
+    }
+    // Fallback fiyatlar (StoreKit yüklenemezse)
+    if (!_productsLoading) {
+      return planType == PlanType.yearly ? '₺29.999,99' : '₺2.999,99';
     }
     return 'Yükleniyor...';
   }
@@ -294,19 +299,25 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     border: Border.all(
                       color: _statusMessage.contains("❌")
                           ? Colors.red
-                          : Colors.green,
+                          : _statusMessage.contains("ℹ️")
+                              ? Colors.blue.shade300
+                              : Colors.green,
                     ),
                     borderRadius: BorderRadius.circular(8),
                     color: _statusMessage.contains("❌")
                         ? Colors.red.withValues(alpha: 0.1)
-                        : Colors.green.withValues(alpha: 0.1),
+                        : _statusMessage.contains("ℹ️")
+                            ? Colors.blue.withValues(alpha: 0.08)
+                            : Colors.green.withValues(alpha: 0.1),
                   ),
                   child: Text(
                     _statusMessage,
                     style: TextStyle(
                       color: _statusMessage.contains("❌")
                           ? Colors.red
-                          : Colors.green,
+                          : _statusMessage.contains("ℹ️")
+                              ? Colors.blue.shade700
+                              : Colors.green,
                       fontWeight: FontWeight.w600,
                     ),
                     textAlign: TextAlign.center,

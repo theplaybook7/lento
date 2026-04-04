@@ -283,19 +283,15 @@ class PaymentService {
         return false;
       }
 
-      final productDetails = products.firstWhere(
-        (p) => p.id == productId,
-        orElse: () => ProductDetails(
-          id: '',
-          title: '',
-          description: '',
-          price: '',
-          rawPrice: 0,
-          currencyCode: '',
-        ),
-      );
+      ProductDetails? productDetails;
+      for (final p in products) {
+        if (p.id == productId) {
+          productDetails = p;
+          break;
+        }
+      }
 
-      if (productDetails.id.isEmpty) {
+      if (productDetails == null) {
         final storeName = isApplePaymentSupported ? 'App Store' : 'Google Play';
         _lastError = 'Seçilen abonelik ürünü $storeName üzerinde bulunamadı.';
         return false;

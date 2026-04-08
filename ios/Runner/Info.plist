@@ -69,6 +69,7 @@
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
+		<string>payment_check</string>
 		<string>checkPaymentInstallments</string>
 	</array>
 	<key>UILaunchStoryboardName</key>

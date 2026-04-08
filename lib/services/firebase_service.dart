@@ -448,7 +448,7 @@ class FirebaseService {
         .collection('projects')
         .where('companyId', isEqualTo: companyId)
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
             final projects = snapshot.docs
                 .where((doc) {
                   final data = doc.data();
@@ -456,8 +456,39 @@ class FirebaseService {
                 })
                 .map((doc) => Project.fromMap(doc.data(), doc.id))
                 .toList();
-            // En uzun süredir işlem yapılmamış proje en üstte
-            projects.sort((a, b) => a.startDate.compareTo(b.startDate));
+
+            // Her proje için ruhsat son işlem tarihini al
+            final Map<String, DateTime?> sonIslemMap = {};
+            await Future.wait(projects.map((p) async {
+              try {
+                final islemler = await _db
+                    .collection('ruhsat').doc(p.id)
+                    .collection('islemler').get();
+                DateTime? sonIslem;
+                for (final doc in islemler.docs) {
+                  final gt = doc.data()['guncellendiTarihi'];
+                  DateTime? t;
+                  if (gt is Timestamp) t = gt.toDate();
+                  if (t != null && (sonIslem == null || t.isAfter(sonIslem))) {
+                    sonIslem = t;
+                  }
+                }
+                sonIslemMap[p.id] = sonIslem;
+              } catch (_) {
+                sonIslemMap[p.id] = null;
+              }
+            }));
+
+            // Hiç işlem yapılmamış en üstte, sonra en eski işlem tarihi en üstte
+            projects.sort((a, b) {
+              final aDate = sonIslemMap[a.id];
+              final bDate = sonIslemMap[b.id];
+              if (aDate == null && bDate == null) return 0;
+              if (aDate == null) return -1; // a hiç işlem yok → üstte
+              if (bDate == null) return 1;  // b hiç işlem yok → üstte
+              return aDate.compareTo(bDate); // eski tarih üstte
+            });
+
             return projects;
         });
   }

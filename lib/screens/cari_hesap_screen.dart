@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
@@ -184,7 +185,7 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
     final data = doc.data() as Map<String, dynamic>;
     final ad = data['ad'] ?? 'İsimsiz';
     final tip = data['tip'] ?? 'musteri';
-    final bakiye = (data['bakiye'] ?? 0.0) as double;
+    final bakiye = ((data['bakiye'] ?? 0) as num).toDouble();
     final telefon = data['telefon'] ?? '';
     final email = data['email'] ?? '';
 
@@ -457,7 +458,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-          final globalBakiye = (data['bakiye'] ?? 0.0) as double;
+          final globalBakiye = ((data['bakiye'] ?? 0) as num).toDouble();
           final telefon = data['telefon'] ?? '';
           final email = data['email'] ?? '';
           final adres = data['adres'] ?? '';
@@ -1314,7 +1315,10 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                       final compressedList = await compressImage(selectedImages[i]);
                       final compressedBytes = Uint8List.fromList(compressedList);
                       
-                      await storageRef.putData(compressedBytes);
+                      await storageRef.putData(
+                        compressedBytes,
+                        SettableMetadata(contentType: 'image/jpeg'),
+                      );
                       final url = await storageRef.getDownloadURL();
                       photoUrls.add(url);
                     }
@@ -1483,23 +1487,23 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           .doc(projectId)
                           .get();
                       
-                      final currentIncome = (financeDoc.data()?['totalIncome'] ?? 0.0) as double;
-                      final currentExpenses = (financeDoc.data()?['totalExpenses'] ?? 0.0) as double;
+                      final currentIncome = ((financeDoc.data()?['totalIncome'] ?? 0) as num).toDouble();
+                      final currentExpenses = ((financeDoc.data()?['totalExpenses'] ?? 0) as num).toDouble();
                       
                       if (tip == 'borc') {
                         await FirebaseFirestore.instance
                             .collection('project_finance')
                             .doc(projectId)
-                            .update({
+                            .set({
                               'totalExpenses': currentExpenses + tutarTL,
-                            });
+                            }, SetOptions(merge: true));
                       } else if (tip == 'alacak') {
                         await FirebaseFirestore.instance
                             .collection('project_finance')
                             .doc(projectId)
-                            .update({
+                            .set({
                               'totalIncome': currentIncome + tutarTL,
-                            });
+                            }, SetOptions(merge: true));
                       }
                     }
                   }
@@ -1510,7 +1514,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                       .doc(widget.cariId)
                       .get();
                   
-                  final mevcutBakiye = (cariDoc.data()?['bakiye'] ?? 0.0) as double;
+                  final mevcutBakiye = ((cariDoc.data()?['bakiye'] ?? 0) as num).toDouble();
                   final yeniBakiye = tip == 'alacak' 
                       ? mevcutBakiye + tutarTL 
                       : mevcutBakiye - tutarTL;
@@ -1900,7 +1904,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                   final results = await Future.wait([cariDocFuture]);
                   final cariDoc = results[0] as DocumentSnapshot;
                   
-                  final mevcutBakiye = (cariDoc.data() is Map ? (cariDoc.data() as Map)['bakiye'] : 0.0) as double;
+                  final mevcutBakiye = ((cariDoc.data() is Map ? (cariDoc.data() as Map)['bakiye'] ?? 0 : 0) as num).toDouble();
                   
                   // Eski hareketi geri al
                   double yeniBakiye = mevcutBakiye;
@@ -1955,8 +1959,8 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                         .doc(projectId)
                         .get();
                     
-                    var currentIncome = (financeDoc.data()?['totalIncome'] ?? 0.0) as double;
-                    var currentExpenses = (financeDoc.data()?['totalExpenses'] ?? 0.0) as double;
+                    var currentIncome = ((financeDoc.data()?['totalIncome'] ?? 0) as num).toDouble();
+                    var currentExpenses = ((financeDoc.data()?['totalExpenses'] ?? 0) as num).toDouble();
                     
                     // Eski hareketi reverse et
                     if (eskiTip == 'alacak') {
@@ -1975,10 +1979,10 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                     updateList.add(FirebaseFirestore.instance
                         .collection('project_finance')
                         .doc(projectId)
-                        .update({
+                        .set({
                           'totalIncome': currentIncome,
                           'totalExpenses': currentExpenses,
-                        }));
+                        }, SetOptions(merge: true)));
                   }
                   
                   // Tüm update işlemlerini paralel yap
@@ -2040,7 +2044,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
         final cariDoc = results[1] as DocumentSnapshot;
         final hareketData = hareketDoc.data() as Map<String, dynamic>?;
         
-        final mevcutBakiye = (cariDoc.data() as Map<String, dynamic>?)?['bakiye'] as double? ?? 0.0;
+        final mevcutBakiye = (((cariDoc.data() as Map<String, dynamic>?)?['bakiye'] ?? 0) as num).toDouble();
         final yeniBakiye = tip == 'alacak' 
             ? mevcutBakiye - tutarTL 
             : mevcutBakiye + tutarTL;
@@ -2108,8 +2112,8 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
               .doc(projectId)
               .get();
           
-          var currentIncome = (financeDoc.data()?['totalIncome'] ?? 0.0) as double;
-          var currentExpenses = (financeDoc.data()?['totalExpenses'] ?? 0.0) as double;
+          var currentIncome = ((financeDoc.data()?['totalIncome'] ?? 0) as num).toDouble();
+          var currentExpenses = ((financeDoc.data()?['totalExpenses'] ?? 0) as num).toDouble();
           
           if (tip == 'alacak') {
             currentIncome = (currentIncome - tutarTL).clamp(0, double.infinity);
@@ -2120,10 +2124,10 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
           deleteList.add(FirebaseFirestore.instance
               .collection('project_finance')
               .doc(projectId)
-              .update({
+              .set({
                 'totalIncome': currentIncome,
                 'totalExpenses': currentExpenses,
-              }));
+              }, SetOptions(merge: true)));
         }
 
         // Tüm işlemleri paralel yap
@@ -2250,7 +2254,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
         for (var doc in hareketler.docs) {
           final data = doc.data();
           final tip = data['tip'] as String?;
-          final tutarTL = (data['tutarTL'] ?? 0.0) as double;
+          final tutarTL = ((data['tutarTL'] ?? 0) as num).toDouble();
 
           if (tip == 'alacak') {
             gelirDusulecek += tutarTL;
@@ -2290,15 +2294,15 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
               .doc(projectId)
               .get();
           if (financeDoc.exists) {
-            final curIncome = (financeDoc.data()?['totalIncome'] ?? 0.0) as double;
-            final curExpenses = (financeDoc.data()?['totalExpenses'] ?? 0.0) as double;
+            final curIncome = ((financeDoc.data()?['totalIncome'] ?? 0) as num).toDouble();
+            final curExpenses = ((financeDoc.data()?['totalExpenses'] ?? 0) as num).toDouble();
             await FirebaseFirestore.instance
                 .collection('project_finance')
                 .doc(projectId)
-                .update({
+                .set({
                   'totalIncome': (curIncome - gelirDusulecek).clamp(0, double.infinity),
                   'totalExpenses': (curExpenses - giderDusulecek).clamp(0, double.infinity),
-                });
+                }, SetOptions(merge: true));
           }
         }
       }

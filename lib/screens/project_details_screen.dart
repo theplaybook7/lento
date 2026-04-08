@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:developer' as developer;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../models/project_model.dart';
 import '../services/firebase_service.dart';
@@ -2851,6 +2852,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       final fileName = belge['başlık'] ?? 'belge';
       if (kIsWeb) {
         await web_utils.downloadFile(url, fileName);
+      } else {
+        // iOS/Android: Tarayıcıda aç
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       }
       
       ScaffoldMessenger.of(context).showSnackBar(

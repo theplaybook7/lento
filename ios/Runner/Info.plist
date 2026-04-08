@@ -34,6 +34,11 @@
 	<string>Uygulama, cekilen fotograflari kaydetmek icin fotograf kutuphanesine yazma izni ister.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

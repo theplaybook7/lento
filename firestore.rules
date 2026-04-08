@@ -53,6 +53,11 @@ service cloud.firestore {
       match /bildirimler/{bildirimId} {
         allow read, write: if isAuthenticated() && hasUserSirketId() && userSirketId() == sirketId;
       }
+
+      // Sistem alt koleksiyonu (pasif kontrol vb.)
+      match /sistem/{docId} {
+        allow read, write: if isAuthenticated() && hasUserSirketId() && userSirketId() == sirketId;
+      }
     }
 
     // Cari Hesaplar

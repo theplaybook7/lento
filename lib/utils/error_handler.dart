@@ -60,6 +60,18 @@ String hataCevir(Object e) {
   if (mesaj.contains('object-not-found')) {
     return 'Dosya bulunamadı.';
   }
+  if (mesaj.contains('storage/unauthorized') || mesaj.contains('storage/unauthenticated')) {
+    return 'Dosya yükleme izni yok. Lütfen tekrar giriş yapın.';
+  }
+  if (mesaj.contains('storage/retry-limit-exceeded')) {
+    return 'Dosya yükleme başarısız. Lütfen tekrar deneyin.';
+  }
+  if (mesaj.contains('storage/canceled')) {
+    return 'Dosya yükleme iptal edildi.';
+  }
+  if (mesaj.contains('Null check')) {
+    return 'Veri okunamadı. Lütfen tekrar deneyin.';
+  }
 
   // Genel hata — teknik detayı göstermeden kısa bir mesaj
   return 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.';

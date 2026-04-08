@@ -2475,6 +2475,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: false,
+        withData: true,
       );
 
       if (result == null) {
@@ -2485,7 +2486,14 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       }
 
       final file = result.files.single;
-      
+
+      if (file.bytes == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dosya okunamadı. Lütfen tekrar deneyin.')),
+        );
+        return;
+      }
+
       // Yükleniyor göstergesi
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

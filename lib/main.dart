@@ -24,9 +24,17 @@ void main() async {
   String? startupError;
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    // iOS tarafinda default app onceden olusmus olabilir; tekrar init etmeyelim.
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } on FirebaseException catch (e) {
+    // [core/duplicate-app] durumunda mevcut app'i kullanmaya devam et.
+    if (e.code != 'duplicate-app') {
+      startupError = e.toString();
+    }
   } catch (e) {
     startupError = e.toString();
   }

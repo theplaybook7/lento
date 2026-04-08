@@ -137,7 +137,10 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
         );
 
         final bytes = await image.readAsBytes();
-        await ref.putData(bytes);
+        await ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/png'),
+        );
 
         final logoUrl = await ref.getDownloadURL();
 

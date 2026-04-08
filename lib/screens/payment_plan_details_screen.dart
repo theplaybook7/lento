@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:typed_data';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/payment_model.dart';
 import '../services/firebase_service.dart';
 import '../utils/image_utils.dart';
@@ -718,7 +718,10 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           final storageRef = FirebaseService().getStorageRef('payment_proofs/$fileName');
           final compressedList = await compressImage(selectedImages[i]);
           final compressedBytes = Uint8List.fromList(compressedList);
-          await storageRef.putData(compressedBytes);
+          await storageRef.putData(
+            compressedBytes,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
           final url = await storageRef.getDownloadURL();
           photoUrls.add(url);
         }
@@ -1087,7 +1090,10 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           final storageRef = FirebaseService().getStorageRef('payment_proofs/$fileName');
           final compressedList = await compressImage(selectedImages[i]);
           final compressedBytes = Uint8List.fromList(compressedList);
-          await storageRef.putData(compressedBytes);
+          await storageRef.putData(
+            compressedBytes,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
           final url = await storageRef.getDownloadURL();
           newPhotoUrls.add(url);
         }

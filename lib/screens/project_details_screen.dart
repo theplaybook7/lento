@@ -27,6 +27,21 @@ class ProjectDetailsScreen extends StatefulWidget {
   State<ProjectDetailsScreen> createState() => _ProjectDetailsScreenState();
 }
 
+String _mimeTypeFromExtension(String ext) {
+  switch (ext.toLowerCase()) {
+    case 'pdf': return 'application/pdf';
+    case 'doc': return 'application/msword';
+    case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xls': return 'application/vnd.ms-excel';
+    case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'png': return 'image/png';
+    case 'jpg': case 'jpeg': return 'image/jpeg';
+    case 'gif': return 'image/gif';
+    case 'webp': return 'image/webp';
+    default: return 'application/octet-stream';
+  }
+}
+
 class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with SingleTickerProviderStateMixin {
   late FirebaseService _firebase;
   late TabController _tabController;
@@ -39,13 +54,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   final List<Map<String, String>> _yuklenenBelgeler = []; // {başlık, tarih, type}
   
   // Ruhsat arama
-  String _ruhsatArama = '';
-  String _belgeArama = '';
+  final String _ruhsatArama = '';
+  final String _belgeArama = '';
 
   // Akış Diyagramı durum yönetimi
   final Map<int, int> _akisDurumlari = {};
   final Map<int, String> _akisNotlari = {};
-  String _akisArama = '';
+  final String _akisArama = '';
   int? _expandedAkisNodeId;
   final TextEditingController _akisNotEditController = TextEditingController();
   bool _tapuSureciGerekli = false; // Karar Kontrolü Evet/Hayır
@@ -96,10 +111,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           continue;
         }
         if (doc.id == 'yola_terk_kontrol') {
-          if (mounted) setState(() {
+          if (mounted) {
+            setState(() {
             _yolaTerkMi = data['yolaTerk'] == true;
             _yolaTerkKararVerildi = data['kararVerildi'] == true;
           });
+          }
           continue;
         }
         final sira = data['sira'] as int?;
@@ -1476,7 +1493,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   // ── Ağaç Düğümü (Normal — genişleyebilir) ──
-  Widget _akisNode(int id, String title, {bool isDecision = false}) {
+  Widget _akisNode(int id, String title) {
     final s = _akisDurumlari[id] ?? 0;
     final hasNote = (_akisNotlari[id] ?? '').isNotEmpty;
     final noteText = _akisNotlari[id] ?? '';
@@ -1916,8 +1933,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               onPressed: () async {
                 final yeniNot = _akisNotEditController.text.trim();
                 setState(() {
-                  if (yeniNot.isEmpty) _akisNotlari.remove(id);
-                  else _akisNotlari[id] = yeniNot;
+                  if (yeniNot.isEmpty) {
+                    _akisNotlari.remove(id);
+                  } else {
+                    _akisNotlari[id] = yeniNot;
+                  }
                   _expandedAkisNodeId = null;
                 });
                 try {
@@ -2515,7 +2535,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           .child(uniqueFileName);
 
       // Dosyayı yükle
-      await storageRef.putData(file.bytes!);
+      final contentType = _mimeTypeFromExtension(fileExtension);
+      await storageRef.putData(
+        file.bytes!,
+        SettableMetadata(contentType: contentType),
+      );
 
       // Firestore'a kaydet
       final yeniBelge = {
@@ -3493,7 +3517,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             .ref()
             .child('santiye_fotograflar/${widget.projectId}/$fileName');
         
-        await storageRef.putData(file.bytes!);
+        final ext = file.name.split('.').last.toLowerCase();
+        final contentType = (ext == 'png') ? 'image/png' : 'image/jpeg';
+        await storageRef.putData(
+          file.bytes!,
+          SettableMetadata(contentType: contentType),
+        );
         final downloadUrl = await storageRef.getDownloadURL();
         
         // Firestore'a kaydet

@@ -356,10 +356,10 @@ class FirebaseService {
         }
       }
 
-      await _db.collection('project_finance').doc(projectId).update({
+      await _db.collection('project_finance').doc(projectId).set({
         'totalIncome': totalIncome,
         'totalExpenses': totalExpenses,
-      });
+      }, SetOptions(merge: true));
     } catch (e) {
       developer.log('Proje finansmanı güncelleme hatası: $e');
     }
@@ -595,6 +595,7 @@ class FirebaseService {
 
       // Plan durumunu güncelle
       final plan = await _db.collection('payment_plans').doc(paymentPlanId).get();
+      if (!plan.exists) return;
       final planData = plan.data() as Map<String, dynamic>;
       final totalAmount = (planData['totalAmount'] as num?)?.toDouble() ?? 0;
 
@@ -656,7 +657,7 @@ class FirebaseService {
 
       final planData = planDoc.data() as Map<String, dynamic>;
       final projectId = planData['projectId'] as String?;
-      final totalBudget = planData['totalAmount'] as double? ?? 0.0;
+      final totalBudget = (planData['totalAmount'] as num?)?.toDouble() ?? 0.0;
 
       // Yeni taksit için tutarı yüzde üzerinden hesapla
       final amount = (totalBudget * installmentPercentage) / 100;

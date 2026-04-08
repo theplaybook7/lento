@@ -1168,6 +1168,7 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
     }
 
     final plan = await FirebaseFirestore.instance.collection('payment_plans').doc(widget.paymentPlanId).get();
+    if (!plan.exists) return;
     final planData = plan.data() as Map<String, dynamic>;
     final totalAmount = (planData['totalAmount'] as num?)?.toDouble() ?? 0;
     final newStatus = planTotalPaid >= totalAmount ? 'completed' : 'partialPaid';

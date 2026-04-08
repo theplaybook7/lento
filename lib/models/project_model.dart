@@ -55,15 +55,15 @@ class Project {
       id: id,
       name: map['name'] ?? '',
       description: map['description'],
-      startDate: (map['startDate'] as Timestamp).toDate(),
-      endDate: map['endDate'] != null ? (map['endDate'] as Timestamp).toDate() : null,
+      startDate: map['startDate'] is Timestamp ? (map['startDate'] as Timestamp).toDate() : DateTime.now(),
+      endDate: map['endDate'] != null && map['endDate'] is Timestamp ? (map['endDate'] as Timestamp).toDate() : null,
       status: ProjectStatus.values.firstWhere(
         (e) => e.name == map['status'],
         orElse: () => ProjectStatus.planning,
       ),
       currentPhase: map['currentPhase'] ?? 'planning',
       totalBudget: (map['totalBudget'] ?? 0).toDouble(),
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      createdAt: map['createdAt'] is Timestamp ? (map['createdAt'] as Timestamp).toDate() : DateTime.now(),
       companyId: map['companyId'] ?? '',
       isArchived: map['isArchived'] ?? false,
     );
@@ -106,8 +106,8 @@ class ProjectPhase {
     return ProjectPhase(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
-      startDate: (map['startDate'] as Timestamp).toDate(),
-      endDate: map['endDate'] != null ? (map['endDate'] as Timestamp).toDate() : null,
+      startDate: map['startDate'] is Timestamp ? (map['startDate'] as Timestamp).toDate() : DateTime.now(),
+      endDate: map['endDate'] != null && map['endDate'] is Timestamp ? (map['endDate'] as Timestamp).toDate() : null,
       status: ProjectPhaseStatus.values.firstWhere(
         (e) => e.name == map['status'],
         orElse: () => ProjectPhaseStatus.planning,
@@ -156,7 +156,7 @@ class FinanceTransaction {
   factory FinanceTransaction.fromMap(Map<String, dynamic> map) {
     return FinanceTransaction(
       id: map['id'] ?? '',
-      date: (map['date'] as Timestamp).toDate(),
+      date: map['date'] is Timestamp ? (map['date'] as Timestamp).toDate() : DateTime.now(),
       description: map['description'] ?? '',
       amount: (map['amount'] ?? 0).toDouble(),
       category: FinanceCategory.values.firstWhere(
@@ -165,7 +165,7 @@ class FinanceTransaction {
       ),
       type: map['type'] ?? 'expense',
       reference: map['reference'],
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      createdAt: map['createdAt'] is Timestamp ? (map['createdAt'] as Timestamp).toDate() : DateTime.now(),
     );
   }
 }
@@ -240,7 +240,7 @@ class CompanyFinance {
       totalIncome: (map['totalIncome'] ?? 0).toDouble(),
       totalExpenses: (map['totalExpenses'] ?? 0).toDouble(),
       projectIds: List<String>.from(map['projectIds'] ?? []),
-      lastUpdated: (map['lastUpdated'] as Timestamp).toDate(),
+      lastUpdated: map['lastUpdated'] is Timestamp ? (map['lastUpdated'] as Timestamp).toDate() : DateTime.now(),
     );
   }
 }

@@ -45,7 +45,7 @@ service cloud.firestore {
       // sirketId varsa normal erişim, yoksa email eşleşmesi ile okumaya izin ver
       allow read: if isAuthenticated() && (
         (hasUserSirketId() && userSirketId() == sirketId)
-        || (!hasUserSirketId() && request.auth.token.email in resource.data.emailler)
+        || ('emailler' in resource.data && request.auth.token.email in resource.data.emailler)
       );
       allow write: if isAdmin() && userSirketId() == sirketId;
 

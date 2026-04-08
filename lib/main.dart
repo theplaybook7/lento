@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -19,6 +21,20 @@ import 'screens/dashboard.dart';
 /// StreamBuilder'ın VeriYuklemeEkrani'na geçmesini engeller.
 final ValueNotifier<bool> companyCreationInProgress = ValueNotifier(false);
 
+Future<void> _initializeIosServices() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
+    return;
+  }
+
+  try {
+    final notificationService = PaymentNotificationService();
+    await notificationService.initialize().timeout(const Duration(seconds: 10));
+    await notificationService.initializeBackgroundTasks().timeout(const Duration(seconds: 10));
+  } catch (_) {
+    // iOS arka plan/bildirim servisleri uygulama acilisini bloklamamali.
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   String? startupError;
@@ -39,14 +55,12 @@ void main() async {
     startupError = e.toString();
   }
   
-  // Bildirim ve arka plan görevleri sadece iOS'ta aktiftir.
-  if (startupError == null && !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-    final notificationService = PaymentNotificationService();
-    await notificationService.initialize();
-    await notificationService.initializeBackgroundTasks();
-  }
-  
   runApp(InsaatYonetimApp(startupError: startupError));
+
+  // Bildirim ve arka plan görevleri UI acildiktan sonra baslatilsin.
+  if (startupError == null) {
+    unawaited(_initializeIosServices());
+  }
 }
 
 class InsaatYonetimApp extends StatelessWidget {

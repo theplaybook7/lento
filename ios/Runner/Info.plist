@@ -30,6 +30,10 @@
 	<string>Uygulama, santiye fotograflari cekmek ve proje gorselleri eklemek icin kameraya erisim ister.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Uygulama, projelere fotograf yuklemek ve belge eklemek icin fotograf kutuphanesine erisim ister.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Uygulama, cekilen fotograflari kaydetmek icin fotograf kutuphanesine yazma izni ister.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

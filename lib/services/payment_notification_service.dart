@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
 import 'firebase_service.dart';
 
-const String _paymentBackgroundTaskName = 'checkPaymentInstallments';
+const String _paymentBackgroundTaskName = 'payment_check';
 
 class PaymentNotificationService {
   static final PaymentNotificationService _instance = PaymentNotificationService._internal();
@@ -124,7 +126,7 @@ class PaymentNotificationService {
       );
 
       await Workmanager().registerPeriodicTask(
-        'payment_check',
+        _paymentBackgroundTaskName,
         _paymentBackgroundTaskName,
         frequency: const Duration(hours: 24),
         initialDelay: const Duration(minutes: 15),
@@ -139,7 +141,7 @@ class PaymentNotificationService {
   /// Background task'i durdur
   Future<void> stopBackgroundTasks() async {
     try {
-      await Workmanager().cancelByTag('payment_check');
+      await Workmanager().cancelByUniqueName(_paymentBackgroundTaskName);
       developer.log('Background task durduruldu');
     } catch (e) {
       developer.log('Background task durdurma hatası: $e');

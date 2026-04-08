@@ -81,6 +81,45 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
     }
   }
 
+  Future<void> _sifremiUnuttum() async {
+    final emailText = _emailCtrl.text.trim();
+    if (emailText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen e-posta adresinizi girin.")),
+      );
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: _normalizeEmail(emailText));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.")),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String msg;
+      switch (e.code) {
+        case 'user-not-found':
+          msg = 'Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı.';
+          break;
+        case 'invalid-email':
+          msg = 'Geçersiz e-posta adresi.';
+          break;
+        default:
+          msg = 'Bir hata oluştu. Lütfen tekrar deneyin.';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Bir hata oluştu. Lütfen tekrar deneyin.")),
+        );
+      }
+    }
+  }
+
   Future<void> _sirketKurDialog() async {
     if (PaymentService().isApplePaymentSupported) {
       // iOS/macOS: IAP akışı
@@ -851,7 +890,24 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                             ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  
+                  // Şifremi Unuttum
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _loading ? null : _sifremiUnuttum,
+                      child: Text(
+                        "Şifremi Unuttum",
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   
                   // Yeni Şirket Kur Butonu
                   SizedBox(

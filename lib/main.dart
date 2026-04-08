@@ -111,7 +111,7 @@ class StartupErrorScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Uygulama Firebase baslatilirken hata aldi. Xcode Scheme > Run > Arguments altinda gerekli --dart-define degerlerinin verildigini kontrol edin.',
+                'Uygulama başlatılırken bir hata oluştu. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.',
               ),
               const SizedBox(height: 16),
               Expanded(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import '../utils/upload_helper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:typed_data';
@@ -463,7 +464,8 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                             final ref = FirebaseStorage.instance.ref(
                               'sirket_logolari/${currentEmail}_logo_${DateTime.now().millisecondsSinceEpoch}.png',
                             );
-                            await ref.putData(
+                            await uploadToStorage(
+                              ref,
                               logoBytes!,
                               SettableMetadata(contentType: 'image/png'),
                             );

@@ -9,6 +9,7 @@ import '../services/firebase_service.dart';
 import '../utils/image_utils.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
+import '../utils/upload_helper.dart';
 
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
@@ -718,7 +719,8 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           final storageRef = FirebaseService().getStorageRef('payment_proofs/$fileName');
           final compressedList = await compressImage(selectedImages[i]);
           final compressedBytes = Uint8List.fromList(compressedList);
-          await storageRef.putData(
+          await uploadToStorage(
+            storageRef,
             compressedBytes,
             SettableMetadata(contentType: 'image/jpeg'),
           );
@@ -1090,7 +1092,8 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           final storageRef = FirebaseService().getStorageRef('payment_proofs/$fileName');
           final compressedList = await compressImage(selectedImages[i]);
           final compressedBytes = Uint8List.fromList(compressedList);
-          await storageRef.putData(
+          await uploadToStorage(
+            storageRef,
             compressedBytes,
             SettableMetadata(contentType: 'image/jpeg'),
           );

@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import '../services/firebase_service.dart';
 import '../utils/format_utils.dart';
 import '../utils/image_utils.dart';
+import '../utils/upload_helper.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
 import '../project_core.dart' show SistemYoneticisi;
@@ -1315,7 +1316,8 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                       final compressedList = await compressImage(selectedImages[i]);
                       final compressedBytes = Uint8List.fromList(compressedList);
                       
-                      await storageRef.putData(
+                      await uploadToStorage(
+                        storageRef,
                         compressedBytes,
                         SettableMetadata(contentType: 'image/jpeg'),
                       );

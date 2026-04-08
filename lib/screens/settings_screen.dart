@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import '../utils/upload_helper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -137,7 +138,8 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
         );
 
         final bytes = await image.readAsBytes();
-        await ref.putData(
+        await uploadToStorage(
+          ref,
           bytes,
           SettableMetadata(contentType: 'image/png'),
         );

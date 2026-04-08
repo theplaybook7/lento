@@ -12,6 +12,7 @@ import '../services/firebase_service.dart';
 import '../utils/format_utils.dart' as format_utils;
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
+import '../utils/upload_helper.dart';
 import '../project_core.dart';
 import '../notification_service.dart';
 import '../utils/responsive_utils.dart' as resp;
@@ -2537,7 +2538,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
       // Dosyayı yükle
       final contentType = _mimeTypeFromExtension(fileExtension);
-      await storageRef.putData(
+      await uploadToStorage(
+        storageRef,
         file.bytes!,
         SettableMetadata(contentType: contentType),
       );
@@ -3520,7 +3522,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         
         final ext = file.name.split('.').last.toLowerCase();
         final contentType = (ext == 'png') ? 'image/png' : 'image/jpeg';
-        await storageRef.putData(
+        await uploadToStorage(
+          storageRef,
           file.bytes!,
           SettableMetadata(contentType: contentType),
         );

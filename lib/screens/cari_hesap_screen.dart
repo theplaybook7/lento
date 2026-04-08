@@ -12,6 +12,7 @@ import '../utils/image_utils.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
 import '../project_core.dart' show SistemYoneticisi;
+import 'package:url_launcher/url_launcher.dart';
 import '../web/web_utils.dart' as web_utils;
 import '../utils/responsive_utils.dart' as resp;
 
@@ -2368,28 +2369,27 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
     );
   }
 
-  void _downloadCariImage(String imageUrl) {
+  void _downloadCariImage(String imageUrl) async {
     try {
       if (kIsWeb) {
         web_utils.downloadImage(
           imageUrl,
           fileName: 'cari_${DateTime.now().millisecondsSinceEpoch}.jpg',
         );
-        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('İndirme başlatıldı')),
           );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mobilde indirme: fotoğrafa uzun basarak kaydedin')),
-        );
+        await launchUrl(Uri.parse(imageUrl), mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(hataCevir(e))),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(hataCevir(e))),
+        );
+      }
     }
   }  Future<void> _projeSec() async {
     final projects = await FirebaseFirestore.instance.collection('projects').where('companyId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').get();

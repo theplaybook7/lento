@@ -65,7 +65,61 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
           .where('emailler', arrayContains: email)
           .get();
 
-      if (query.docs.length <= 1) {
+      final sirketler = query.docs.map((d) => Sirket.fromFirestore(d)).toList();
+      final bulunanIds = query.docs.map((d) => d.id).toSet();
+
+      // Tüm şirketlerde personelListesi'nden emailler'i düzelt (migration)
+      for (final doc in query.docs) {
+        try {
+          final s = Sirket.fromFirestore(doc);
+          final allEmails = <String>[s.yoneticiEposta.trim().toLowerCase()];
+          for (final p in s.personelListesi) {
+            final pe = p.email.trim().toLowerCase();
+            if (pe.isNotEmpty && !allEmails.contains(pe)) allEmails.add(pe);
+          }
+          await FirebaseFirestore.instance
+              .collection('sirketler')
+              .doc(doc.id)
+              .update({'emailler': allEmails});
+        } catch (_) {}
+      }
+
+      // users koleksiyonundaki sirketId ile extra şirket kontrolü
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final sirketId = userDoc.data()?['sirketId'] as String?;
+        if (sirketId != null && sirketId.isNotEmpty && !bulunanIds.contains(sirketId)) {
+          try {
+            final extraDoc = await FirebaseFirestore.instance
+                .collection('sirketler')
+                .doc(sirketId)
+                .get();
+            if (extraDoc.exists) {
+              final s = Sirket.fromFirestore(extraDoc);
+              final isAdmin = s.yoneticiEposta.trim().toLowerCase() == email;
+              final isPersonel = s.personelListesi.any(
+                (p) => p.email.trim().toLowerCase() == email,
+              );
+              if (isAdmin || isPersonel) {
+                sirketler.add(s);
+                // emailler'i düzelt
+                try {
+                  await FirebaseFirestore.instance
+                      .collection('sirketler')
+                      .doc(sirketId)
+                      .update({'emailler': FieldValue.arrayUnion([email])});
+                } catch (_) {}
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (sirketler.length <= 1) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Yalnızca bir şirkete kayıtlısınız.')),
@@ -73,8 +127,6 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
         }
         return;
       }
-
-      final sirketler = query.docs.map((d) => Sirket.fromFirestore(d)).toList();
       final mevcutId = SistemYoneticisi().aktifSirket?.id;
 
       if (!mounted) return;
@@ -847,6 +899,27 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         ],
                       ),
                     ),
+                    if (okunmamis.length > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              await BildirimServisi.tumunuOkunduIsaretle(okunmamis);
+                              if (context.mounted) Navigator.pop(context);
+                            },
+                            icon: const Icon(Icons.done_all, size: 14),
+                            label: const Text('Hepsini Okundu İşaretle', style: TextStyle(fontSize: 11)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.deepOrange,
+                              side: const BorderSide(color: Colors.deepOrange),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ),
                     Divider(height: 1, color: Colors.grey.shade200),
                     const SizedBox(height: 4),
                     ListView.builder(
@@ -1194,14 +1267,15 @@ class _CarilerTabState extends State<_CarilerTab> {
           children: [
             Icon(ikon, size: 18, color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7)),
             const SizedBox(width: 4),
-            Text(
+            Flexible(child: Text(
               etiket,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: aktif ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.7),
                 fontWeight: aktif ? FontWeight.w600 : FontWeight.normal,
                 fontSize: 12,
               ),
-            ),
+            )),
           ],
         ),
       ),
@@ -1456,6 +1530,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   void initState() {
     super.initState();
     _ruhsatPasifBildirimKontrol();
+    _akisDiyagramiPasifBildirimKontrol();
   }
 
   Future<void> _projeIsimDuzenle(Project project) async {
@@ -1595,6 +1670,77 @@ class _ProjectsTabState extends State<_ProjectsTab> {
     }
   }
 
+  // ── Akış Diyagramı 4+ Gün Pasif Bildirim Kontrolü ──
+  Future<void> _akisDiyagramiPasifBildirimKontrol() async {
+    if (!SistemYoneticisi().yetkiVarMi('ruhsat')) return;
+    final sirketId = SistemYoneticisi().aktifSirket?.id;
+    if (sirketId == null) return;
+
+    try {
+      final kontrolRef = FirebaseFirestore.instance
+          .collection('sirketler').doc(sirketId)
+          .collection('sistem').doc('akis_pasif_kontrol');
+      final kontrolDoc = await kontrolRef.get();
+      if (kontrolDoc.exists) {
+        final sonKontrol = kontrolDoc.data()?['sonKontrol'];
+        if (sonKontrol != null) {
+          final sonTarih = sonKontrol is Timestamp ? sonKontrol.toDate() : (sonKontrol is DateTime ? sonKontrol : null);
+          if (sonTarih != null && DateTime.now().difference(sonTarih).inHours < 24) return;
+        }
+      }
+
+      final projeler = await FirebaseFirestore.instance
+          .collection('projects')
+          .where('companyId', isEqualTo: sirketId)
+          .get();
+
+      for (final proje in projeler.docs) {
+        final projeData = proje.data();
+        if (projeData['isArchived'] == true) continue;
+        final projeAdi = projeData['name'] ?? 'Proje';
+
+        final islemler = await FirebaseFirestore.instance
+            .collection('ruhsat').doc(proje.id)
+            .collection('akis_diyagrami').get();
+
+        if (islemler.docs.isEmpty) continue;
+
+        int tamamlanan = 0;
+        DateTime? sonIslem;
+        for (final doc in islemler.docs) {
+          final d = doc.data();
+          if (doc.id == 'karar_kontrol') continue;
+          if ((d['durum'] as int? ?? 0) == 2) tamamlanan++;
+          final gt = d['guncellendiTarihi'];
+          if (gt != null) {
+            DateTime? t;
+            if (gt is Timestamp) t = gt.toDate();
+            else if (gt is DateTime) t = gt;
+            if (t != null && (sonIslem == null || t.isAfter(sonIslem))) sonIslem = t;
+          }
+        }
+
+        if (tamamlanan >= 37) continue;
+
+        if (sonIslem != null) {
+          final pasifGun = DateTime.now().difference(sonIslem).inDays;
+          if (pasifGun >= 4) {
+            await BildirimServisi.bildirimGonder(
+              baslik: '⚠️ Akış Diyagramı Uyarısı',
+              mesaj: '$projeAdi projesinde $pasifGun gündür akış diyagramında işlem yapılmadı!',
+              projeId: proje.id,
+              modul: 'ruhsat',
+            );
+          }
+        }
+      }
+
+      await kontrolRef.set({'sonKontrol': FieldValue.serverTimestamp()});
+    } catch (e) {
+      developer.log('Akış diyagramı pasif bildirim kontrol hatası: $e', name: 'dashboard');
+    }
+  }
+
   static const _ruhsatMaddeleri = [
     'LİHKAB BAŞVURU',
     'LİHKAB SONUÇ',
@@ -1646,61 +1792,61 @@ class _ProjectsTabState extends State<_ProjectsTab> {
     'KAT İRTİFAKI ONAYLANAN',
   ];
 
+  static const Map<int, String> _akisNodeNames = {
+    1: 'LİHKAP', 2: 'İmar Durumu', 3: 'İstikamet Memuru',
+    4: 'İstikamet Çizimi', 5: 'Karar Kontrolü', 6: 'Folyo Hazırlanması', 7: 'Etüt Çalışması',
+    8: 'Karot Alımı', 9: 'RBT', 10: 'Kesim Yazıları', 11: 'Muafiyet',
+    12: 'Boş Yazısı', 13: 'Yıkım', 14: 'Zemin Etütü',
+    15: 'Mimari Proje', 16: 'Statik Taslak', 17: 'Statik Proje',
+    18: 'YİBF Girişi', 19: 'Elektrik Proje', 20: 'Mekanik Proje',
+    21: 'Akustik Proje', 22: 'EKB', 23: 'Müellif Evrakları', 24: 'İSKİ',
+    25: 'Eksiklerin Giderilmesi', 26: 'Ruhsat Dilekçesi',
+    27: 'YD Proje Onayı', 28: 'Belediye Proje Onayı', 29: 'Fen İşleri',
+    30: 'Müteahhit Belgeleri', 31: 'Harçlar', 32: 'Otopark',
+    33: 'Teminat Mektubu', 34: 'Numarataj', 35: 'Ruhsat Yazımı',
+    36: 'Ruhsat Teslimi', 37: 'Kat İrtifakı',
+    46: 'Zemin Etütü Onayı', 47: 'Noter Evrakları',
+  };
+
   Future<Map<String, dynamic>> _getRuhsatOzet(String projectId) async {
     final snapshot = await FirebaseFirestore.instance
         .collection('ruhsat')
         .doc(projectId)
-        .collection('islemler')
+        .collection('akis_diyagrami')
         .get();
 
     int tamamlanan = 0;
     int devamEden = 0;
-    int sonTamamlananSira = 0;
     DateTime? sonIslemTarihi;
+    String? aktifMadde;
 
     for (var doc in snapshot.docs) {
+      if (doc.id == 'karar_kontrol') continue;
       final data = doc.data();
       final durum = data['durum'] as int? ?? 0;
-      final sira = data['sira'] as int? ?? 0;
-      if (durum == 2) {
-        tamamlanan++;
-        if (sira > sonTamamlananSira) sonTamamlananSira = sira;
+      if (durum == 2) tamamlanan++;
+      if (durum == 1) {
+        devamEden++;
+        final sira = data['sira'] as int? ?? 0;
+        aktifMadde ??= _akisNodeNames[sira] ?? data['madde'] as String?;
       }
-      if (durum == 1) devamEden++;
 
-      // En son işlem tarihini bul
       final gt = data['guncellendiTarihi'];
       if (gt != null) {
         DateTime? t;
-        if (gt is Timestamp) {
-          t = gt.toDate();
-        } else if (gt is DateTime) {
-          t = gt;
-        }
+        if (gt is Timestamp) t = gt.toDate();
+        else if (gt is DateTime) t = gt;
         if (t != null && (sonIslemTarihi == null || t.isAfter(sonIslemTarihi))) {
           sonIslemTarihi = t;
         }
       }
     }
 
-    // Şu anki aşama: devam eden varsa onu göster, yoksa son tamamlananın sonraki adımı
-    int aktifSira = 0;
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      if ((data['durum'] as int? ?? 0) == 1) {
-        final s = data['sira'] as int? ?? 0;
-        if (aktifSira == 0 || s < aktifSira) aktifSira = s;
-      }
-    }
-    if (aktifSira == 0 && sonTamamlananSira < _ruhsatMaddeleri.length) {
-      aktifSira = sonTamamlananSira + 1;
-    }
-
     return {
       'tamamlanan': tamamlanan,
       'devamEden': devamEden,
-      'toplam': _ruhsatMaddeleri.length,
-      'aktifSira': aktifSira,
+      'toplam': 39,
+      'aktifMadde': aktifMadde,
       'sonIslemTarihi': sonIslemTarihi,
     };
   }
@@ -1907,7 +2053,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                 final tamamlanan = r['tamamlanan'] as int;
                                 final devamEden = r['devamEden'] as int;
                                 final toplam = r['toplam'] as int;
-                                final aktifSira = r['aktifSira'] as int;
+                                final aktifMadde = r['aktifMadde'] as String?;
 
                                 if (tamamlanan == 0 && devamEden == 0) return const SizedBox.shrink();
 
@@ -1917,9 +2063,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                   pasifGunSayisi = DateTime.now().difference(sonIslemTarihi).inDays;
                                 }
 
-                                final aktifMadde = aktifSira > 0 && aktifSira <= _ruhsatMaddeleri.length
-                                    ? _ruhsatMaddeleri[aktifSira - 1]
-                                    : null;
+                                final aktifMaddeStr = aktifMadde;
                                 final tamamlandi = tamamlanan == toplam;
 
                                 return Padding(
@@ -1948,14 +2092,15 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                               color: tamamlandi ? Colors.green.shade700 : Colors.orange.shade700,
                                             ),
                                             const SizedBox(width: 6),
-                                            Text(
+                                            Flexible(child: Text(
                                               'Ruhsat: $tamamlanan/$toplam',
+                                              overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w700,
                                                 color: tamamlandi ? Colors.green.shade700 : Colors.orange.shade700,
                                               ),
-                                            ),
+                                            )),
                                             if (devamEden > 0) ...[
                                               const SizedBox(width: 6),
                                               Text(
@@ -1990,18 +2135,19 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                               children: [
                                                 const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.red),
                                                 const SizedBox(width: 4),
-                                                Text(
+                                                Flexible(child: Text(
                                                   '$pasifGunSayisi gündür işlem yapılmadı!',
+                                                  overflow: TextOverflow.ellipsis,
                                                   style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red),
-                                                ),
+                                                )),
                                               ],
                                             ),
                                           ),
                                         ],
-                                        if (aktifMadde != null && !tamamlandi) ...[
+                                        if (aktifMaddeStr != null && !tamamlandi) ...[
                                           const SizedBox(height: 6),
                                           Text(
-                                            '▸ $aktifMadde',
+                                            '▸ $aktifMaddeStr',
                                             style: TextStyle(
                                               fontSize: 10,
                                               color: Colors.grey.shade600,

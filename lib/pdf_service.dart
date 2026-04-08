@@ -96,7 +96,7 @@ Future<Uint8List> generateSimplePdf({
           final ustM2 = _parseFormatted(b.ustKatM2Ctrl.text);
           visualFloors[i + 1]?.add({
             'label': '$tipKisa (Üst)',
-            'sub': isMut ? 'MÜT' : (isOrt ? 'ORT' : 'MAL'),
+            'sub': isMut ? 'MÜT' : (isOrt ? 'ORT' : 'M.S'),
             'm2': ustM2,
             'flex': ustM2.round(),
             'bg': isOrt ? PdfColors.grey300 : (isMut ? PdfColors.white : PdfColors.green50),
@@ -111,7 +111,7 @@ Future<Uint8List> generateSimplePdf({
           final altM2 = _parseFormatted(b.altKatM2Ctrl.text);
           visualFloors[i - 1]?.add({
             'label': '$tipKisa (Alt)',
-            'sub': isMut ? 'MÜT' : (isOrt ? 'ORT' : 'MAL'),
+            'sub': isMut ? 'MÜT' : (isOrt ? 'ORT' : 'M.S'),
             'm2': altM2,
             'flex': altM2.round(),
             'bg': isOrt ? PdfColors.grey300 : (isMut ? PdfColors.white : PdfColors.green50),
@@ -125,7 +125,7 @@ Future<Uint8List> generateSimplePdf({
 
       visualFloors[i]?.add({
         'label': '$tipKisa $labelEk',
-        'sub': isMut ? 'MÜT' : (isOrt ? 'ORT' : 'MAL'),
+        'sub': isMut ? 'MÜT' : (isOrt ? 'ORT' : 'M.S'),
         'm2': area,
         'flex': area.round(),
         'bg': isOrt ? PdfColors.grey300 : (isMut ? PdfColors.white : PdfColors.green50),
@@ -163,10 +163,10 @@ Future<Uint8List> generateSimplePdf({
     pw.TextAlign align = pw.TextAlign.center,
     PdfColor color = PdfColors.black,
     bool isBold = false,
-    double fontSize = 8,
+    double fontSize = 11,
   }) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.all(2),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 3),
       child: pw.Text(
         text,
         textAlign: align,
@@ -182,12 +182,12 @@ Future<Uint8List> generateSimplePdf({
 
   pw.Widget headerCell(String text) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.all(2),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 3),
       child: pw.Text(
         text,
         textAlign: pw.TextAlign.center,
         style: pw.TextStyle(
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: pw.FontWeight.bold,
           color: PdfColors.white,
           font: fontBold,
@@ -249,15 +249,15 @@ Future<Uint8List> generateSimplePdf({
         pw.TableRow(
           decoration: pw.BoxDecoration(color: b.sahip == 'Muteahhit' ? PdfColors.red50 : PdfColors.white),
           children: [
-            cell('${kat.ad} - ${b.tip}\n(${b.sahip})', align: pw.TextAlign.left, fontSize: 8),
-            cell(_formatNumber(b.toplamMetrekare), fontSize: 8),
-            cell(_formatNumber(insaatMaliyeti), fontSize: 8),
-            cell(_formatNumber(daireBasiOrtakMaliyet), fontSize: 8),
-            cell(hibeTL > 0 ? '-${_formatNumber(hibeTL)}' : '-', color: PdfColors.green700, fontSize: 8),
-            cell(krediTL > 0 ? '-${_formatNumber(krediTL)}' : '-', color: PdfColors.blue700, fontSize: 8),
+            cell('${kat.ad} - ${b.tip} (${b.sahip})', align: pw.TextAlign.left, fontSize: 11),
+            cell(_formatNumber(b.toplamMetrekare), fontSize: 11, isBold: true),
+            cell(_formatNumber(insaatMaliyeti), fontSize: 11, isBold: true),
+            cell(_formatNumber(daireBasiOrtakMaliyet), fontSize: 11, isBold: true),
+            cell(hibeTL > 0 ? '-${_formatNumber(hibeTL)}' : '-', color: PdfColors.green700, fontSize: 11, isBold: true),
+            cell(krediTL > 0 ? '-${_formatNumber(krediTL)}' : '-', color: PdfColors.blue700, fontSize: 11, isBold: true),
             if (toprakSutunuVar)
-              cell(b.sahip == 'Mal Sahibi' ? '-${_formatNumber(kisiBasiToprakIadesi.toDouble())}' : '-', color: PdfColors.orange800, fontSize: 8),
-            cell(netTutarStr, color: netColor, isBold: isBold, fontSize: 8),
+              cell(b.sahip == 'Mal Sahibi' ? '-${_formatNumber(kisiBasiToprakIadesi.toDouble())}' : '-', color: PdfColors.orange800, fontSize: 11, isBold: true),
+            cell(netTutarStr, color: netColor, isBold: isBold, fontSize: 12),
           ],
         ),
       );
@@ -266,11 +266,11 @@ Future<Uint8List> generateSimplePdf({
 
   // Dinamik sayfalama - sayfa yüksekliğine göre satır sayısı hesapla
   final sayfaIcYukseklik = format.height - 30; // 15+15 margin
-  const satirTahminiYukseklik = 35.0;
-  const tabloBaslikYukseklik = 28.0;
-  const ilkSayfaUstBolumYukseklik = 135.0;
-  const devamSayfaUstBolumYukseklik = 30.0;
-  const ozetBolumYukseklik = 130.0;
+  const satirTahminiYukseklik = 38.0;
+  const tabloBaslikYukseklik = 32.0;
+  const ilkSayfaUstBolumYukseklik = 100.0;
+  const devamSayfaUstBolumYukseklik = 22.0;
+  const ozetBolumYukseklik = 100.0;
 
   final ilkSayfaKullanilabilir = sayfaIcYukseklik - ilkSayfaUstBolumYukseklik - tabloBaslikYukseklik;
   final int ilkSayfaMaxOzetsiz = (ilkSayfaKullanilabilir / satirTahminiYukseklik).floor();
@@ -313,8 +313,8 @@ Future<Uint8List> generateSimplePdf({
   pw.Widget ozetSatir(String baslik, String deger) {
     return pw.Column(
       children: [
-        pw.Text(baslik, style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700, font: font)),
-        pw.Text(deger, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, font: fontBold)),
+        pw.Text(baslik, style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700, font: font)),
+        pw.Text(deger, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, font: fontBold)),
       ],
     );
   }
@@ -348,7 +348,7 @@ Future<Uint8List> generateSimplePdf({
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       if (firmaLogosu != null)
-                        pw.Image(pw.MemoryImage(firmaLogosu), width: 120, height: 120)
+                        pw.Image(pw.MemoryImage(firmaLogosu), width: 80, height: 80)
                       else
                         pw.Text(
                           sirket.toUpperCase(),
@@ -370,7 +370,7 @@ Future<Uint8List> generateSimplePdf({
                 ],
               ),
               pw.Divider(color: PdfColors.blueGrey, thickness: 0.5),
-              pw.SizedBox(height: 3),
+              pw.SizedBox(height: 1),
             ] else ...[
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -379,7 +379,7 @@ Future<Uint8List> generateSimplePdf({
                   pw.Text('Sayfa ${sayfaNo + 1}/$toplamSayfaSayisi', style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600, font: font)),
                 ],
               ),
-              pw.SizedBox(height: 5),
+              pw.SizedBox(height: 2),
             ],
 
             pw.Container(
@@ -426,9 +426,9 @@ Future<Uint8List> generateSimplePdf({
             ),
 
             if (sonSayfa) ...[
-              pw.SizedBox(height: 5),
+              pw.SizedBox(height: 3),
               pw.Container(
-                padding: const pw.EdgeInsets.all(4),
+                padding: const pw.EdgeInsets.all(3),
                 decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400), color: PdfColors.grey100),
                 child: pw.Column(
                   children: [
@@ -440,9 +440,9 @@ Future<Uint8List> generateSimplePdf({
                         ozetSatir('BB Ortak Payı', '${_formatNumber(daireBasiDusenOrtakM2)} m²'),
                       ],
                     ),
-                    pw.SizedBox(height: 5),
+                    pw.SizedBox(height: 3),
                     pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                      padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                       decoration: pw.BoxDecoration(color: PdfColors.blue100, borderRadius: pw.BorderRadius.circular(4)),
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -450,16 +450,16 @@ Future<Uint8List> generateSimplePdf({
                           pw.Row(
                             mainAxisAlignment: pw.MainAxisAlignment.center,
                             children: [
-                              pw.Text('MAL SAHİPLERİ TOPLAM ÖDEME (Net): ', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, font: fontBold)),
-                              pw.Text('${_formatNumber(malSahibiNetToplam)} TL', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900, font: fontBold)),
+                              pw.Text('MAL SAHİPLERİ TOPLAM ÖDEME (Net): ', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, font: fontBold)),
+                              pw.Text('${_formatNumber(malSahibiNetToplam)} TL', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900, font: fontBold)),
                             ],
                           ),
                           pw.SizedBox(height: 4),
                           pw.Row(
                             mainAxisAlignment: pw.MainAxisAlignment.center,
                             children: [
-                              pw.Text('Hibe/Kredi Toplamı: ', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800, font: fontBold)),
-                              pw.Text('${_formatNumber(hibeTutari + krediTutari)} TL', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900, font: fontBold)),
+                              pw.Text('Hibe/Kredi Toplamı: ', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800, font: fontBold)),
+                              pw.Text('${_formatNumber(hibeTutari + krediTutari)} TL', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900, font: fontBold)),
                             ],
                           ),
                         ],
@@ -498,9 +498,9 @@ Future<Uint8List> generateSimplePdf({
         : 55.0;
 
     // Kat fontunu kat sayısına göre ayarla
-    final katLabelFont = katSayisi > 10 ? 6.0 : 8.0;
-    final katM2Font = katSayisi > 10 ? 6.0 : 8.0;
-    final katSubFont = katSayisi > 10 ? 5.0 : 6.0;
+    final katLabelFont = katSayisi > 10 ? 7.0 : 9.0;
+    final katM2Font = katSayisi > 10 ? 7.0 : 10.0;
+    final katSubFont = katSayisi > 10 ? 6.0 : 8.0;
 
     pdf.addPage(
       pw.Page(
@@ -547,9 +547,9 @@ Future<Uint8List> generateSimplePdf({
                               child: pw.Column(
                                 mainAxisAlignment: pw.MainAxisAlignment.center,
                                 children: [
-                                  pw.Text(room['label'] as String, style: pw.TextStyle(fontSize: katLabelFont, color: room['textCol'] as PdfColor, font: font), textAlign: pw.TextAlign.center),
+                                  pw.Text(room['label'] as String, style: pw.TextStyle(fontSize: katLabelFont, fontWeight: pw.FontWeight.bold, color: room['textCol'] as PdfColor, font: fontBold), textAlign: pw.TextAlign.center),
                                   pw.Text('${_formatNumber(room['m2'] as double)} m²', style: pw.TextStyle(fontSize: katM2Font, fontWeight: pw.FontWeight.bold, color: room['textCol'] as PdfColor, font: fontBold)),
-                                  pw.Text(room['sub'] as String, style: pw.TextStyle(fontSize: katSubFont, color: room['textCol'] as PdfColor, font: font)),
+                                  pw.Text(room['sub'] as String, style: pw.TextStyle(fontSize: katSubFont, fontWeight: pw.FontWeight.bold, color: room['textCol'] as PdfColor, font: fontBold)),
                                 ],
                               ),
                             ),
@@ -566,11 +566,11 @@ Future<Uint8List> generateSimplePdf({
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.center,
               children: [
-                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.green50, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('MAL SAHİBİ', style: pw.TextStyle(fontSize: 10, font: font))]),
+                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.green50, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('MAL SAHİBİ (M.S)', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, font: fontBold))]),
                 pw.SizedBox(width: 20),
-                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.white, border: pw.Border.all(color: PdfColors.red, width: 1))), pw.SizedBox(width: 5), pw.Text('MÜTEAHHİT', style: pw.TextStyle(fontSize: 10, font: font))]),
+                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.white, border: pw.Border.all(color: PdfColors.red, width: 1))), pw.SizedBox(width: 5), pw.Text('MÜTEAHHİT (MÜT)', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, font: fontBold))]),
                 pw.SizedBox(width: 20),
-                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.grey300, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('ORTAK ALAN', style: pw.TextStyle(fontSize: 10, font: font))]),
+                pw.Row(children: [pw.Container(width: 18, height: 18, decoration: pw.BoxDecoration(color: PdfColors.grey300, border: pw.Border.all(color: PdfColors.black, width: 1))), pw.SizedBox(width: 5), pw.Text('ORTAK ALAN (ORT)', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, font: fontBold))]),
               ],
             ),
           ],

@@ -159,6 +159,9 @@ service cloud.firestore {
       match /islemler/{islemId} {
         allow read, write: if isAuthenticated();
       }
+      match /akis_diyagrami/{docId} {
+        allow read, write: if isAuthenticated();
+      }
       match /belgeler/{belgeId} {
         allow read, write: if isAuthenticated();
       }

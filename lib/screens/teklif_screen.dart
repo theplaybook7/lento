@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 
 import '../audit_log_servisi.dart';
 import '../pdf_service.dart';
@@ -635,6 +637,23 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
     }
   }
 
+  Future<Uint8List?> _firmaLogosuGetir() async {
+    final sirket = SistemYoneticisi().aktifSirket;
+    // logoUrl varsa her zaman ondan indir (güncel logo)
+    final url = sirket?.logoUrl;
+    if (url != null && url.isNotEmpty) {
+      try {
+        final response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200) {
+          sirket!.logo = response.bodyBytes;
+          return response.bodyBytes;
+        }
+      } catch (_) {}
+    }
+    // Fallback: memory'deki logo
+    return sirket?.logo;
+  }
+
   Future<void> _pdfOlusturKontrol() async {
     // Çift tıklamayı engelle
     if (_pdfIslemde) {
@@ -775,7 +794,7 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
         hibeTutari: kullanilanHibeTL,
         krediTutari: kullanilanKrediTL,
         katListesi: widget.katListesi,
-        firmaLogosu: SistemYoneticisi().aktifSirket?.logo,
+        firmaLogosu: await _firmaLogosuGetir(),
       ).timeout(
         const Duration(seconds: 120),
         onTimeout: () {

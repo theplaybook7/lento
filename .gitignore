@@ -47,6 +47,9 @@ android/key.properties
 android/keystore/*.jks
 .firebase/
 
+# Node modules
+node_modules/
+
 # Cloud Functions
 functions/node_modules/
 functions/.env

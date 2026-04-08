@@ -141,14 +141,18 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
 
         final logoUrl = await ref.getDownloadURL();
 
-        // Firestore'da güncelle
+        // Firestore'da güncelle (eski base64 logo alanını da sil)
         await FirebaseFirestore.instance
             .collection('sirketler')
             .doc(_sirket.id)
-            .update({'logoUrl': logoUrl});
+            .update({
+              'logoUrl': logoUrl,
+              'logo': FieldValue.delete(),
+            });
 
         // Yerel veriyi güncelle
         _sirket.logoUrl = logoUrl;
+        _sirket.logo = bytes;
         SistemYoneticisi().aktifSirket = _sirket;
 
         if (mounted) {
@@ -556,6 +560,44 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   return;
                 }
 
+                final normalizedEmail = emailCtrl.text.trim().toLowerCase();
+
+                // Aynı email bu şirkette zaten var mı?
+                final mevcutMu = _sirket.personelListesi.any(
+                  (p) => p.email.trim().toLowerCase() == normalizedEmail,
+                ) || _sirket.yoneticiEposta.trim().toLowerCase() == normalizedEmail;
+                if (mevcutMu) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Bu email zaten bu şirkette kayıtlı."),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                // Başka bir şirkette kayıtlı mı kontrol et
+                try {
+                  final emailSorgu = await FirebaseFirestore.instance
+                      .collection('sirketler')
+                      .where('emailler', arrayContains: normalizedEmail)
+                      .get();
+                  final baskaSirkette = emailSorgu.docs.any((d) => d.id != _sirket.id);
+                  if (baskaSirkette) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Bu email başka bir şirkette zaten kayıtlı."),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                    return;
+                  }
+                } catch (_) {}
+
                 final yeniPersonel = PersonelYetki(
                   email: emailCtrl.text.trim(),
                   adminMi: admin,
@@ -566,7 +608,6 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
 
                 try {
                   final updatedList = [..._sirket.personelListesi, yeniPersonel];
-                  final normalizedEmail = emailCtrl.text.trim().toLowerCase();
                   await FirebaseFirestore.instance
                       .collection('sirketler')
                       .doc(_sirket.id)

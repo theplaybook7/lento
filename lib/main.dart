@@ -156,7 +156,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   }
 
   /// Birden fazla şirkete kayıtlı kullanıcı için şirket seçim dialogu
-  Future<Sirket?> _sirketSecDialog(List<Sirket> sirketler) async {
+  Future<Sirket?> _sirketSecDialog(List<Sirket> sirketler, {Sirket? varsayilan}) async {
     return showDialog<Sirket>(
       context: context,
       barrierDismissible: false,
@@ -169,10 +169,15 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
             itemCount: sirketler.length,
             itemBuilder: (context, index) {
               final s = sirketler[index];
+              final isVarsayilan = varsayilan != null && s.id == varsayilan.id;
               return ListTile(
                 leading: const Icon(Icons.business),
                 title: Text(s.ad),
                 subtitle: Text(s.yoneticiEposta),
+                trailing: isVarsayilan
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : null,
+                selected: isVarsayilan,
                 onTap: () => Navigator.pop(ctx, s),
               );
             },
@@ -213,122 +218,163 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
             .get();
 
         final sirketId = userDoc.data()?['sirketId'] as String?;
-        if (sirketId != null && sirketId.isNotEmpty) {
-          try {
-            final sirketDoc = await FirebaseFirestore.instance
-                .collection('sirketler')
-                .doc(sirketId)
-                .get();
 
-            if (sirketDoc.exists) {
-              final s = Sirket.fromFirestore(sirketDoc);
-              if (_normalizeEmail(s.yoneticiEposta) == email) {
-                bulunanSirket = s;
-                kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
-                // Mevcut şirketlerde adminlar haritasını otomatik oluştur
-                final data = sirketDoc.data();
-                if (data != null && (data['adminlar'] == null || !(data['adminlar'] as Map).containsKey(user.uid))) {
-                  try {
-                    await FirebaseFirestore.instance
-                        .collection('sirketler')
-                        .doc(sirketId)
-                        .update({'adminlar.${user.uid}': true});
-                  } catch (_) {}
-                }
-                // emailler field yoksa otomatik oluştur (migration)
-                if (data != null && data['emailler'] == null) {
-                  try {
-                    final emails = <String>[_normalizeEmail(s.yoneticiEposta)];
-                    for (final p in s.personelListesi) {
-                      final pe = _normalizeEmail(p.email);
-                      if (pe.isNotEmpty && !emails.contains(pe)) emails.add(pe);
-                    }
-                    await FirebaseFirestore.instance
-                        .collection('sirketler')
-                        .doc(sirketId)
-                        .update({'emailler': emails});
-                  } catch (_) {}
-                }
-              } else {
+        // Her zaman email ile tüm şirketleri ara (çoklu şirket desteği)
+        try {
+          final emailQuery = await FirebaseFirestore.instance
+              .collection('sirketler')
+              .where('emailler', arrayContains: email)
+              .get();
+
+          final bulunanSirketler = <Sirket>[];
+          final bulunanYetkiler = <PersonelYetki>[];
+          final bulunanDocIds = <String>{};
+
+          for (final doc in emailQuery.docs) {
+            final s = Sirket.fromFirestore(doc);
+            PersonelYetki? yetki;
+            if (_normalizeEmail(s.yoneticiEposta) == email) {
+              yetki = PersonelYetki(email: email, adminMi: true);
+              // Mevcut şirketlerde adminlar haritasını otomatik oluştur
+              final data = doc.data();
+              if (data['adminlar'] == null || !(data['adminlar'] as Map).containsKey(user.uid)) {
                 try {
-                  final p = s.personelListesi.firstWhere(
-                    (element) => _normalizeEmail(element.email) == email,
-                  );
-                  bulunanSirket = s;
-                  kullaniciYetkisi = p;
-                } catch (_) {
-                  // Bu şirkette yok
-                }
+                  await FirebaseFirestore.instance
+                      .collection('sirketler')
+                      .doc(doc.id)
+                      .update({'adminlar.${user.uid}': true});
+                } catch (_) {}
+              }
+              // emailler field yoksa otomatik oluştur (migration)
+              if (data['emailler'] == null) {
+                try {
+                  final emails = <String>[_normalizeEmail(s.yoneticiEposta)];
+                  for (final p in s.personelListesi) {
+                    final pe = _normalizeEmail(p.email);
+                    if (pe.isNotEmpty && !emails.contains(pe)) emails.add(pe);
+                  }
+                  await FirebaseFirestore.instance
+                      .collection('sirketler')
+                      .doc(doc.id)
+                      .update({'emailler': emails});
+                } catch (_) {}
+              }
+            } else {
+              try {
+                yetki = s.personelListesi.firstWhere(
+                  (element) => _normalizeEmail(element.email) == email,
+                );
+              } catch (_) {
+                continue;
               }
             }
-          } catch (_) {
-            // Bozuk şirket verisi, fallback taramaya devam et
+            bulunanSirketler.add(s);
+            bulunanYetkiler.add(yetki);
+            bulunanDocIds.add(doc.id);
           }
-        }
 
-        if (bulunanSirket == null) {
-          // User doc yoksa oluştur (Firestore security rules hasUserSirketId için gerekli)
-          if (!userDoc.exists) {
+          // sirketId ile kayıtlı şirket email sorgusunda bulunamadıysa kontrol et
+          if (sirketId != null && sirketId.isNotEmpty && !bulunanDocIds.contains(sirketId)) {
             try {
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(user.uid)
-                  .set({'email': email}, SetOptions(merge: true));
+              final sirketDoc = await FirebaseFirestore.instance
+                  .collection('sirketler')
+                  .doc(sirketId)
+                  .get();
+              if (sirketDoc.exists) {
+                final s = Sirket.fromFirestore(sirketDoc);
+                PersonelYetki? yetki;
+                if (_normalizeEmail(s.yoneticiEposta) == email) {
+                  yetki = PersonelYetki(email: email, adminMi: true);
+                } else {
+                  try {
+                    yetki = s.personelListesi.firstWhere(
+                      (element) => _normalizeEmail(element.email) == email,
+                    );
+                  } catch (_) {}
+                }
+                if (yetki != null) {
+                  bulunanSirketler.add(s);
+                  bulunanYetkiler.add(yetki);
+                  // emailler array'ini otomatik düzelt
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('sirketler')
+                        .doc(sirketId)
+                        .update({'emailler': FieldValue.arrayUnion([email])});
+                  } catch (_) {}
+                }
+              }
             } catch (_) {}
           }
 
-          // sirketId yoksa veya şirket bulunamadıysa, email ile tüm şirketlerde ara
-          try {
-            final emailQuery = await FirebaseFirestore.instance
-                .collection('sirketler')
-                .where('emailler', arrayContains: email)
-                .get();
-
-            final bulunanSirketler = <Sirket>[];
-            final bulunanYetkiler = <PersonelYetki>[];
-
-            for (final doc in emailQuery.docs) {
-              final s = Sirket.fromFirestore(doc);
-              PersonelYetki? yetki;
-              if (_normalizeEmail(s.yoneticiEposta) == email) {
-                yetki = PersonelYetki(email: email, adminMi: true);
-              } else {
-                try {
-                  yetki = s.personelListesi.firstWhere(
-                    (element) => _normalizeEmail(element.email) == email,
-                  );
-                } catch (_) {
-                  // emailler array'inde var ama personelListesi'nde yok — skip
-                  continue;
-                }
+          // Tüm şirketlerde personelListesi'nden emailler migration
+          for (int i = 0; i < bulunanSirketler.length; i++) {
+            final s = bulunanSirketler[i];
+            final docId = i < emailQuery.docs.length ? emailQuery.docs[i].id : s.id;
+            // emailler'de olmayan personel emaillerini ekle
+            try {
+              final allEmails = <String>[_normalizeEmail(s.yoneticiEposta)];
+              for (final p in s.personelListesi) {
+                final pe = _normalizeEmail(p.email);
+                if (pe.isNotEmpty && !allEmails.contains(pe)) allEmails.add(pe);
               }
-              bulunanSirketler.add(s);
-              bulunanYetkiler.add(yetki);
-            }
+              await FirebaseFirestore.instance
+                  .collection('sirketler')
+                  .doc(docId)
+                  .update({'emailler': allEmails});
+            } catch (_) {}
+          }
 
-            if (bulunanSirketler.length == 1) {
-              bulunanSirket = bulunanSirketler.first;
-              kullaniciYetkisi = bulunanYetkiler.first;
-              // sirketId'yi user doc'a kaydet (gelecek login için hızlı erişim)
-              await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-                'sirketId': bulunanSirket.id,
-              }, SetOptions(merge: true));
-            } else if (bulunanSirketler.length > 1) {
-              // Birden fazla şirket — kullanıcıya seçtir
-              if (mounted) {
-                final secim = await _sirketSecDialog(bulunanSirketler);
-                if (secim != null) {
-                  final idx = bulunanSirketler.indexOf(secim);
-                  bulunanSirket = secim;
-                  kullaniciYetkisi = bulunanYetkiler[idx];
-                  await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-                    'sirketId': bulunanSirket.id,
-                  }, SetOptions(merge: true));
-                }
+          if (bulunanSirketler.length == 1) {
+            bulunanSirket = bulunanSirketler.first;
+            kullaniciYetkisi = bulunanYetkiler.first;
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+              'sirketId': bulunanSirket.id,
+            }, SetOptions(merge: true));
+          } else if (bulunanSirketler.length > 1) {
+            // Birden fazla şirket — kayıtlı sirketId varsa onu varsayılan yap, yoksa seçtir
+            Sirket? varsayilan;
+            if (sirketId != null && sirketId.isNotEmpty) {
+              try {
+                varsayilan = bulunanSirketler.firstWhere((s) => s.id == sirketId);
+              } catch (_) {}
+            }
+            if (mounted) {
+              final secim = await _sirketSecDialog(bulunanSirketler, varsayilan: varsayilan);
+              if (secim != null) {
+                final idx = bulunanSirketler.indexOf(secim);
+                bulunanSirket = secim;
+                kullaniciYetkisi = bulunanYetkiler[idx];
+                await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+                  'sirketId': bulunanSirket.id,
+                }, SetOptions(merge: true));
               }
             }
-          } catch (_) {
-            // Sorgu başarısız — devam et, şirket bulunamadı gösterilecek
+          }
+        } catch (_) {
+          // Email sorgusu başarısız — sirketId ile fallback dene
+          if (sirketId != null && sirketId.isNotEmpty) {
+            try {
+              final sirketDoc = await FirebaseFirestore.instance
+                  .collection('sirketler')
+                  .doc(sirketId)
+                  .get();
+              if (sirketDoc.exists) {
+                final s = Sirket.fromFirestore(sirketDoc);
+                if (_normalizeEmail(s.yoneticiEposta) == email) {
+                  bulunanSirket = s;
+                  kullaniciYetkisi = PersonelYetki(email: email, adminMi: true);
+                } else {
+                  try {
+                    final p = s.personelListesi.firstWhere(
+                      (element) => _normalizeEmail(element.email) == email,
+                    );
+                    bulunanSirket = s;
+                    kullaniciYetkisi = p;
+                  } catch (_) {}
+                }
+              }
+            } catch (_) {}
           }
         }
 

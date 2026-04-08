@@ -66,4 +66,22 @@ class BildirimServisi {
       return !okuyanlar.contains(email) && _yetkisiVarMi(b);
     }).toList();
   }
+
+  /// Tüm okunmamış bildirimleri okundu olarak işaretler
+  static Future<void> tumunuOkunduIsaretle(List<QueryDocumentSnapshot> okunmamislar) async {
+    final email = SistemYoneticisi().girisYapanEmail;
+    final sirketId = SistemYoneticisi().aktifSirket?.id;
+    if (email == null || sirketId == null) return;
+    
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in okunmamislar) {
+      batch.update(
+        FirebaseFirestore.instance
+            .collection('sirketler').doc(sirketId)
+            .collection('bildirimler').doc(doc.id),
+        {'okuyanlar': FieldValue.arrayUnion([email])},
+      );
+    }
+    await batch.commit();
+  }
 }

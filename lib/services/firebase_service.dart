@@ -457,20 +457,24 @@ class FirebaseService {
                 .map((doc) => Project.fromMap(doc.data(), doc.id))
                 .toList();
 
-            // Her proje için ruhsat son işlem tarihini al
+            // Her proje için ruhsat son işlem tarihini al (islemler + akis_diyagrami)
             final Map<String, DateTime?> sonIslemMap = {};
             await Future.wait(projects.map((p) async {
               try {
-                final islemler = await _db
-                    .collection('ruhsat').doc(p.id)
-                    .collection('islemler').get();
                 DateTime? sonIslem;
-                for (final doc in islemler.docs) {
-                  final gt = doc.data()['guncellendiTarihi'];
-                  DateTime? t;
-                  if (gt is Timestamp) t = gt.toDate();
-                  if (t != null && (sonIslem == null || t.isAfter(sonIslem))) {
-                    sonIslem = t;
+                // Hem islemler hem akis_diyagrami koleksiyonlarını kontrol et
+                final results = await Future.wait([
+                  _db.collection('ruhsat').doc(p.id).collection('islemler').get(),
+                  _db.collection('ruhsat').doc(p.id).collection('akis_diyagrami').get(),
+                ]);
+                for (final snap in results) {
+                  for (final doc in snap.docs) {
+                    final gt = doc.data()['guncellendiTarihi'];
+                    DateTime? t;
+                    if (gt is Timestamp) t = gt.toDate();
+                    if (t != null && (sonIslem == null || t.isAfter(sonIslem))) {
+                      sonIslem = t;
+                    }
                   }
                 }
                 sonIslemMap[p.id] = sonIslem;

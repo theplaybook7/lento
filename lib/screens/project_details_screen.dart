@@ -2231,6 +2231,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     'sira': sira,
                     'madde': madde,
                     'not': yeniNot,
+                    'guncellendiTarihi': DateTime.now(),
                   }, SetOptions(merge: true));
               // Not değiştiyse bildirim gönder
               if (yeniNot.isNotEmpty) {

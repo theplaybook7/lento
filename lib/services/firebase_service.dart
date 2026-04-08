@@ -447,16 +447,19 @@ class FirebaseService {
     return _db
         .collection('projects')
         .where('companyId', isEqualTo: companyId)
-        .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .where((doc) {
-              final data = doc.data();
-              // İstemci tarafında isArchived filtrelemesi
-              return (data['isArchived'] ?? false) == false;
-            })
-            .map((doc) => Project.fromMap(doc.data(), doc.id))
-            .toList());
+        .map((snapshot) {
+            final projects = snapshot.docs
+                .where((doc) {
+                  final data = doc.data();
+                  return (data['isArchived'] ?? false) == false;
+                })
+                .map((doc) => Project.fromMap(doc.data(), doc.id))
+                .toList();
+            // En uzun süredir işlem yapılmamış proje en üstte
+            projects.sort((a, b) => a.startDate.compareTo(b.startDate));
+            return projects;
+        });
   }
 
   // ============== ÖDEME PLANI İŞLEMLERİ ==============

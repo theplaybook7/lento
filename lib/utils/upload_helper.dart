@@ -13,19 +13,29 @@ Future<void> uploadToStorage(
   try {
     await ref.putData(bytes, metadata);
     print('[UPLOAD] ✅ Başarılı: ${ref.fullPath}');
+    return;
   } catch (e) {
     print('[UPLOAD] ⚠️ putData hata: $e');
-    // iOS cancelFetcher: "Upload has already been finalized" = dosya yüklendi ama
-    // SDK finalization adımında hata aldı. 1 saniye bekleyip doğrula.
-    await Future.delayed(const Duration(seconds: 2));
+  }
+
+  // putData hata verdi. iOS'ta bu genelde "Upload has already been finalized" (400)
+  // veya plist çakışması (412) olabilir. Dosyanın yüklenip yüklenmediğini kontrol et.
+  for (int attempt = 1; attempt <= 3; attempt++) {
+    await Future.delayed(Duration(seconds: attempt * 2));
     try {
       final url = await ref.getDownloadURL();
-      print('[UPLOAD] ✅ Doğrulandı (dosya yüklendi): $url');
-      return; // Başarılı
-    } catch (verifyError) {
-      print('[UPLOAD] ❌ Doğrulama başarısız: $verifyError');
-      // Dosya gerçekten yüklenmedi, orjinal hatayı fırlat
-      throw e;
+      print('[UPLOAD] ✅ Doğrulandı (attempt $attempt): $url');
+      return;
+    } catch (_) {
+      print('[UPLOAD] ⏳ Doğrulama attempt $attempt başarısız, tekrar deneniyor...');
     }
   }
+
+  // Dosya yüklenmemiş. Varsa kısmı dosyayı silip sıfırdan yükle.
+  print('[UPLOAD] 🔄 Tam yeniden yükleme: ${ref.fullPath}');
+  try {
+    await ref.delete();
+  } catch (_) {}
+  await ref.putData(bytes, metadata);
+  print('[UPLOAD] ✅ Yeniden yükleme başarılı: ${ref.fullPath}');
 }

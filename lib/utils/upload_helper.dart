@@ -35,30 +35,45 @@ Future<String> _uploadViaRestApi(
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) throw Exception('Kullanıcı giriş yapmamış');
 
+  print('[UPLOAD] REST API başlıyor: ${ref.fullPath} (${bytes.length} bytes)');
+
   final token = await user.getIdToken();
+  print('[UPLOAD] Token alındı: ${token != null ? "OK" : "NULL"}');
+
   final bucket = ref.storage.bucket;
   final encodedPath = Uri.encodeComponent(ref.fullPath);
+  print('[UPLOAD] Bucket: $bucket');
 
   final uploadUrl = Uri.parse(
     'https://firebasestorage.googleapis.com/v0/b/$bucket/o'
     '?uploadType=media&name=$encodedPath',
   );
+  print('[UPLOAD] URL: $uploadUrl');
 
-  final response = await http.post(
-    uploadUrl,
-    headers: {
-      'Authorization': 'Firebase $token',
-      'Content-Type': metadata.contentType ?? 'application/octet-stream',
-    },
-    body: bytes,
-  );
+  try {
+    final response = await http.post(
+      uploadUrl,
+      headers: {
+        'Authorization': 'Firebase $token',
+        'Content-Type': metadata.contentType ?? 'application/octet-stream',
+      },
+      body: bytes,
+    );
 
-  if (response.statusCode != 200) {
-    throw Exception('Upload failed (${response.statusCode}): ${response.body}');
+    print('[UPLOAD] Response: ${response.statusCode}');
+
+    if (response.statusCode != 200) {
+      print('[UPLOAD] ❌ Body: ${response.body.substring(0, response.body.length.clamp(0, 500))}');
+      throw Exception('Upload failed (${response.statusCode}): ${response.body}');
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final downloadToken = json['downloadTokens'] as String;
+    final url = 'https://firebasestorage.googleapis.com/v0/b/$bucket/o/$encodedPath?alt=media&token=$downloadToken';
+    print('[UPLOAD] ✅ Başarılı: $url');
+    return url;
+  } catch (e) {
+    print('[UPLOAD] ❌ Exception: $e');
+    rethrow;
   }
-
-  final json = jsonDecode(response.body) as Map<String, dynamic>;
-  final downloadToken = json['downloadTokens'] as String;
-
-  return 'https://firebasestorage.googleapis.com/v0/b/$bucket/o/$encodedPath?alt=media&token=$downloadToken';
 }

@@ -451,7 +451,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
   }
 
   Future<void> _personelEkle() async {
-    if (!_isCompanyOwner) {
+    if (!_isAdmin) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Sadece şirket yetkilisi personel yetkilerini değiştirebilir")),
@@ -652,7 +652,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
   }
 
   Future<void> _personelDuzenle(PersonelYetki personel) async {
-    if (!_isCompanyOwner) {
+    if (!_isAdmin) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Sadece şirket yetkilisi personel yetkilerini değiştirebilir")),
@@ -803,7 +803,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
   }
 
   Future<void> _personelSil(PersonelYetki personel) async {
-    if (!_isCompanyOwner) {
+    if (!_isAdmin) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Sadece şirket yetkilisi personel yetkilerini değiştirebilir")),
@@ -1193,7 +1193,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     ),
                     child: Column(
                       children: [
-                        if (!_isCompanyOwner)
+                        if (!_isAdmin)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                             child: Text(
@@ -1235,12 +1235,12 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.edit_outlined),
-                                    onPressed: _isCompanyOwner ? () => _personelDuzenle(personel) : null,
+                                    onPressed: _isAdmin ? () => _personelDuzenle(personel) : null,
                                     tooltip: "Düzenle",
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                    onPressed: _isCompanyOwner ? () => _personelSil(personel) : null,
+                                    onPressed: _isAdmin ? () => _personelSil(personel) : null,
                                     tooltip: "Sil",
                                   ),
                                 ],
@@ -1255,7 +1255,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton.icon(
-                      onPressed: _saving || !_isCompanyOwner ? null : _personelEkle,
+                      onPressed: _saving || !_isAdmin ? null : _personelEkle,
                       icon: const Icon(Icons.person_add_outlined),
                       label: const Text("Yeni Personel Ekle"),
                       style: OutlinedButton.styleFrom(

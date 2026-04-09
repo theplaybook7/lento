@@ -91,6 +91,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
       return;
     }
     try {
+      FirebaseAuth.instance.setLanguageCode('tr');
       await FirebaseAuth.instance.sendPasswordResetEmail(email: _normalizeEmail(emailText));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

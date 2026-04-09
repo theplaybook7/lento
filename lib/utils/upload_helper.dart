@@ -1,17 +1,16 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:developer' as developer;
 import 'package:firebase_storage/firebase_storage.dart';
 
 /// Firebase Storage'a bytes yükle.
-/// iOS'ta cancelFetcher hatasını bypass eder:
-/// UploadTask'ın snapshotEvents stream'ini dinler,
-/// TaskState.success geldiğinde tamamlar.
+/// iOS'ta cancelFetcher hatasını bypass eder.
 Future<void> uploadToStorage(
   Reference ref,
   Uint8List bytes,
   SettableMetadata metadata,
 ) async {
+  print('[UPLOAD] Başlıyor: ${ref.fullPath} (${bytes.length} bytes)');
+
   final task = ref.putData(bytes, metadata);
 
   final completer = Completer<void>();
@@ -19,19 +18,19 @@ Future<void> uploadToStorage(
   late StreamSubscription<TaskSnapshot> subscription;
   subscription = task.snapshotEvents.listen(
     (snapshot) {
+      print('[UPLOAD] State: ${snapshot.state} (${ref.fullPath})');
       if (snapshot.state == TaskState.success && !completer.isCompleted) {
-        developer.log('Upload başarılı: ${ref.fullPath}', name: 'upload');
+        print('[UPLOAD] ✅ Başarılı: ${ref.fullPath}');
         completer.complete();
         subscription.cancel();
       } else if (snapshot.state == TaskState.error && !completer.isCompleted) {
-        developer.log('Upload stream error: ${ref.fullPath}', name: 'upload');
-        // Error state — ama cancelFetcher yüzünden olabilir, doğrula
+        print('[UPLOAD] ⚠️ Stream error, doğrulanıyor: ${ref.fullPath}');
         _verifyAndComplete(ref, completer);
         subscription.cancel();
       }
     },
     onError: (e) {
-      developer.log('Upload onError: $e (${e.runtimeType})', name: 'upload');
+      print('[UPLOAD] ❌ onError: $e');
       if (!completer.isCompleted) {
         _verifyAndComplete(ref, completer, fallbackError: e);
         subscription.cancel();
@@ -39,22 +38,21 @@ Future<void> uploadToStorage(
     },
     onDone: () {
       if (!completer.isCompleted) {
-        // Stream kapandı ama ne success ne error geldi — doğrula
+        print('[UPLOAD] Stream bitti, doğrulanıyor: ${ref.fullPath}');
         _verifyAndComplete(ref, completer);
       }
     },
   );
 
-  // Ayrıca task'ın future'ını da dinle (success durumunda ilk tetiklenecek olan bu olabilir)
   task.then((_) {
     if (!completer.isCompleted) {
-      developer.log('Upload future resolved: ${ref.fullPath}', name: 'upload');
+      print('[UPLOAD] ✅ Future resolved: ${ref.fullPath}');
       completer.complete();
       subscription.cancel();
     }
   }).catchError((e) {
     if (!completer.isCompleted) {
-      developer.log('Upload future error: $e', name: 'upload');
+      print('[UPLOAD] ❌ Future error: $e');
       _verifyAndComplete(ref, completer, fallbackError: e);
       subscription.cancel();
     }
@@ -63,18 +61,17 @@ Future<void> uploadToStorage(
   return completer.future;
 }
 
-/// Dosyanın gerçekten yüklenip yüklenmediğini doğrula
 Future<void> _verifyAndComplete(
   Reference ref,
   Completer<void> completer, {
   Object? fallbackError,
 }) async {
   try {
-    await ref.getDownloadURL();
-    developer.log('Upload doğrulandı (dosya mevcut): ${ref.fullPath}', name: 'upload');
+    final url = await ref.getDownloadURL();
+    print('[UPLOAD] ✅ Doğrulandı, dosya mevcut: $url');
     if (!completer.isCompleted) completer.complete();
   } catch (verifyError) {
-    developer.log('Upload doğrulama başarısız: $verifyError', name: 'upload');
+    print('[UPLOAD] ❌ Doğrulama başarısız: $verifyError');
     if (!completer.isCompleted) {
       completer.completeError(fallbackError ?? verifyError);
     }

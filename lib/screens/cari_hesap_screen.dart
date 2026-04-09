@@ -1308,22 +1308,27 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                 try {
                   final List<String> photoUrls = [];
                   if (selectedImages.isNotEmpty) {
+                    print('[CARİ] ${selectedImages.length} fotoğraf yüklenecek');
                     for (var i = 0; i < selectedImages.length; i++) {
                       final fileName = 'cari_${widget.cariId}_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
                       final storageRef = FirebaseService().getStorageRef('cari_hareketler/$fileName');
                       
-                      // Resmi sıkıştır
+                      print('[CARİ] Resim $i sıkıştırılıyor...');
                       final compressedList = await compressImage(selectedImages[i]);
                       final compressedBytes = Uint8List.fromList(compressedList);
+                      print('[CARİ] Resim $i sıkıştırıldı: ${compressedBytes.length} bytes');
                       
                       await uploadToStorage(
                         storageRef,
                         compressedBytes,
                         SettableMetadata(contentType: 'image/jpeg'),
                       );
+                      print('[CARİ] Resim $i yüklendi, URL alınıyor...');
                       final url = await storageRef.getDownloadURL();
+                      print('[CARİ] Resim $i URL: $url');
                       photoUrls.add(url);
                     }
+                    print('[CARİ] Tüm fotoğraflar yüklendi: ${photoUrls.length}');
                   }
 
                   String? giderId;

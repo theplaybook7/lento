@@ -38,19 +38,21 @@ Future<void> _uploadViaRestApi(
   final bucket = ref.storage.bucket;
   final objectPath = ref.fullPath;
 
+  // Firebase Storage v0 REST API — Firebase ID token ile çalışır
   final uploadUrl = Uri.parse(
-    'https://firebasestorage.googleapis.com/upload/storage/v1/b/$bucket/o'
-    '?uploadType=media&name=${Uri.encodeComponent(objectPath)}',
+    'https://firebasestorage.googleapis.com/v0/b/$bucket/o'
+    '?name=${Uri.encodeComponent(objectPath)}'
+    '&uploadType=media',
   );
 
   print('[UPLOAD] 📡 REST API ile yükleniyor: $objectPath (${bytes.length} bytes)');
+  print('[UPLOAD] 📡 Bucket: $bucket');
 
   final response = await http.post(
     uploadUrl,
     headers: {
-      'Authorization': 'Bearer $token',
+      'Authorization': 'Firebase $token',
       'Content-Type': metadata.contentType ?? 'application/octet-stream',
-      'Content-Length': bytes.length.toString(),
     },
     body: bytes,
   );

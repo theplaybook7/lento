@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 
-Future<TaskSnapshot> platformUploadBytes(
+Future<void> platformUploadBytes(
   Reference ref,
   Uint8List bytes,
   SettableMetadata metadata,

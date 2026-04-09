@@ -17,9 +17,9 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static const String _webApiKey = 'AIzaSyAFPmbGYzuFhropyLDn3iidaRlzgVX_hpo';
 
-  static const String _iosApiKey = 'AIzaSyD1__BEaD8G3vETuOcGgvR6pc3zq8jBnu8';
+  static const String _iosApiKey = 'AIzaSyAQ3F_9X8rv-MMCTCgh66JNN5Ujh6nmZTM';
 
-  static const String _macosApiKey = 'AIzaSyD1__BEaD8G3vETuOcGgvR6pc3zq8jBnu8';
+  static const String _macosApiKey = 'AIzaSyAQ3F_9X8rv-MMCTCgh66JNN5Ujh6nmZTM';
 
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -56,7 +56,7 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get ios => FirebaseOptions(
     apiKey: _iosApiKey,
-    appId: '1:478876596230:ios:b862535e946b0b0bdd6b87',
+    appId: '1:478876596230:ios:b862535e946b080bdd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
@@ -75,7 +75,7 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get macos => FirebaseOptions(
     apiKey: _macosApiKey,
-    appId: '1:478876596230:ios:b862535e946b0b0bdd6b87',
+    appId: '1:478876596230:ios:b862535e946b080bdd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',

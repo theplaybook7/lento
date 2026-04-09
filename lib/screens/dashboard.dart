@@ -55,160 +55,6 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     super.dispose();
   }
 
-  Future<void> _sirketDegistir() async {
-    final email = SistemYoneticisi().girisYapanEmail ?? '';
-    if (email.isEmpty) return;
-
-    try {
-      final query = await FirebaseFirestore.instance
-          .collection('sirketler')
-          .where('emailler', arrayContains: email)
-          .get();
-
-      final sirketler = query.docs.map((d) => Sirket.fromFirestore(d)).toList();
-      final bulunanIds = query.docs.map((d) => d.id).toSet();
-
-      // Tüm şirketlerde personelListesi'nden emailler'i düzelt (migration)
-      for (final doc in query.docs) {
-        try {
-          final s = Sirket.fromFirestore(doc);
-          final allEmails = <String>[s.yoneticiEposta.trim().toLowerCase()];
-          for (final p in s.personelListesi) {
-            final pe = p.email.trim().toLowerCase();
-            if (pe.isNotEmpty && !allEmails.contains(pe)) allEmails.add(pe);
-          }
-          await FirebaseFirestore.instance
-              .collection('sirketler')
-              .doc(doc.id)
-              .update({'emailler': allEmails});
-        } catch (_) {}
-      }
-
-      // users koleksiyonundaki sirketId ile extra şirket kontrolü
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        final sirketId = userDoc.data()?['sirketId'] as String?;
-        if (sirketId != null && sirketId.isNotEmpty && !bulunanIds.contains(sirketId)) {
-          try {
-            final extraDoc = await FirebaseFirestore.instance
-                .collection('sirketler')
-                .doc(sirketId)
-                .get();
-            if (extraDoc.exists) {
-              final s = Sirket.fromFirestore(extraDoc);
-              final isAdmin = s.yoneticiEposta.trim().toLowerCase() == email;
-              final isPersonel = s.personelListesi.any(
-                (p) => p.email.trim().toLowerCase() == email,
-              );
-              if (isAdmin || isPersonel) {
-                sirketler.add(s);
-                // emailler'i düzelt
-                try {
-                  await FirebaseFirestore.instance
-                      .collection('sirketler')
-                      .doc(sirketId)
-                      .update({'emailler': FieldValue.arrayUnion([email])});
-                } catch (_) {}
-              }
-            }
-          } catch (_) {}
-        }
-      }
-
-      if (sirketler.length <= 1) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Yalnızca bir şirkete kayıtlısınız.')),
-          );
-        }
-        return;
-      }
-      final mevcutId = SistemYoneticisi().aktifSirket?.id;
-
-      if (!mounted) return;
-      final secilen = await showDialog<Sirket>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Şirket Değiştir'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: sirketler.length,
-              itemBuilder: (context, i) {
-                final s = sirketler[i];
-                final aktifMi = s.id == mevcutId;
-                return ListTile(
-                  leading: Icon(
-                    aktifMi ? Icons.business : Icons.business_outlined,
-                    color: aktifMi ? AppTheme.primaryColor : null,
-                  ),
-                  title: Text(
-                    s.ad,
-                    style: TextStyle(
-                      fontWeight: aktifMi ? FontWeight.bold : FontWeight.normal,
-                      color: aktifMi ? AppTheme.primaryColor : null,
-                    ),
-                  ),
-                  subtitle: Text(aktifMi ? 'Aktif' : s.yoneticiEposta),
-                  trailing: aktifMi ? const Icon(Icons.check, color: Colors.green) : null,
-                  onTap: aktifMi ? null : () => Navigator.pop(ctx, s),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, null),
-              child: const Text('İPTAL'),
-            ),
-          ],
-        ),
-      );
-
-      if (secilen != null && mounted) {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) return;
-
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'sirketId': secilen.id,
-        }, SetOptions(merge: true));
-
-        // Yetkiyi belirle
-        final normalEmail = email.trim().toLowerCase();
-        PersonelYetki? yetki;
-        if (normalEmail == secilen.yoneticiEposta.trim().toLowerCase()) {
-          yetki = PersonelYetki(email: normalEmail, adminMi: true);
-        } else {
-          final match = secilen.personelListesi.where(
-            (p) => p.email.trim().toLowerCase() == normalEmail,
-          );
-          yetki = match.isNotEmpty ? match.first : null;
-        }
-
-        SistemYoneticisi().aktifSirket = secilen;
-        SistemYoneticisi().aktifKullaniciYetkileri = yetki;
-
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const DashboardSayfasi()),
-            (route) => false,
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(hataCevir(e))),
-        );
-      }
-    }
-  }
-
   Widget _buildNavIcon({
     required String tooltip,
     required IconData icon,
@@ -267,21 +113,9 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: GestureDetector(
-          onTap: _sirketDegistir,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  SistemYoneticisi().aktifSirket?.ad ?? 'Lento',
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(Icons.swap_horiz, size: 18),
-            ],
-          ),
+        title: Text(
+          SistemYoneticisi().aktifSirket?.ad ?? 'Lento',
+          overflow: TextOverflow.ellipsis,
         ),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
@@ -352,15 +186,12 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     context,
                     MaterialPageRoute(builder: (c) => const SettingsSayfasi()),
                   );
-                } else if (value == 'switch_company') {
-                  _sirketDegistir();
                 } else if (value == 'logout') {
                   SistemYoneticisi().temizle();
                   await FirebaseAuth.instance.signOut();
                 }
               },
               itemBuilder: (context) => const [
-                PopupMenuItem(value: 'switch_company', child: Text('Şirket Değiştir')),
                 PopupMenuItem(value: 'settings', child: Text('Ayarlar')),
                 PopupMenuItem(value: 'logout', child: Text('Çıkış')),
               ],
@@ -1714,8 +1545,9 @@ class _ProjectsTabState extends State<_ProjectsTab> {
           final gt = d['guncellendiTarihi'];
           if (gt != null) {
             DateTime? t;
-            if (gt is Timestamp) t = gt.toDate();
-            else if (gt is DateTime) t = gt;
+            if (gt is Timestamp) {
+              t = gt.toDate();
+            } else if (gt is DateTime) t = gt;
             if (t != null && (sonIslem == null || t.isAfter(sonIslem))) sonIslem = t;
           }
         }
@@ -1834,8 +1666,9 @@ class _ProjectsTabState extends State<_ProjectsTab> {
       final gt = data['guncellendiTarihi'];
       if (gt != null) {
         DateTime? t;
-        if (gt is Timestamp) t = gt.toDate();
-        else if (gt is DateTime) t = gt;
+        if (gt is Timestamp) {
+          t = gt.toDate();
+        } else if (gt is DateTime) t = gt;
         if (t != null && (sonIslemTarihi == null || t.isAfter(sonIslemTarihi))) {
           sonIslemTarihi = t;
         }

@@ -1,41 +1,66 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:http/http.dart' as http;
 
 /// Firebase Storage'a bytes yükle.
-/// iOS'ta "Upload has already been finalized" hatası upload'un
-/// aslında başarılı olduğu anlamına gelir. Bu durumda getDownloadURL
-/// ile doğrular ve hatayı yoksayar.
+/// iOS'ta native SDK 412/400 hataları veriyor; REST API ile bypass ediyoruz.
+/// Web ve Android'de normal putData kullanılır.
 Future<void> uploadToStorage(
   Reference ref,
   Uint8List bytes,
   SettableMetadata metadata,
 ) async {
-  try {
+  final useRestApi = !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+       defaultTargetPlatform == TargetPlatform.macOS);
+
+  if (useRestApi) {
+    await _uploadViaRestApi(ref, bytes, metadata);
+  } else {
     await ref.putData(bytes, metadata);
     print('[UPLOAD] ✅ Başarılı: ${ref.fullPath}');
-    return;
-  } catch (e) {
-    print('[UPLOAD] ⚠️ putData hata: $e');
   }
+}
 
-  // putData hata verdi. iOS'ta bu genelde "Upload has already been finalized" (400)
-  // veya plist çakışması (412) olabilir. Dosyanın yüklenip yüklenmediğini kontrol et.
-  for (int attempt = 1; attempt <= 3; attempt++) {
-    await Future.delayed(Duration(seconds: attempt * 2));
-    try {
-      final url = await ref.getDownloadURL();
-      print('[UPLOAD] ✅ Doğrulandı (attempt $attempt): $url');
-      return;
-    } catch (_) {
-      print('[UPLOAD] ⏳ Doğrulama attempt $attempt başarısız, tekrar deneniyor...');
-    }
+/// Firebase Storage REST API ile doğrudan upload.
+/// Native iOS SDK'yı tamamen bypass eder.
+Future<void> _uploadViaRestApi(
+  Reference ref,
+  Uint8List bytes,
+  SettableMetadata metadata,
+) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) throw Exception('Kullanıcı giriş yapmamış');
+
+  final token = await user.getIdToken();
+  final bucket = ref.storage.bucket;
+  final objectPath = ref.fullPath;
+
+  final uploadUrl = Uri.parse(
+    'https://firebasestorage.googleapis.com/upload/storage/v1/b/$bucket/o'
+    '?uploadType=media&name=${Uri.encodeComponent(objectPath)}',
+  );
+
+  print('[UPLOAD] 📡 REST API ile yükleniyor: $objectPath (${bytes.length} bytes)');
+
+  final response = await http.post(
+    uploadUrl,
+    headers: {
+      'Authorization': 'Bearer $token',
+      'Content-Type': metadata.contentType ?? 'application/octet-stream',
+      'Content-Length': bytes.length.toString(),
+    },
+    body: bytes,
+  );
+
+  if (response.statusCode == 200) {
+    print('[UPLOAD] ✅ REST API başarılı: $objectPath');
+  } else {
+    print('[UPLOAD] ❌ REST API hata: ${response.statusCode} ${response.body}');
+    throw Exception(
+      'Upload failed: ${response.statusCode} ${response.reasonPhrase}',
+    );
   }
-
-  // Dosya yüklenmemiş. Varsa kısmı dosyayı silip sıfırdan yükle.
-  print('[UPLOAD] 🔄 Tam yeniden yükleme: ${ref.fullPath}');
-  try {
-    await ref.delete();
-  } catch (_) {}
-  await ref.putData(bytes, metadata);
-  print('[UPLOAD] ✅ Yeniden yükleme başarılı: ${ref.fullPath}');
 }

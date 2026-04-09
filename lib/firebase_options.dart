@@ -56,7 +56,7 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get ios => FirebaseOptions(
     apiKey: _iosApiKey,
-    appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
+    appId: '1:478876596230:ios:b862535e946b0b0bdd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',
@@ -75,7 +75,7 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get macos => FirebaseOptions(
     apiKey: _macosApiKey,
-    appId: '1:478876596230:ios:b9a10331363d2749dd6b87',
+    appId: '1:478876596230:ios:b862535e946b0b0bdd6b87',
     messagingSenderId: '478876596230',
     projectId: 'insaat-yonetim-takip',
     storageBucket: 'insaat-yonetim-takip.firebasestorage.app',

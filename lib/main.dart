@@ -40,20 +40,12 @@ void main() async {
   String? startupError;
 
   try {
-    final targetOptions = DefaultFirebaseOptions.currentPlatform;
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(options: targetOptions);
-    } else {
-      // iOS: GoogleService-Info.plist farklı appId ile auto-init yapmış olabilir.
-      // Dart options ile eşleşmiyorsa sil ve doğru config ile yeniden başlat.
-      final currentApp = Firebase.app();
-      if (currentApp.options.appId != targetOptions.appId) {
-        await currentApp.delete();
-        await Firebase.initializeApp(options: targetOptions);
-      }
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
     }
   } on FirebaseException catch (e) {
-    // [core/duplicate-app] durumunda mevcut app'i kullanmaya devam et.
     if (e.code != 'duplicate-app') {
       startupError = e.toString();
     }

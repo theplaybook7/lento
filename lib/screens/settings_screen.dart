@@ -138,13 +138,11 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
         );
 
         final bytes = await image.readAsBytes();
-        await uploadToStorage(
+        final logoUrl = await uploadToStorage(
           ref,
           bytes,
           SettableMetadata(contentType: 'image/png'),
         );
-
-        final logoUrl = await ref.getDownloadURL();
 
         // Firestore'da güncelle (eski base64 logo alanını da sil)
         await FirebaseFirestore.instance

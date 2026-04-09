@@ -464,12 +464,11 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                             final ref = FirebaseStorage.instance.ref(
                               'sirket_logolari/${currentEmail}_logo_${DateTime.now().millisecondsSinceEpoch}.png',
                             );
-                            await uploadToStorage(
+                            logoUrl = await uploadToStorage(
                               ref,
                               logoBytes!,
                               SettableMetadata(contentType: 'image/png'),
                             );
-                            logoUrl = await ref.getDownloadURL();
                           } catch (e) {
                             logoUrl = null;
                           }

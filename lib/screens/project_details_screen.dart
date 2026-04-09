@@ -2539,19 +2539,19 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       // Dosyayı yükle
       final contentType = _mimeTypeFromExtension(fileExtension);
       print('[BELGE] Yükleniyor: $fileName ($contentType, ${file.bytes!.length} bytes)');
-      await uploadToStorage(
+      final downloadUrl = await uploadToStorage(
         storageRef,
         file.bytes!,
         SettableMetadata(contentType: contentType),
       );
-      print('[BELGE] Upload tamamlandı, URL alınıyor...');
+      print('[BELGE] Upload tamamlandı: $downloadUrl');
 
       // Firestore'a kaydet
       final yeniBelge = {
         'başlık': fileName,
         'tarih': DateTime.now().toString().split(' ')[0],
         'type': fileExtension,
-        'firbaseUrl': await storageRef.getDownloadURL(),
+        'firbaseUrl': downloadUrl,
         'boyut': file.size,
         'yuklenmeTarihi': DateTime.now(),
       };
@@ -3525,13 +3525,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         final ext = file.name.split('.').last.toLowerCase();
         final contentType = (ext == 'png') ? 'image/png' : 'image/jpeg';
         print('[ŞANTİYE] Fotoğraf yükleniyor: ${file.name} ($contentType, ${file.bytes!.length} bytes)');
-        await uploadToStorage(
+        final downloadUrl = await uploadToStorage(
           storageRef,
           file.bytes!,
           SettableMetadata(contentType: contentType),
         );
-        print('[ŞANTİYE] Upload tamamlandı, URL alınıyor...');
-        final downloadUrl = await storageRef.getDownloadURL();
         print('[ŞANTİYE] URL: $downloadUrl');
         
         // Firestore'a kaydet

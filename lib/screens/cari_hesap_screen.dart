@@ -1318,13 +1318,11 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                       final compressedBytes = Uint8List.fromList(compressedList);
                       print('[CARİ] Resim $i sıkıştırıldı: ${compressedBytes.length} bytes');
                       
-                      await uploadToStorage(
+                      final url = await uploadToStorage(
                         storageRef,
                         compressedBytes,
                         SettableMetadata(contentType: 'image/jpeg'),
                       );
-                      print('[CARİ] Resim $i yüklendi, URL alınıyor...');
-                      final url = await storageRef.getDownloadURL();
                       print('[CARİ] Resim $i URL: $url');
                       photoUrls.add(url);
                     }

@@ -719,12 +719,11 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           final storageRef = FirebaseService().getStorageRef('payment_proofs/$fileName');
           final compressedList = await compressImage(selectedImages[i]);
           final compressedBytes = Uint8List.fromList(compressedList);
-          await uploadToStorage(
+          final url = await uploadToStorage(
             storageRef,
             compressedBytes,
             SettableMetadata(contentType: 'image/jpeg'),
           );
-          final url = await storageRef.getDownloadURL();
           photoUrls.add(url);
         }
       }
@@ -1092,12 +1091,11 @@ class _PaymentPlanDetailsScreenState extends State<PaymentPlanDetailsScreen> {
           final storageRef = FirebaseService().getStorageRef('payment_proofs/$fileName');
           final compressedList = await compressImage(selectedImages[i]);
           final compressedBytes = Uint8List.fromList(compressedList);
-          await uploadToStorage(
+          final url = await uploadToStorage(
             storageRef,
             compressedBytes,
             SettableMetadata(contentType: 'image/jpeg'),
           );
-          final url = await storageRef.getDownloadURL();
           newPhotoUrls.add(url);
         }
       }

@@ -30,7 +30,7 @@ class FcmService {
         // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
         // Bu key'i Firebase Console'dan alıp buraya koymanız gerekir
         token = await _messaging.getToken(
-          vapidKey: 'YOUR_VAPID_KEY', // TODO: Firebase Console'dan alınacak
+          vapidKey: 'BIIx0YZjIcdBoXPcUpCzMSldawZYzeg9DKrLWs9820RxEXhf_uYV-fhj1YJwX5RzGJlFYsSRDRkafpDiCfHB2rk',
         );
       } else {
         token = await _messaging.getToken();

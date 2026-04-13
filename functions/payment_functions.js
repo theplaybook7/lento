@@ -196,3 +196,181 @@ exports.checkPaymentStatus = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+// ===== PROJE PASİFLİK BİLDİRİMLERİ (Günlük) =====
+
+/**
+ * Her gün sabah 09:00'da (Türkiye saati) çalışır.
+ * 4+ gün işlem yapılmamış projeleri bulur ve FCM push bildirim gönderir.
+ */
+exports.dailyInactivityCheck = functions.pubsub
+  .schedule("every day 09:00")
+  .timeZone("Europe/Istanbul")
+  .onRun(async (context) => {
+    console.log("🔔 Günlük pasiflik kontrolü başladı");
+
+    try {
+      // Tüm şirketleri al
+      const sirketlerSnap = await db.collection("sirketler").get();
+
+      for (const sirketDoc of sirketlerSnap.docs) {
+        const sirketId = sirketDoc.id;
+        const sirketAd = sirketDoc.data().ad || "Şirket";
+
+        // Şirketin projelerini al
+        const projelerSnap = await db
+          .collection("sirketler")
+          .doc(sirketId)
+          .collection("projeler")
+          .where("arsivlendi", "==", false)
+          .get();
+
+        const pasifProjeler = [];
+
+        for (const projeDoc of projelerSnap.docs) {
+          const projeId = projeDoc.id;
+          const projeAd = projeDoc.data().ad || "Proje";
+
+          // Ruhsat islemler koleksiyonundan en son güncelleme tarihini bul
+          let sonIslemTarihi = null;
+
+          // islemler kontrol
+          const islemlerSnap = await db
+            .collection("sirketler")
+            .doc(sirketId)
+            .collection("projeler")
+            .doc(projeId)
+            .collection("ruhsat")
+            .doc(projeId)
+            .collection("islemler")
+            .orderBy("guncellendiTarihi", "desc")
+            .limit(1)
+            .get();
+
+          if (!islemlerSnap.empty) {
+            const t = islemlerSnap.docs[0].data().guncellendiTarihi;
+            if (t) sonIslemTarihi = t.toDate();
+          }
+
+          // akis_diyagrami kontrol
+          const akisSnap = await db
+            .collection("sirketler")
+            .doc(sirketId)
+            .collection("projeler")
+            .doc(projeId)
+            .collection("ruhsat")
+            .doc(projeId)
+            .collection("akis_diyagrami")
+            .orderBy("guncellendiTarihi", "desc")
+            .limit(1)
+            .get();
+
+          if (!akisSnap.empty) {
+            const t = akisSnap.docs[0].data().guncellendiTarihi;
+            if (t) {
+              const akisTarih = t.toDate();
+              if (!sonIslemTarihi || akisTarih > sonIslemTarihi) {
+                sonIslemTarihi = akisTarih;
+              }
+            }
+          }
+
+          if (sonIslemTarihi) {
+            const now = new Date();
+            const diffDays = Math.floor(
+              (now - sonIslemTarihi) / (1000 * 60 * 60 * 24)
+            );
+            if (diffDays >= 4) {
+              pasifProjeler.push({ ad: projeAd, gun: diffDays });
+            }
+          }
+        }
+
+        if (pasifProjeler.length === 0) continue;
+
+        // Bu şirketin kullanıcılarının FCM token'larını topla
+        const emailler = sirketDoc.data().emailler || [];
+        const tokens = [];
+
+        for (const email of emailler) {
+          // Email ile kullanıcı bul
+          try {
+            const userRecord = await admin.auth().getUserByEmail(email);
+            const userDoc = await db
+              .collection("users")
+              .doc(userRecord.uid)
+              .get();
+            if (userDoc.exists && userDoc.data().fcmTokens) {
+              tokens.push(...userDoc.data().fcmTokens);
+            }
+          } catch (_) {
+            // Kullanıcı bulunamadı, devam et
+          }
+        }
+
+        if (tokens.length === 0) continue;
+
+        // Bildirim gönder
+        const body =
+          pasifProjeler.length === 1
+            ? `${pasifProjeler[0].ad} - ${pasifProjeler[0].gun} gündür işlem yapılmadı!`
+            : `${pasifProjeler.length} projede ${pasifProjeler[0].gun}+ gündür işlem yapılmadı!`;
+
+        const message = {
+          notification: {
+            title: `⚠️ ${sirketAd} - Pasif Proje Uyarısı`,
+            body: body,
+          },
+          data: {
+            type: "inactivity_warning",
+            sirketId: sirketId,
+          },
+        };
+
+        // Her token'a gönder (geçersiz olanları temizle)
+        const invalidTokens = [];
+        for (const token of tokens) {
+          try {
+            await admin.messaging().send({
+              ...message,
+              token: token,
+            });
+          } catch (err) {
+            if (
+              err.code === "messaging/invalid-registration-token" ||
+              err.code === "messaging/registration-token-not-registered"
+            ) {
+              invalidTokens.push(token);
+            }
+          }
+        }
+
+        // Geçersiz token'ları temizle
+        if (invalidTokens.length > 0) {
+          for (const email of emailler) {
+            try {
+              const userRecord = await admin.auth().getUserByEmail(email);
+              await db
+                .collection("users")
+                .doc(userRecord.uid)
+                .update({
+                  fcmTokens: admin.firestore.FieldValue.arrayRemove(
+                    invalidTokens
+                  ),
+                });
+            } catch (_) {}
+          }
+        }
+
+        console.log(
+          `✅ ${sirketAd}: ${pasifProjeler.length} pasif proje, ${tokens.length} cihaza bildirim gönderildi`
+        );
+      }
+
+      console.log("🔔 Günlük pasiflik kontrolü tamamlandı");
+      return null;
+    } catch (error) {
+      console.error("❌ Pasiflik kontrolü hatası:", error);
+      return null;
+    }
+  });

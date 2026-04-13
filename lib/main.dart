@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart'; 
 import 'services/payment_notification_service.dart';
+import 'services/fcm_service.dart';
 import 'theme/app_theme.dart';
 import 'utils/error_handler.dart';
 import 'payment_service.dart';
@@ -401,6 +402,9 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
         if (bulunanSirket != null) {
           SistemYoneticisi().aktifSirket = bulunanSirket;
           SistemYoneticisi().aktifKullaniciYetkileri = kullaniciYetkisi;
+
+          // FCM push bildirim token kaydı
+          unawaited(FcmService().initialize());
 
           // Abonelik kontrolü - tüm platformlar (Apple Guideline 3.1.1)
           bool subscriptionActive = false;

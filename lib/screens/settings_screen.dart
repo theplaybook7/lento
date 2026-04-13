@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../project_core.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
+import '../services/fcm_service.dart';
 import '../utils/responsive_utils.dart' as resp;
 import '../payment_service.dart';
 import '../main.dart' show AuthGate;
@@ -312,6 +313,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
     );
 
     if (confirm == true) {
+      await FcmService().removeToken();
       SistemYoneticisi().temizle();
       await FirebaseAuth.instance.signOut();
     }

@@ -909,7 +909,7 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
               ),
               if (subType != null) ...[
                 const SizedBox(height: 8),
-                Text('Plan: ${subType == 'yearly' ? 'Yıllık' : subType == 'monthly' ? 'Aylık' : subType}'),
+                Text('Plan: ${subType == 'yearly' ? 'Yıllık' : subType == 'monthly' ? 'Aylık' : subType == 'trial' ? '1 Hafta Deneme' : subType}'),
               ],
               if (subEnd != null) ...[
                 const SizedBox(height: 4),

@@ -91,7 +91,74 @@ class PaymentService {
     if (type == 'yearly') {
       return DateTime.now().add(const Duration(days: 365));
     }
+    if (type == 'trial') {
+      return DateTime.now().add(const Duration(days: 7));
+    }
     return DateTime.now().add(const Duration(days: 30));
+  }
+
+  /// 1 haftalık ücretsiz deneme başlat
+  Future<bool> startFreeTrial() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        _lastError = 'Oturum açmanız gerekiyor.';
+        return false;
+      }
+
+      // Daha önce deneme kullanılmış mı kontrol et
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>;
+        if (data['trialUsed'] == true) {
+          _lastError = 'Ücretsiz deneme hakkınız daha önce kullanılmıştır.';
+          return false;
+        }
+      }
+
+      final endDate = _subscriptionEndDateForType('trial');
+
+      await _firestore.collection('users').doc(user.uid).set({
+        'companyCreationPaid': true,
+        'paidAt': DateTime.now(),
+        'subscriptionType': 'trial',
+        'subscriptionEndDate': Timestamp.fromDate(endDate),
+        'autoRenew': false,
+        'trialUsed': true,
+        'trialStartDate': DateTime.now(),
+        'lastPurchaseStatus': 'trial',
+      }, SetOptions(merge: true));
+
+      // Şirkete de yaz
+      try {
+        final sirketId = userDoc.data()?['sirketId'] as String?;
+        if (sirketId != null && sirketId.isNotEmpty) {
+          await updateCompanySubscription(
+            sirketId: sirketId,
+            subscriptionType: 'trial',
+            subscriptionEndDate: endDate,
+          );
+        }
+      } catch (_) {}
+
+      _lastError = '';
+      return true;
+    } catch (e) {
+      _lastError = 'Deneme başlatılamadı: $e';
+      return false;
+    }
+  }
+
+  /// Kullanıcı daha önce deneme kullanmış mı?
+  Future<bool> hasUsedTrial() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      return doc.data()?['trialUsed'] == true;
+    } catch (_) {
+      return false;
+    }
   }
 
   bool _isStoreKitNoResponse(String message) {

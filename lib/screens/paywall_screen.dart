@@ -16,7 +16,7 @@ class PaywallScreen extends StatefulWidget {
   State<PaywallScreen> createState() => _PaywallScreenState();
 }
 
-enum PlanType { monthly, yearly }
+enum PlanType { monthly, yearly, trial }
 
 class _PaywallScreenState extends State<PaywallScreen> {
   bool _loading = false;
@@ -24,6 +24,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   String _statusMessage = "";
   final Map<String, ProductDetails> _products = {};
   PlanType _selectedPlan = PlanType.yearly;
+  bool _trialUsed = false;
 
   @override
   void initState() {
@@ -34,6 +35,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Future<void> _prepareStore() async {
     final paymentService = PaymentService();
     await paymentService.initialize();
+
+    // Deneme kullanılmış mı kontrol et
+    final trialUsed = await paymentService.hasUsedTrial();
+    if (mounted) setState(() => _trialUsed = trialUsed);
 
     if (!paymentService.isPaymentSupported) {
       if (mounted) {
@@ -78,6 +83,25 @@ class _PaywallScreenState extends State<PaywallScreen> {
     try {
       final paymentService = PaymentService();
 
+      // Deneme başlat
+      if (planType == PlanType.trial) {
+        final success = await paymentService.startFreeTrial();
+        if (success) {
+          setState(() {
+            _statusMessage = "✅ 1 haftalık ücretsiz deneme başlatıldı! Yönlendiriliyorsunuz...";
+            _trialUsed = true;
+          });
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) Navigator.pop(context, true);
+          });
+        } else {
+          setState(() {
+            _statusMessage = "❌ ${paymentService.lastError.isNotEmpty ? paymentService.lastError : 'Deneme başlatılamadı.'}";
+          });
+        }
+        return;
+      }
+
       if (!paymentService.isPaymentSupported) {
         setState(() {
           _statusMessage = 'Abonelik satın alma bu cihazda desteklenmiyor.';
@@ -94,6 +118,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
           break;
         case PlanType.monthly:
           productId = 'company_monthly_subscription';
+          break;
+        case PlanType.trial:
           break;
       }
 
@@ -254,6 +280,26 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 40),
 
+              // Ücretsiz Deneme
+              if (!_trialUsed)
+                ...[
+                  _buildPlanCard(
+                    title: "1 Hafta Ücretsiz",
+                    subtitle: "Deneme",
+                    price: "₺0",
+                    duration: "/7 gün",
+                    features: [
+                      "Tüm özellikler açık",
+                      "Kredi kartı gerekmez",
+                      "Otomatik yenileme yok",
+                    ],
+                    planType: PlanType.trial,
+                    isPopular: false,
+                    isTrial: true,
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
               // Plans
               _buildPlanCard(
                 title: "Aylık",
@@ -330,7 +376,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: _loading || _productsLoading ? null : () => _buySubscription(_selectedPlan),
+                  onPressed: _loading || (_productsLoading && _selectedPlan != PlanType.trial) ? null : () => _buySubscription(_selectedPlan),
                   icon: _loading
                       ? SizedBox(
                           width: 20,
@@ -348,7 +394,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   label: Text(
                     _loading
                         ? "İşleniyor..."
-                        : _selectedPlan == PlanType.yearly ? "Yıllık Başla" : "Aylık Başla",
+                        : _selectedPlan == PlanType.trial
+                            ? "Ücretsiz Dene"
+                            : _selectedPlan == PlanType.yearly ? "Yıllık Başla" : "Aylık Başla",
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -458,6 +506,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     required List<String> features,
     required PlanType planType,
     required bool isPopular,
+    bool isTrial = false,
   }) {
     final isSelected = _selectedPlan == planType;
     return GestureDetector(
@@ -562,15 +611,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _loading || _productsLoading ? null : () => _buySubscription(planType),
+                    onPressed: _loading || (_productsLoading && !isTrial) ? null : () => _buySubscription(planType),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isPopular ? AppTheme.primaryColor : Colors.grey.shade300,
-                      foregroundColor: isPopular ? Colors.white : Colors.black87,
+                      backgroundColor: isTrial ? Colors.green : (isPopular ? AppTheme.primaryColor : Colors.grey.shade300),
+                      foregroundColor: isTrial ? Colors.white : (isPopular ? Colors.white : Colors.black87),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     child: Text(
-                      "Satın Al",
+                      isTrial ? "Ücretsiz Dene" : "Satın Al",
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),

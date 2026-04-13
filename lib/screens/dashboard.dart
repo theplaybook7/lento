@@ -1393,16 +1393,40 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   bool _projeFiltreyeUygunMu(String projectId) {
     if (_filtreDurum == null && _filtreAsama == null) return true;
     final nodes = _akisCache[projectId] ?? [];
-    if (nodes.isEmpty) return false;
 
+    // Hem aşama hem durum seçiliyse: o aşamanın durumunu kontrol et
+    if (_filtreAsama != null) {
+      for (final node in nodes) {
+        final sira = node['sira'] as int? ?? 0;
+        if (sira != _filtreAsama) continue;
+        final durum = node['durum'] as int? ?? 0;
+        return _filtreDurum == null || durum == _filtreDurum;
+      }
+      // Aşama bulunamadı — eğer durum "başlamadı" ise eşleşir
+      return _filtreDurum == null || _filtreDurum == 0;
+    }
+
+    // Sadece durum seçili (aşama yok): projenin genel akış durumuna göre
+    if (nodes.isEmpty) return _filtreDurum == 0;
+
+    int tamamlanan = 0;
+    int devamEden = 0;
     for (final node in nodes) {
       final durum = node['durum'] as int? ?? 0;
-      final sira = node['sira'] as int? ?? 0;
-      final asamaUygun = _filtreAsama == null || sira == _filtreAsama;
-      final durumUygun = _filtreDurum == null || durum == _filtreDurum;
-      if (asamaUygun && durumUygun) return true;
+      if (durum == 2) tamamlanan++;
+      if (durum == 1) devamEden++;
     }
-    return false;
+
+    switch (_filtreDurum) {
+      case 0: // Başlamadı: hiçbir node ilerlememiş
+        return tamamlanan == 0 && devamEden == 0;
+      case 1: // Devam Ediyor: en az bir node ilerlemiş ama hepsi bitmemiş
+        return (tamamlanan > 0 || devamEden > 0) && tamamlanan < nodes.length;
+      case 2: // Tamamlandı: tüm node'lar tamamlanmış
+        return tamamlanan == nodes.length;
+      default:
+        return true;
+    }
   }
 
   Future<void> _projeIsimDuzenle(Project project) async {

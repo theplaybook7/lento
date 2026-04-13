@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/project_model.dart';
@@ -43,31 +44,29 @@ class FirebaseService {
         'isArchived': false,
       });
 
-      // Firestore otomatik ID ile koleksiyon oluştur
-      await _db.collection('project_finance').doc(docRef.id).set({
-        'projectId': docRef.id,
-        'totalIncome': 0,
-        'totalExpenses': 0,
-        'budgetedAmount': totalBudget,
-      });
+      // Yardımcı dokümanları paralel oluştur
+      await Future.wait([
+        _db.collection('project_finance').doc(docRef.id).set({
+          'projectId': docRef.id,
+          'totalIncome': 0,
+          'totalExpenses': 0,
+          'budgetedAmount': totalBudget,
+        }),
+        _db.collection('ruhsat').doc(docRef.id).set({
+          'projectId': docRef.id,
+          'createdAt': DateTime.now(),
+          'documents': [],
+        }),
+        _db.collection('santiye').doc(docRef.id).set({
+          'projectId': docRef.id,
+          'createdAt': DateTime.now(),
+          'photos': [],
+          'documents': [],
+        }),
+      ]);
 
-      // Ruhsat dosyası oluştur
-      await _db.collection('ruhsat').doc(docRef.id).set({
-        'projectId': docRef.id,
-        'createdAt': DateTime.now(),
-        'documents': [],
-      });
-
-      // Şantiye dosyası oluştur
-      await _db.collection('santiye').doc(docRef.id).set({
-        'projectId': docRef.id,
-        'createdAt': DateTime.now(),
-        'photos': [],
-        'documents': [],
-      });
-
-      // Şirket finansmanını güncelle
-      await _updateCompanyFinance(companyId);
+      // Şirket finansmanını arka planda güncelle (beklemeden)
+      unawaited(_updateCompanyFinance(companyId));
 
       developer.log('Proje oluşturuldu: ${docRef.id}');
       return docRef.id;

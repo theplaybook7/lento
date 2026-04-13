@@ -1702,7 +1702,9 @@ class _ProjectsTabState extends State<_ProjectsTab> {
     30: 'Müteahhit Belgeleri', 31: 'Harçlar', 32: 'Otopark',
     33: 'Teminat Mektubu', 34: 'Numarataj', 35: 'Ruhsat Yazımı',
     36: 'Ruhsat Teslimi', 37: 'Kat İrtifakı',
-    46: 'Zemin Etütü Onayı', 47: 'Noter Evrakları',
+    38: 'Encümen Girişi', 39: 'Encümen Çıkışı', 40: 'Kadastro', 41: 'Tapu İşlemi',
+    42: '2. LİHKAP', 43: '2. İmar Durumu', 44: '2. İstikamet Çizimi',
+    45: 'Yola Terk Kontrolü', 46: 'Zemin Etütü Onayı', 47: 'Noter Evrakları',
   };
 
   Future<Map<String, dynamic>> _getRuhsatOzet(String projectId) async {

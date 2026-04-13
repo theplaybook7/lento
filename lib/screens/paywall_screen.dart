@@ -29,6 +29,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
   @override
   void initState() {
     super.initState();
+    // Web'de varsayılan olarak trial seç (IAP yok)
+    if (!PaymentService().isPaymentSupported) {
+      _selectedPlan = PlanType.trial;
+    }
     _prepareStore();
   }
 
@@ -252,34 +256,35 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 14),
 
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.25),
+              if (PaymentService().isPaymentSupported)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.25),
+                    ),
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.verified_outlined, size: 16, color: AppTheme.primaryColor),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        PaymentService().isApplePaymentSupported
-                            ? 'Ödeme App Store üzerinden güvenli şekilde yapılır'
-                            : 'Ödeme Google Play üzerinden güvenli şekilde yapılır',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.primaryColor,
-                          fontWeight: FontWeight.w600,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_outlined, size: 16, color: AppTheme.primaryColor),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          PaymentService().isApplePaymentSupported
+                              ? 'Ödeme App Store üzerinden güvenli şekilde yapılır'
+                              : 'Ödeme Google Play üzerinden güvenli şekilde yapılır',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 40),
 
               // Ücretsiz Deneme
@@ -302,41 +307,43 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   const SizedBox(height: 16),
                 ],
 
-              // Plans
-              _buildPlanCard(
-                title: "Aylık",
-                subtitle: "Subscription",
-                price: _priceTextForPlan(PlanType.monthly),
-                duration: "/ay",
-                features: [
-                  "Sınırsız proje yönetimi",
-                  "Personel ve rol yönetimi",
-                  "Mali raporlama ve analiz",
-                  "Otomatik aylık yenileme",
-                  "7 gün para iade garantisi",
-                ],
-                planType: PlanType.monthly,
-                isPopular: false,
-              ),
-              const SizedBox(height: 16),
+              // Plans (only on platforms supporting IAP)
+              if (PaymentService().isPaymentSupported) ...[
+                _buildPlanCard(
+                  title: "Aylık",
+                  subtitle: "Subscription",
+                  price: _priceTextForPlan(PlanType.monthly),
+                  duration: "/ay",
+                  features: [
+                    "Sınırsız proje yönetimi",
+                    "Personel ve rol yönetimi",
+                    "Mali raporlama ve analiz",
+                    "Otomatik aylık yenileme",
+                    "7 gün para iade garantisi",
+                  ],
+                  planType: PlanType.monthly,
+                  isPopular: false,
+                ),
+                const SizedBox(height: 16),
 
-              _buildPlanCard(
-                title: "Yıllık",
-                subtitle: "En Uygun",
-                price: _priceTextForPlan(PlanType.yearly),
-                duration: "/yıl",
-                discount: "2 ay tasarruf et",
-                features: [
-                  "Sınırsız proje yönetimi",
-                  "Personel ve rol yönetimi",
-                  "Mali raporlama ve analiz",
-                  "Otomatik yıllık yenileme",
-                  "30 gün para iade garantisi",
-                  "Öncelikli destek",
-                ],
-                planType: PlanType.yearly,
-                isPopular: true,
-              ),
+                _buildPlanCard(
+                  title: "Yıllık",
+                  subtitle: "En Uygun",
+                  price: _priceTextForPlan(PlanType.yearly),
+                  duration: "/yıl",
+                  discount: "2 ay tasarruf et",
+                  features: [
+                    "Sınırsız proje yönetimi",
+                    "Personel ve rol yönetimi",
+                    "Mali raporlama ve analiz",
+                    "Otomatik yıllık yenileme",
+                    "30 gün para iade garantisi",
+                    "Öncelikli destek",
+                  ],
+                  planType: PlanType.yearly,
+                  isPopular: true,
+                ),
+              ],
               const SizedBox(height: 40),
 
               // Status Message
@@ -416,44 +423,46 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               const SizedBox(height: 16),
 
-              TextButton(
-                onPressed: _loading ? null : _restorePurchases,
-                child: const Text('Satın Alımları Geri Yükle'),
-              ),
+              if (PaymentService().isPaymentSupported) ...[
+                TextButton(
+                  onPressed: _loading ? null : _restorePurchases,
+                  child: const Text('Satın Alımları Geri Yükle'),
+                ),
 
-              // Abonelik Yönetimi Linki
-              const SizedBox(height: 4),
-              TextButton.icon(
-                onPressed: () => launchUrl(
-                  Uri.parse(
-                    PaymentService().isApplePaymentSupported
-                        ? 'https://apps.apple.com/account/subscriptions'
-                        : 'https://play.google.com/store/account/subscriptions',
+                // Abonelik Yönetimi Linki
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: () => launchUrl(
+                    Uri.parse(
+                      PaymentService().isApplePaymentSupported
+                          ? 'https://apps.apple.com/account/subscriptions'
+                          : 'https://play.google.com/store/account/subscriptions',
+                    ),
+                    mode: LaunchMode.externalApplication,
                   ),
-                  mode: LaunchMode.externalApplication,
+                  icon: const Icon(Icons.settings, size: 16),
+                  label: const Text('Aboneliği Yönet'),
                 ),
-                icon: const Icon(Icons.settings, size: 16),
-                label: const Text('Aboneliği Yönet'),
-              ),
 
-              // Subscription Terms
-              const SizedBox(height: 8),
-              Text(
-                PaymentService().isApplePaymentSupported
-                    ? "Ödeme, Apple Kimliğiniz hesabına tahsil edilecektir. "
-                      "Abonelik, mevcut dönem sona ermeden en az 24 saat önce iptal edilmedikçe otomatik olarak yenilenir. "
-                      "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
-                      "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz."
-                    : "Ödeme, Google hesabınıza tahsil edilecektir. "
-                      "Abonelik, mevcut dönem sona ermeden en az 24 saat önce iptal edilmedikçe otomatik olarak yenilenir. "
-                      "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
-                      "Aboneliğinizi Google Play > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade600,
-                  fontSize: 12,
+                // Subscription Terms
+                const SizedBox(height: 8),
+                Text(
+                  PaymentService().isApplePaymentSupported
+                      ? "Ödeme, Apple Kimliğiniz hesabına tahsil edilecektir. "
+                        "Abonelik, mevcut dönem sona ermeden en az 24 saat önce iptal edilmedikçe otomatik olarak yenilenir. "
+                        "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
+                        "Aboneliğinizi Ayarlar > Apple Kimliği > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz."
+                      : "Ödeme, Google hesabınıza tahsil edilecektir. "
+                        "Abonelik, mevcut dönem sona ermeden en az 24 saat önce iptal edilmedikçe otomatik olarak yenilenir. "
+                        "Yenileme ücreti, mevcut dönem sona ermeden 24 saat içinde hesabınızdan tahsil edilir. "
+                        "Aboneliğinizi Google Play > Abonelikler bölümünden yönetebilir veya iptal edebilirsiniz.",
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
+              ],
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

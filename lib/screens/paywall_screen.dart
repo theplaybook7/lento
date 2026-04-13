@@ -44,7 +44,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
       if (mounted) {
         setState(() {
           _productsLoading = false;
-          _statusMessage = 'Abonelik satın alma bu cihazda desteklenmiyor.';
+          if (_trialUsed) {
+            _statusMessage = 'Abonelik satın alma bu cihazda desteklenmiyor. Lütfen mobil uygulamayı kullanın.';
+          }
         });
       }
       return;

@@ -436,8 +436,8 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
             final isAdmin = kullaniciYetkisi?.adminMi == true ||
                 _normalizeEmail(bulunanSirket.yoneticiEposta) == email;
 
-            if (isAdmin && PaymentService().isPaymentSupported) {
-              // iOS/macOS/Android Admin: Direkt PaywallScreen göster
+            if (isAdmin && (PaymentService().isPaymentSupported || !(await PaymentService().hasUsedTrial()))) {
+              // Admin: PaywallScreen göster (IAP + deneme veya sadece deneme)
               if (mounted) {
                 final purchased = await Navigator.push<bool>(
                   context,
@@ -451,7 +451,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                   });
                   return;
                 }
-                // Satın alma sonrası şirkete kaydet
+                // Satın alma/deneme sonrası şirkete kaydet
                 final newSub = await PaymentService().getSubscriptionStatus();
                 if (newSub['active'] == true) {
                   final t = newSub['type'] as String?;
@@ -466,7 +466,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                 }
               }
             } else if (isAdmin) {
-              // Web/diğer platformlar Admin: Uygulama üzerinden satın alınmalı
+              // Web admin, deneme de kullanılmış: Mobil uygulama gerekli
               if (mounted) {
                 setState(() {
                   _hataMetni = 'Devam etmek için aktif bir abonelik gerekli. Lütfen mobil uygulama üzerinden abonelik satın alın.';
@@ -517,8 +517,8 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
     final subStatus = await paymentService.getSubscriptionStatus();
 
     if (!(subStatus['active'] as bool)) {
-      if (paymentService.isPaymentSupported) {
-        // iOS/macOS/Android: IAP ile satın alma
+      if (paymentService.isPaymentSupported || !(await paymentService.hasUsedTrial())) {
+        // IAP veya deneme ile satın alma
         if (mounted) {
           final purchased = await Navigator.push<bool>(
             context,
@@ -527,7 +527,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
           if (purchased != true) return;
         }
       } else {
-        // Diğer platformlar: Abonelik gerekli — Uygulama üzerinden satın alınmalı
+        // Web/diğer platformlar, deneme de kullanılmış: Mobil uygulama gerekli
         if (mounted) {
           showDialog(
             context: context,

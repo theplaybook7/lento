@@ -1357,11 +1357,52 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Filtre state
+  int? _filtreDurum;       // null=hepsi, 0=başlamadı, 1=devam ediyor, 2=tamamlandı
+  int? _filtreAsama;       // akış diyagramı node sıra numarası (null=hepsi)
+  // Projelerin akış diyagramı cache
+  final Map<String, List<Map<String, dynamic>>> _akisCache = {};
+  bool _akisCacheLoaded = false;
+
   @override
   void initState() {
     super.initState();
     _ruhsatPasifBildirimKontrol();
     _akisDiyagramiPasifBildirimKontrol();
+  }
+
+  Future<void> _loadAkisCache(List<Project> projects) async {
+    if (_akisCacheLoaded) return;
+    _akisCacheLoaded = true;
+    for (final p in projects) {
+      if (_akisCache.containsKey(p.id)) continue;
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('ruhsat').doc(p.id)
+            .collection('akis_diyagrami').get();
+        _akisCache[p.id] = snap.docs
+            .where((d) => d.id != 'karar_kontrol' && d.id != 'yola_terk_kontrol')
+            .map((d) => d.data())
+            .toList();
+      } catch (_) {
+        _akisCache[p.id] = [];
+      }
+    }
+  }
+
+  bool _projeFiltreyeUygunMu(String projectId) {
+    if (_filtreDurum == null && _filtreAsama == null) return true;
+    final nodes = _akisCache[projectId] ?? [];
+    if (nodes.isEmpty) return false;
+
+    for (final node in nodes) {
+      final durum = node['durum'] as int? ?? 0;
+      final sira = node['sira'] as int? ?? 0;
+      final asamaUygun = _filtreAsama == null || sira == _filtreAsama;
+      final durumUygun = _filtreDurum == null || durum == _filtreDurum;
+      if (asamaUygun && durumUygun) return true;
+    }
+    return false;
   }
 
   Future<void> _projeIsimDuzenle(Project project) async {
@@ -1718,6 +1759,82 @@ class _ProjectsTabState extends State<_ProjectsTab> {
             onChanged: (v) => setState(() => _searchQuery = v),
           ),
         ),
+        // Filtre satırı
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.grey.shade50,
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int?>(
+                      value: _filtreDurum,
+                      isExpanded: true,
+                      hint: const Text('İş Durumu', style: TextStyle(fontSize: 13)),
+                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('Tümü')),
+                        DropdownMenuItem(value: 0, child: Text('Başlamadı')),
+                        DropdownMenuItem(value: 1, child: Text('Devam Ediyor')),
+                        DropdownMenuItem(value: 2, child: Text('Tamamlandı')),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _filtreDurum = v;
+                        _akisCacheLoaded = false;
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.grey.shade50,
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<int?>(
+                      value: _filtreAsama,
+                      isExpanded: true,
+                      hint: const Text('Aşama', style: TextStyle(fontSize: 13)),
+                      style: const TextStyle(fontSize: 13, color: Colors.black87),
+                      menuMaxHeight: 350,
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('Tümü')),
+                        ..._akisNodeNames.entries.map((e) =>
+                          DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis)),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _filtreAsama = v;
+                        _akisCacheLoaded = false;
+                      }),
+                    ),
+                  ),
+                ),
+              ),
+              if (_filtreDurum != null || _filtreAsama != null)
+                IconButton(
+                  icon: const Icon(Icons.filter_alt_off, size: 20),
+                  tooltip: 'Filtreleri Temizle',
+                  onPressed: () => setState(() {
+                    _filtreDurum = null;
+                    _filtreAsama = null;
+                    _akisCacheLoaded = false;
+                  }),
+                ),
+            ],
+          ),
+        ),
         Expanded(
           child: StreamBuilder<List<Project>>(
             stream: _firebase.getProjectsStream(widget.companyId),
@@ -1747,9 +1864,29 @@ class _ProjectsTabState extends State<_ProjectsTab> {
               }
 
               final allProjects = snapshot.data!;
-              final projects = _searchQuery.isEmpty
+              var projects = _searchQuery.isEmpty
                   ? allProjects
                   : allProjects.where((p) => p.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+              // Akış diyagramı filtresi
+              final hasAkisFilter = _filtreDurum != null || _filtreAsama != null;
+              if (hasAkisFilter) {
+                return FutureBuilder<void>(
+                  future: _loadAkisCache(allProjects),
+                  builder: (context, _) {
+                    final filtered = projects.where((p) => _projeFiltreyeUygunMu(p.id)).toList();
+                    if (filtered.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'Filtreyle eşleşen proje bulunamadı',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      );
+                    }
+                    return _buildProjectList(filtered);
+                  },
+                );
+              }
 
               if (projects.isEmpty) {
                 return Center(
@@ -1760,11 +1897,20 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                 );
               }
 
-              return ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: projects.length,
-          itemBuilder: (context, index) {
-            final project = projects[index];
+              return _buildProjectList(projects);
+          },
+        ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProjectList(List<Project> projects) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: projects.length,
+      itemBuilder: (context, index) {
+        final project = projects[index];
 
             return FutureBuilder<ProjectFinance>(
               future: _firebase.getProjectFinanceSummary(project.id),
@@ -2003,15 +2149,9 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                 );
               },
             );
-              },
-            );
-          },
-        ),
-        ),
-      ],
+      },
     );
   }
-
   Color _getStatusColor(ProjectStatus status) {
     switch (status) {
       case ProjectStatus.planning:

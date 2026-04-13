@@ -217,29 +217,24 @@ exports.dailyInactivityCheck = functions.pubsub
         const sirketId = sirketDoc.id;
         const sirketAd = sirketDoc.data().ad || "Şirket";
 
-        // Şirketin projelerini al
+        // Şirketin projelerini al (top-level projects koleksiyonu)
         const projelerSnap = await db
-          .collection("sirketler")
-          .doc(sirketId)
-          .collection("projeler")
-          .where("arsivlendi", "==", false)
+          .collection("projects")
+          .where("companyId", "==", sirketId)
+          .where("isArchived", "==", false)
           .get();
 
         const pasifProjeler = [];
 
         for (const projeDoc of projelerSnap.docs) {
           const projeId = projeDoc.id;
-          const projeAd = projeDoc.data().ad || "Proje";
+          const projeAd = projeDoc.data().name || "Proje";
 
           // Ruhsat islemler koleksiyonundan en son güncelleme tarihini bul
           let sonIslemTarihi = null;
 
-          // islemler kontrol
+          // islemler kontrol (top-level ruhsat koleksiyonu)
           const islemlerSnap = await db
-            .collection("sirketler")
-            .doc(sirketId)
-            .collection("projeler")
-            .doc(projeId)
             .collection("ruhsat")
             .doc(projeId)
             .collection("islemler")
@@ -254,10 +249,6 @@ exports.dailyInactivityCheck = functions.pubsub
 
           // akis_diyagrami kontrol
           const akisSnap = await db
-            .collection("sirketler")
-            .doc(sirketId)
-            .collection("projeler")
-            .doc(projeId)
             .collection("ruhsat")
             .doc(projeId)
             .collection("akis_diyagrami")
@@ -281,12 +272,29 @@ exports.dailyInactivityCheck = functions.pubsub
               (now - sonIslemTarihi) / (1000 * 60 * 60 * 24)
             );
             if (diffDays >= 4) {
-              pasifProjeler.push({ ad: projeAd, gun: diffDays });
+              pasifProjeler.push({ ad: projeAd, gun: diffDays, id: projeId });
             }
           }
         }
 
         if (pasifProjeler.length === 0) continue;
+
+        // Firestore'a in-app bildirim yaz (zil ikonu için)
+        for (const proje of pasifProjeler) {
+          await db
+            .collection("sirketler")
+            .doc(sirketId)
+            .collection("bildirimler")
+            .add({
+              baslik: "⚠️ Ruhsat İşlem Uyarısı",
+              mesaj: `${proje.ad} projesinde ${proje.gun} gündür işlem yapılmadı!`,
+              projeId: proje.id || "",
+              gonderen: "Sistem",
+              modul: "ruhsat",
+              tarih: admin.firestore.FieldValue.serverTimestamp(),
+              okuyanlar: [],
+            });
+        }
 
         // Bu şirketin kullanıcılarının FCM token'larını topla
         const emailler = sirketDoc.data().emailler || [];
@@ -308,9 +316,14 @@ exports.dailyInactivityCheck = functions.pubsub
           }
         }
 
-        if (tokens.length === 0) continue;
+        if (tokens.length === 0) {
+          console.log(
+            `✅ ${sirketAd}: ${pasifProjeler.length} pasif proje, in-app bildirim yazıldı (FCM token yok)`
+          );
+          continue;
+        }
 
-        // Bildirim gönder
+        // FCM Push bildirim gönder
         const body =
           pasifProjeler.length === 1
             ? `${pasifProjeler[0].ad} - ${pasifProjeler[0].gun} gündür işlem yapılmadı!`

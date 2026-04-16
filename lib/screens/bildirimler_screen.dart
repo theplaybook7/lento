@@ -14,6 +14,7 @@ class BildirimlerScreen extends StatefulWidget {
 
 class _BildirimlerScreenState extends State<BildirimlerScreen> {
   final List<QueryDocumentSnapshot> _bildirimler = [];
+  final Set<String> _localOkunanlar = {}; // Yerel okundu takibi
   DocumentSnapshot? _sonDoc;
   bool _yukleniyor = false;
   bool _dahaBildirimVar = true;
@@ -73,6 +74,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
   Future<void> _yenile() async {
     setState(() {
       _bildirimler.clear();
+      _localOkunanlar.clear();
       _sonDoc = null;
       _dahaBildirimVar = true;
     });
@@ -90,7 +92,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
       }
       // Filtre kontrolü
       final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
-      final okunmus = okuyanlar.contains(email);
+      final okunmus = okuyanlar.contains(email) || _localOkunanlar.contains(doc.id);
       if (_filtre == 'okunmamis') return !okunmus;
       if (_filtre == 'okunmus') return okunmus;
       return true;
@@ -201,7 +203,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                   final modul = b['modul'] ?? '';
                   final tarih = b['tarih'] as Timestamp?;
                   final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
-                  final okunmus = okuyanlar.contains(email);
+                  final okunmus = okuyanlar.contains(email) || _localOkunanlar.contains(doc.id);
 
                   Color modulRenk;
                   IconData modulIkon;
@@ -253,7 +255,11 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(10),
                       onTap: () async {
-                        if (!okunmus) await _okunduIsaretle(doc);
+                        if (!okunmus) {
+                          _localOkunanlar.add(doc.id);
+                          _okunduIsaretle(doc);
+                          setState(() {});
+                        }
                         if (!mounted) return;
                         if (projeId.toString().isNotEmpty) {
                           Navigator.push(

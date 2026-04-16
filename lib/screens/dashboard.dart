@@ -13,6 +13,7 @@ import 'new_project_screen.dart';
 import 'project_details_screen.dart';
 import 'project_archive_screen.dart';
 import 'company_finance_dashboard.dart';
+import 'bildirimler_screen.dart';
 import 'cari_hesap_screen.dart';
 import 'settings_screen.dart';
 import '../services/firebase_service.dart';
@@ -687,6 +688,18 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         Icon(Icons.notifications_off_outlined, size: 40, color: Colors.grey.shade300),
                         const SizedBox(height: 8),
                         Text('Bildirim yok', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const BildirimlerScreen()));
+                            },
+                            icon: const Icon(Icons.list_alt, size: 16),
+                            label: const Text('Tüm Bildirimleri Görüntüle', style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -703,6 +716,18 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         Icon(Icons.check_circle_outline, size: 40, color: Colors.green.shade300),
                         const SizedBox(height: 8),
                         Text('Tüm bildirimler okundu', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const BildirimlerScreen()));
+                            },
+                            icon: const Icon(Icons.list_alt, size: 16),
+                            label: const Text('Tüm Bildirimleri Görüntüle', style: TextStyle(fontSize: 12)),
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -876,6 +901,19 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     );
                   },
                 ),
+                    Divider(height: 1, color: Colors.grey.shade200),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const BildirimlerScreen()));
+                        },
+                        icon: const Icon(Icons.list_alt, size: 16),
+                        label: const Text('Tüm Bildirimleri Görüntüle', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
                   ],
                 );
               },

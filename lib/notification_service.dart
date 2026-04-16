@@ -57,6 +57,32 @@ class BildirimServisi {
         .snapshots();
   }
 
+  /// Tüm bildirimleri sayfalı getir (okunmuş + okunmamış)
+  static Future<QuerySnapshot> tumBildirimleriGetir({
+    DocumentSnapshot? sonDoc,
+    int limit = 30,
+  }) async {
+    if (SistemYoneticisi().aktifSirket == null) {
+      return await FirebaseFirestore.instance
+          .collection('_bos_')
+          .limit(0)
+          .get();
+    }
+
+    var query = FirebaseFirestore.instance
+        .collection('sirketler')
+        .doc(SistemYoneticisi().aktifSirket!.id)
+        .collection('bildirimler')
+        .orderBy('tarih', descending: true)
+        .limit(limit);
+
+    if (sonDoc != null) {
+      query = query.startAfterDocument(sonDoc);
+    }
+
+    return query.get();
+  }
+
   /// Yetkiye göre filtrelenmiş okunmamış bildirimleri döndürür
   static List<QueryDocumentSnapshot> okunmamisBildirimler(QuerySnapshot snapshot) {
     final email = SistemYoneticisi().girisYapanEmail;

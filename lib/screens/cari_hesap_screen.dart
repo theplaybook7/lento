@@ -2285,7 +2285,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                                             padding: const EdgeInsets.symmetric(horizontal: 12),
                                             textStyle: const TextStyle(fontSize: 11),
                                           ),
-                                          child: Text(gecikmi ? 'Gecikmiş — Öde' : 'Öde'),
+                                          child: Text(gecikmi ? (isTahsilat ? 'Gecikmiş — Tahsil Et' : 'Gecikmiş — Öde') : (isTahsilat ? 'Tahsil Et' : 'Öde')),
                                         ),
                                       ),
                               );
@@ -2562,31 +2562,126 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
     final projeAd = planData['projeAd'] ?? '';
     final sira = taksitData['sira'] ?? 0;
 
-    final onay = await showDialog<bool>(
+    // Dekont fotoğrafları için dialog
+    List<XFile> dekontImages = [];
+    final result = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: Text(isTahsilat ? 'Tahsilat Onayla' : 'Ödeme Onayla'),
-        content: Text(
-          'Taksit #$sira — ${formatTL(tutar)}\n\n'
-          'Bu tutar cari hesaba ${isTahsilat ? "tahsilat" : "ödeme"} olarak kaydedilecek ve muhasebeye işlenecektir.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('İptal')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(c, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isTahsilat ? Colors.green : Colors.red,
-              foregroundColor: Colors.white,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setDialogState) => AlertDialog(
+          title: Text(isTahsilat ? 'Tahsilat Onayla' : 'Ödeme Onayla'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Taksit #$sira — ${formatTL(tutar)}\n\n'
+                  'Bu tutar cari hesaba ${isTahsilat ? "tahsilat" : "ödeme"} olarak kaydedilecek ve muhasebeye işlenecektir.',
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const Text('Dekont / Fotoğraf (opsiyonel)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final picker = ImagePicker();
+                          final pickedFile = await picker.pickImage(source: ImageSource.camera);
+                          if (pickedFile != null) {
+                            setDialogState(() => dekontImages.add(pickedFile));
+                          }
+                        },
+                        icon: const Icon(Icons.camera_alt, size: 16),
+                        label: const Text('Çek', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade700, foregroundColor: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final picker = ImagePicker();
+                          final pickedFiles = await picker.pickMultiImage();
+                          if (pickedFiles.isNotEmpty) {
+                            setDialogState(() => dekontImages.addAll(pickedFiles));
+                          }
+                        },
+                        icon: const Icon(Icons.photo_library, size: 16),
+                        label: const Text('Galeri', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade600, foregroundColor: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+                if (dekontImages.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('✓ ${dekontImages.length} fotoğraf seçildi',
+                      style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: dekontImages.asMap().entries.map((entry) {
+                      return Stack(
+                        children: [
+                          FutureBuilder<Widget>(
+                            future: _buildCariImageWidget(entry.value),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData) return snapshot.data!;
+                              return const SizedBox(width: 50, height: 50, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+                            },
+                          ),
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: GestureDetector(
+                              onTap: () => setDialogState(() => dekontImages.removeAt(entry.key)),
+                              child: Container(
+                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                child: const Icon(Icons.close, size: 14, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
             ),
-            child: const Text('Onayla'),
           ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('İptal')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(c, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isTahsilat ? Colors.green : Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(isTahsilat ? 'Tahsil Et' : 'Öde'),
+            ),
+          ],
+        ),
       ),
     );
 
-    if (onay != true || !mounted) return;
+    if (result != true || !mounted) return;
 
     try {
+      // Fotoğrafları yükle
+      final List<String> photoUrls = [];
+      if (dekontImages.isNotEmpty) {
+        for (var i = 0; i < dekontImages.length; i++) {
+          final fileName = 'taksit_${widget.cariId}_${planId}_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          final storageRef = FirebaseService().getStorageRef('cari_hareketler/$fileName');
+          final compressedList = await compressImage(dekontImages[i]);
+          final compressedBytes = Uint8List.fromList(compressedList);
+          final url = await uploadToStorage(storageRef, compressedBytes, SettableMetadata(contentType: 'image/jpeg'));
+          photoUrls.add(url);
+        }
+      }
       // 1. Cari hareket oluştur (aynı _yeniHareketDialog mantığı)
       String giderId = '';
       String financeTransactionId = '';
@@ -2693,7 +2788,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
         'kur': 1.0,
         'aciklama': 'Taksit #$sira${projeAd.isNotEmpty ? " ($projeAd)" : ""}',
         'tarih': DateTime.now(),
-        'fotoUrls': [],
+        'fotoUrls': photoUrls,
         'giderId': giderId,
         'financeTransactionId': financeTransactionId,
         'projeId': projectId.isNotEmpty ? projectId : 'manuel',

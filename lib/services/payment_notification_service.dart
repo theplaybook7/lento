@@ -78,26 +78,10 @@ class PaymentNotificationService {
   }
 
   /// Yaklaşan taksitleri kontrol et ve bildirim gönder
+  /// NOT: Eski ödeme planı sistemi kaldırıldı. Taksitli plan sistemi cari_hesap_screen üzerinden çalışıyor.
   Future<void> checkAndNotifyUpcomingInstallments(String projectId) async {
-    try {
-      final upcomingInstallments = await _firebase.getUpcomingInstallments(
-        projectId,
-        daysAhead: 7, // 7 gün içindeki taksitleri al
-      );
-
-      for (var installment in upcomingInstallments) {
-        await showNotification(
-          id: installment.id.hashCode,
-          title: 'Ödeme Tarihi Yaklaşıyor',
-          body: 'Taksit #${installment.installmentNumber} - ₺${installment.amount.toStringAsFixed(2)}',
-          payload: installment.id,
-        );
-      }
-
-      developer.log('${upcomingInstallments.length} bildirim gönderildi');
-    } catch (e) {
-      developer.log('Taksitleri kontrol etme hatası: $e');
-    }
+    // Eski payment_installments koleksiyonu artık kullanılmıyor
+    developer.log('Eski ödeme planı bildirim kontrolü devre dışı');
   }
 
   /// iOS için eski bildirim callback

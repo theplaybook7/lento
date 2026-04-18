@@ -1463,21 +1463,19 @@ class _ProjectsTabState extends State<_ProjectsTab> {
         }
       }
 
-      // 3) Finans verilerini paralel yükle
+      // 3) Finans verilerini paralel yükle (project_finance dokümanlarından hızlı okuma)
       if (!_financeCacheLoaded && SistemYoneticisi().yetkiVarMi('muhasebe')) {
         _financeCacheLoaded = true;
         final uncached = projects.where((p) => !_financeCache.containsKey(p.id)).toList();
         if (uncached.isNotEmpty) {
           changed = true;
-          for (var start = 0; start < uncached.length; start += 5) {
+          // Tüm projeleri paralel oku (her biri sadece 1 doc read)
+          await Future.wait(uncached.map((p) async {
             if (!mounted) return;
-            final batch = uncached.skip(start).take(5).toList();
-            await Future.wait(batch.map((p) async {
-              try {
-                _financeCache[p.id] = await _firebase.getProjectFinanceSummary(p.id);
-              } catch (_) {}
-            }));
-          }
+            try {
+              _financeCache[p.id] = await _firebase.getProjectFinanceSummary(p.id);
+            } catch (_) {}
+          }));
         }
       }
 

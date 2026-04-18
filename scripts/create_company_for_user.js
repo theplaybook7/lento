@@ -12,8 +12,8 @@ const PROJECT_ID = 'insaat-yonetim-takip';
 const API_KEY = 'AIzaSyAFPmbGYzuFhropyLDn3iidaRlzgVX_hpo'; // Web API key
 
 // ======= AYARLAR =======
-const TARGET_EMAIL = 'adnancolpa@icloud.com';
-const COMPANY_NAME = 'Adnan Colpa';
+const TARGET_EMAIL = 'veysel.ceper18@gmail.com';
+const COMPANY_NAME = 'Veysel Ceper Insaat';
 const SUBSCRIPTION_TYPE = 'yearly';
 const SUBSCRIPTION_DAYS = 365;
 // ========================

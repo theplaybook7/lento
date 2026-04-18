@@ -267,64 +267,16 @@ class FirebaseService {
     }
   }
 
-  /// Proje finansmanı özetini al (gerçek cari hareketlerinden hesapla)
+  /// Proje finansmanı özetini al (project_finance dokümanından hızlı okuma)
   Future<ProjectFinance> getProjectFinanceSummary(String projectId) async {
     try {
       final doc = await _db.collection('project_finance').doc(projectId).get();
       final data = doc.data() ?? {};
-
-      // Bu projeye bağlı tüm carileri bul
-      final sirketId = SistemYoneticisi().aktifSirket?.id ?? '';
-      final cariSnap = await _db
-          .collection('cari_hesaplar')
-          .where('sirketId', isEqualTo: sirketId)
-          .get();
-
-      double totalIncome = 0;
-      double totalExpenses = 0;
-
-      // Her carinin bu projeye ait hareketlerini say
-      for (final cariDoc in cariSnap.docs) {
-        final cariData = cariDoc.data();
-        final pids = List<String>.from(cariData['projectIds'] ?? []);
-        final pid = cariData['projectId'] ?? '';
-        if (!pids.contains(projectId) && pid != projectId) continue;
-
-        final hareketSnap = await _db
-            .collection('cari_hesaplar')
-            .doc(cariDoc.id)
-            .collection('hareketler')
-            .where('projeId', isEqualTo: projectId)
-            .get();
-
-        for (final hDoc in hareketSnap.docs) {
-          final hData = hDoc.data();
-          final tutarTL = ((hData['tutarTL'] ?? hData['tutar'] ?? 0.0) as num).toDouble();
-          final tip = hData['tip'] ?? 'borc';
-          if (tip == 'alacak') {
-            totalIncome += tutarTL;
-          } else if (tip == 'borc') {
-            totalExpenses += tutarTL;
-          }
-        }
-      }
-
-      // Cached değerleri güncelle
-      final cachedIncome = (data['totalIncome'] ?? 0).toDouble();
-      final cachedExpenses = (data['totalExpenses'] ?? 0).toDouble();
-      if ((cachedIncome - totalIncome).abs() > 0.01 || (cachedExpenses - totalExpenses).abs() > 0.01) {
-        _db.collection('project_finance').doc(projectId).set({
-          'totalIncome': totalIncome,
-          'totalExpenses': totalExpenses,
-          'budgetedAmount': data['budgetedAmount'] ?? 0,
-        }, SetOptions(merge: true));
-      }
-
       return ProjectFinance(
         projectId: projectId,
-        totalIncome: totalIncome,
-        totalExpenses: totalExpenses,
-        budgetedAmount: (data['budgetedAmount'] ?? 0).toDouble(),
+        totalIncome: ((data['totalIncome'] ?? 0) as num).toDouble(),
+        totalExpenses: ((data['totalExpenses'] ?? 0) as num).toDouble(),
+        budgetedAmount: ((data['budgetedAmount'] ?? 0) as num).toDouble(),
       );
     } catch (e) {
       developer.log('Proje finansmanı özet yükleme hatası: $e');
@@ -455,40 +407,11 @@ class FirebaseService {
                 .map((doc) => Project.fromMap(doc.data(), doc.id))
                 .toList();
 
-            // Her proje için ruhsat son işlem tarihini al (islemler + akis_diyagrami)
-            final Map<String, DateTime?> sonIslemMap = {};
-            await Future.wait(projects.map((p) async {
-              try {
-                DateTime? sonIslem;
-                // Hem islemler hem akis_diyagrami koleksiyonlarını kontrol et
-                final results = await Future.wait([
-                  _db.collection('ruhsat').doc(p.id).collection('islemler').get(),
-                  _db.collection('ruhsat').doc(p.id).collection('akis_diyagrami').get(),
-                ]);
-                for (final snap in results) {
-                  for (final doc in snap.docs) {
-                    final gt = doc.data()['guncellendiTarihi'];
-                    DateTime? t;
-                    if (gt is Timestamp) t = gt.toDate();
-                    if (t != null && (sonIslem == null || t.isAfter(sonIslem))) {
-                      sonIslem = t;
-                    }
-                  }
-                }
-                sonIslemMap[p.id] = sonIslem;
-              } catch (_) {
-                sonIslemMap[p.id] = null;
-              }
-            }));
-
-            // Hiç işlem yapılmamış en üstte, sonra en eski işlem tarihi en üstte
+            // createdAt'e göre sırala (en yeni en üstte) — ağır Firestore okuması kaldırıldı
             projects.sort((a, b) {
-              final aDate = sonIslemMap[a.id];
-              final bDate = sonIslemMap[b.id];
-              if (aDate == null && bDate == null) return 0;
-              if (aDate == null) return -1; // a hiç işlem yok → üstte
-              if (bDate == null) return 1;  // b hiç işlem yok → üstte
-              return aDate.compareTo(bDate); // eski tarih üstte
+              final aDate = a.createdAt;
+              final bDate = b.createdAt;
+              return bDate.compareTo(aDate);
             });
 
             return projects;

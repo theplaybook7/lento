@@ -1882,10 +1882,6 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                       ],
                       onChanged: (v) => setState(() {
                         _filtreDurum = v;
-                        _akisCacheLoaded = false;
-                        _financeCacheLoaded = false;
-                        _preloadInProgress = false;
-                        _ruhsatOzetCache.clear();
                       }),
                     ),
                   ),
@@ -1915,10 +1911,6 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                       ],
                       onChanged: (v) => setState(() {
                         _filtreAsama = v;
-                        _akisCacheLoaded = false;
-                        _financeCacheLoaded = false;
-                        _preloadInProgress = false;
-                        _ruhsatOzetCache.clear();
                       }),
                     ),
                   ),
@@ -1931,10 +1923,6 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                   onPressed: () => setState(() {
                     _filtreDurum = null;
                     _filtreAsama = null;
-                    _akisCacheLoaded = false;
-                    _financeCacheLoaded = false;
-                    _preloadInProgress = false;
-                    _ruhsatOzetCache.clear();
                   }),
                 ),
             ],

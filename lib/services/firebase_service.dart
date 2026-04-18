@@ -330,17 +330,31 @@ class FirebaseService {
         } catch (_) {}
       }));
 
-      // 4) ProjectFinance nesnelerini oluştur + project_finance dokümanlarını güncelle
+      // 4) ProjectFinance nesnelerini oluştur
+      // Önce mevcut project_finance dokümanlarını paralel oku (budgetedAmount için)
+      final existingDocs = <String, Map<String, dynamic>>{};
+      await Future.wait(projectIds.map((pid) async {
+        try {
+          final doc = await _db.collection('project_finance').doc(pid).get();
+          if (doc.exists) existingDocs[pid] = doc.data() ?? {};
+        } catch (_) {}
+      }));
+
       for (final pid in projectIds) {
         final income = incomeMap[pid] ?? 0;
         final expense = expenseMap[pid] ?? 0;
+        final existing = existingDocs[pid] ?? {};
+        final budgeted = ((existing['budgetedAmount'] ?? 0) as num).toDouble();
         result[pid] = ProjectFinance(
           projectId: pid,
           totalIncome: income,
           totalExpenses: expense,
+          budgetedAmount: budgeted,
         );
-        // Arka planda project_finance dokümanını güncelle (gelecekte hızlı okuma için)
-        if (income > 0 || expense > 0) {
+        // Sadece değerler değiştiyse project_finance dokümanını güncelle
+        final cachedIncome = ((existing['totalIncome'] ?? 0) as num).toDouble();
+        final cachedExpense = ((existing['totalExpenses'] ?? 0) as num).toDouble();
+        if ((cachedIncome - income).abs() > 0.01 || (cachedExpense - expense).abs() > 0.01) {
           unawaited(_db.collection('project_finance').doc(pid).set({
             'totalIncome': income,
             'totalExpenses': expense,

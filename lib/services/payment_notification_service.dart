@@ -94,32 +94,11 @@ class PaymentNotificationService {
     developer.log('iOS Bildirim: $title - $body');
   }
 
-  /// Background task başlat (her 24 saatte bir taksitleri kontrol et)
+  /// Background task başlat
+  /// NOT: Eski ödeme planı sistemi kaldırıldı, background task devre dışı.
   Future<void> initializeBackgroundTasks() async {
-    try {
-      if (kIsWeb) {
-        return;
-      }
-
-      if (defaultTargetPlatform != TargetPlatform.iOS) {
-        return;
-      }
-
-      await Workmanager().initialize(
-        callbackDispatcher,
-      );
-
-      await Workmanager().registerPeriodicTask(
-        _paymentBackgroundTaskName,
-        _paymentBackgroundTaskName,
-        frequency: const Duration(hours: 24),
-        initialDelay: const Duration(minutes: 15),
-      );
-
-      developer.log('Background task başlatıldı');
-    } catch (e) {
-      developer.log('Background task hatası: $e');
-    }
+    // Eski background task gereksiz iOS kaynak tüketimi yapıyordu, devre dışı bırakıldı
+    developer.log('Background task devre dışı (eski ödeme sistemi kaldırıldı)');
   }
 
   /// Background task'i durdur

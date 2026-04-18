@@ -69,6 +69,14 @@ service cloud.firestore {
       match /hareketler/{hareketId} {
         allow read, write: if isAuthenticated();
       }
+
+      match /taksit_planlari/{planId} {
+        allow read, write: if isAuthenticated();
+
+        match /taksitler/{taksitId} {
+          allow read, write: if isAuthenticated();
+        }
+      }
     }
 
     // Projeler koleksiyonu

@@ -528,14 +528,28 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Hesap Hareketleri', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    TextButton.icon(
-                      onPressed: () => _yeniHareketDialog(),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Yeni Hareket'),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => _taksitliPlanOlusturDialog(),
+                          icon: const Icon(Icons.calendar_month, size: 16),
+                          label: const Text('Taksitli Plan', style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => _yeniHareketDialog(),
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Yeni Hareket', style: TextStyle(fontSize: 12)),
+                          style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
+              // Taksit Planları bölümü
+              _taksitPlanlariWidget(),
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -2144,6 +2158,628 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
             SnackBar(content: Text(hataCevir(e))),
           );
         }
+      }
+    }
+  }
+
+  // ── Taksit Planları Widget ──
+  Widget _taksitPlanlariWidget() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('cari_hesaplar')
+          .doc(widget.cariId)
+          .collection('taksit_planlari')
+          .orderBy('olusturmaTarihi', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final planlar = snapshot.data!.docs;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              Text('Taksit Planları (${planlar.length})',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
+              const SizedBox(height: 4),
+              ...planlar.map((planDoc) {
+                final plan = planDoc.data() as Map<String, dynamic>;
+                final tip = plan['tip'] ?? 'tahsilat';
+                final toplamTutar = ((plan['toplamTutar'] ?? 0) as num).toDouble();
+                final taksitSayisi = plan['taksitSayisi'] ?? 0;
+                final projeAd = plan['projeAd'] ?? '';
+                final aciklama = plan['aciklama'] ?? '';
+                final isTahsilat = tip == 'tahsilat';
+
+                return StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('cari_hesaplar')
+                      .doc(widget.cariId)
+                      .collection('taksit_planlari')
+                      .doc(planDoc.id)
+                      .collection('taksitler')
+                      .orderBy('sira')
+                      .snapshots(),
+                  builder: (context, taksitSnap) {
+                    final taksitler = taksitSnap.data?.docs ?? [];
+                    int odenen = taksitler.where((t) => (t.data() as Map)['odendi'] == true).length;
+                    double odenenTutar = 0;
+                    for (var t in taksitler) {
+                      final td = t.data() as Map<String, dynamic>;
+                      if (td['odendi'] == true) odenenTutar += ((td['tutar'] ?? 0) as num).toDouble();
+                    }
+                    final tamamlandi = odenen == taksitSayisi && taksitSayisi > 0;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: tamamlandi ? Colors.green.shade200 : Colors.grey.shade200),
+                      ),
+                      color: tamamlandi ? Colors.green.shade50 : null,
+                      child: ExpansionTile(
+                        leading: Icon(
+                          isTahsilat ? Icons.arrow_downward : Icons.arrow_upward,
+                          color: isTahsilat ? Colors.green : Colors.red,
+                          size: 20,
+                        ),
+                        title: Text(
+                          '${isTahsilat ? "Tahsilat" : "Ödeme"} Planı — ${formatTL(toplamTutar)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        subtitle: Text(
+                          '${projeAd.isNotEmpty ? "$projeAd • " : ""}$odenen/$taksitSayisi taksit ödendi${aciklama.isNotEmpty ? " • $aciklama" : ""}',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        children: [
+                          if (taksitler.isNotEmpty)
+                            ...taksitler.map((taksitDoc) {
+                              final t = taksitDoc.data() as Map<String, dynamic>;
+                              final sira = t['sira'] ?? 0;
+                              final tutar = ((t['tutar'] ?? 0) as num).toDouble();
+                              final odendi = t['odendi'] == true;
+                              final vadeTarihi = t['vadeTarihi'] is Timestamp
+                                  ? (t['vadeTarihi'] as Timestamp).toDate()
+                                  : DateTime.now();
+                              final gecikmi = !odendi && vadeTarihi.isBefore(DateTime.now());
+
+                              return ListTile(
+                                dense: true,
+                                leading: CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: odendi
+                                      ? Colors.green.shade100
+                                      : (gecikmi ? Colors.red.shade100 : Colors.grey.shade100),
+                                  child: odendi
+                                      ? Icon(Icons.check, size: 16, color: Colors.green.shade700)
+                                      : Text('$sira', style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: gecikmi ? Colors.red : Colors.grey.shade700,
+                                        )),
+                                ),
+                                title: Text(
+                                  '${formatTL(tutar)} — ${DateFormat('dd.MM.yyyy').format(vadeTarihi)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    decoration: odendi ? TextDecoration.lineThrough : null,
+                                    color: odendi ? Colors.grey : (gecikmi ? Colors.red : null),
+                                  ),
+                                ),
+                                trailing: odendi
+                                    ? Text('Ödendi', style: TextStyle(fontSize: 10, color: Colors.green.shade700, fontWeight: FontWeight.bold))
+                                    : SizedBox(
+                                        height: 28,
+                                        child: ElevatedButton(
+                                          onPressed: () => _taksitOde(planDoc.id, taksitDoc.id, t, isTahsilat, plan),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: isTahsilat ? Colors.green : Colors.red,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                                            textStyle: const TextStyle(fontSize: 11),
+                                          ),
+                                          child: Text(gecikmi ? 'Gecikmiş — Öde' : 'Öde'),
+                                        ),
+                                      ),
+                              );
+                            }),
+                          // Plan sil butonu
+                          if (!tamamlandi)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8, right: 16),
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () => _taksitPlanSil(planDoc.id),
+                                  icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                  label: const Text('Planı Sil', style: TextStyle(fontSize: 11, color: Colors.red)),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              }),
+              const SizedBox(height: 4),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Taksitli Plan Oluştur Dialog ──
+  Future<void> _taksitliPlanOlusturDialog() async {
+    final toplamCtrl = TextEditingController();
+    final taksitSayisiCtrl = TextEditingController(text: '12');
+    final aciklamaCtrl = TextEditingController();
+    DateTime baslangicTarihi = DateTime.now().add(const Duration(days: 30));
+    String tip = 'tahsilat';
+    String projeId = widget.projectId ?? '';
+    String projeAd = '';
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Taksitli Plan Oluştur'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Tahsilat', style: TextStyle(fontSize: 13)),
+                        value: 'tahsilat',
+                        groupValue: tip,
+                        onChanged: (v) => setDialogState(() => tip = v!),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Ödeme', style: TextStyle(fontSize: 13)),
+                        value: 'odeme',
+                        groupValue: tip,
+                        onChanged: (v) => setDialogState(() => tip = v!),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: toplamCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
+                  decoration: const InputDecoration(
+                    labelText: 'Toplam Tutar (₺)',
+                    border: OutlineInputBorder(),
+                    prefixText: '₺ ',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: taksitSayisiCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: 'Taksit Sayısı',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: baslangicTarihi,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 3650)),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => baslangicTarihi = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'İlk Taksit Tarihi',
+                      border: OutlineInputBorder(),
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    child: Text(DateFormat('dd.MM.yyyy').format(baslangicTarihi)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: aciklamaCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Açıklama (opsiyonel)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                if (projeId.isEmpty) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final projects = await FirebaseFirestore.instance
+                          .collection('projects')
+                          .where('companyId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
+                          .get();
+                      if (!ctx.mounted) return;
+                      final selected = await showDialog<Map<String, String>>(
+                        context: ctx,
+                        builder: (c) => AlertDialog(
+                          title: const Text('Proje Seç'),
+                          content: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  title: const Text('Projesiz (Manuel)', style: TextStyle(fontStyle: FontStyle.italic)),
+                                  onTap: () => Navigator.pop(c, {'id': '', 'ad': ''}),
+                                ),
+                                ...projects.docs.map((doc) {
+                                  final pAd = doc.data()['name'] ?? 'İsimsiz';
+                                  return ListTile(
+                                    title: Text(pAd),
+                                    onTap: () => Navigator.pop(c, {'id': doc.id, 'ad': pAd}),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                      if (selected != null) {
+                        setDialogState(() {
+                          projeId = selected['id']!;
+                          projeAd = selected['ad']!;
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.folder_outlined, size: 18),
+                    label: Text(projeAd.isNotEmpty ? projeAd : 'Proje Seç (opsiyonel)', style: const TextStyle(fontSize: 13)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final toplamStr = toplamCtrl.text.replaceAll('.', '').replaceAll(',', '.');
+                final toplam = double.tryParse(toplamStr) ?? 0;
+                final taksitSayisi = int.tryParse(taksitSayisiCtrl.text) ?? 0;
+
+                if (toplam <= 0) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Geçerli bir tutar girin')),
+                  );
+                  return;
+                }
+                if (taksitSayisi <= 0 || taksitSayisi > 120) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Taksit sayısı 1-120 arası olmalı')),
+                  );
+                  return;
+                }
+
+                try {
+                  // Plan oluştur
+                  final planRef = await FirebaseFirestore.instance
+                      .collection('cari_hesaplar')
+                      .doc(widget.cariId)
+                      .collection('taksit_planlari')
+                      .add({
+                    'tip': tip,
+                    'toplamTutar': toplam,
+                    'taksitSayisi': taksitSayisi,
+                    'projeId': projeId,
+                    'projeAd': projeAd,
+                    'aciklama': aciklamaCtrl.text.trim(),
+                    'olusturmaTarihi': FieldValue.serverTimestamp(),
+                    'cariAd': widget.cariAd,
+                    'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
+                  });
+
+                  // Taksitleri oluştur
+                  final taksitTutar = toplam / taksitSayisi;
+                  final batch = FirebaseFirestore.instance.batch();
+                  for (int i = 0; i < taksitSayisi; i++) {
+                    final taksitRef = planRef.collection('taksitler').doc();
+                    final vadeTarihi = DateTime(
+                      baslangicTarihi.year,
+                      baslangicTarihi.month + i,
+                      baslangicTarihi.day,
+                    );
+                    batch.set(taksitRef, {
+                      'sira': i + 1,
+                      'tutar': double.parse(taksitTutar.toStringAsFixed(2)),
+                      'vadeTarihi': Timestamp.fromDate(vadeTarihi),
+                      'odendi': false,
+                      'odemeTarihi': null,
+                      'hareketId': null,
+                    });
+                  }
+                  await batch.commit();
+
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$taksitSayisi taksitli plan oluşturuldu')),
+                    );
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text(hataCevir(e))),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Oluştur'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Taksit Öde — Cari hareket olarak kaydeder (muhasebeye işler) ──
+  Future<void> _taksitOde(
+    String planId,
+    String taksitId,
+    Map<String, dynamic> taksitData,
+    bool isTahsilat,
+    Map<String, dynamic> planData,
+  ) async {
+    final tutar = ((taksitData['tutar'] ?? 0) as num).toDouble();
+    final tip = isTahsilat ? 'alacak' : 'borc';
+    final projeId = planData['projeId'] ?? '';
+    final projeAd = planData['projeAd'] ?? '';
+    final sira = taksitData['sira'] ?? 0;
+
+    final onay = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(isTahsilat ? 'Tahsilat Onayla' : 'Ödeme Onayla'),
+        content: Text(
+          'Taksit #$sira — ${formatTL(tutar)}\n\n'
+          'Bu tutar cari hesaba ${isTahsilat ? "tahsilat" : "ödeme"} olarak kaydedilecek ve muhasebeye işlenecektir.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('İptal')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(c, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isTahsilat ? Colors.green : Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Onayla'),
+          ),
+        ],
+      ),
+    );
+
+    if (onay != true || !mounted) return;
+
+    try {
+      // 1. Cari hareket oluştur (aynı _yeniHareketDialog mantığı)
+      String giderId = '';
+      String financeTransactionId = '';
+      String projectId = projeId;
+
+      if (projectId.isNotEmpty) {
+        // Proje seçiliyse gelir/gider kaydet
+        if (tip == 'borc') {
+          final giderDoc = await FirebaseFirestore.instance.collection('giderler').add({
+            'aciklama': 'Taksit #$sira Ödeme: ${widget.cariAd}',
+            'tutar': tutar,
+            'kategori': 'Cari Ödeme',
+            'tarih': DateTime.now(),
+            'olusturmaTarihi': FieldValue.serverTimestamp(),
+            'projectId': projectId,
+            'cariId': widget.cariId,
+            'cariAd': widget.cariAd,
+            'paraBirimi': 'TL',
+            'orijinalTutar': tutar,
+            'kur': 1.0,
+            'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
+          });
+          giderId = giderDoc.id;
+
+          await FirebaseFirestore.instance
+              .collection('teklifler').doc(projectId).collection('giderler').add({
+            'kategori': 'Cari Ödeme',
+            'altKategori': widget.cariAd,
+            'tutar': tutar,
+            'aciklama': 'Taksit #$sira',
+            'tarih': DateTime.now(),
+            'foto': null,
+          });
+        } else {
+          final gelirDoc = await FirebaseFirestore.instance.collection('gelirler').add({
+            'aciklama': 'Taksit #$sira Tahsilat: ${widget.cariAd}',
+            'tutar': tutar,
+            'kategori': 'Cari Tahsilat',
+            'tarih': DateTime.now(),
+            'olusturmaTarihi': FieldValue.serverTimestamp(),
+            'projectId': projectId,
+            'cariId': widget.cariId,
+            'cariAd': widget.cariAd,
+            'paraBirimi': 'TL',
+            'orijinalTutar': tutar,
+            'kur': 1.0,
+            'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
+          });
+          giderId = gelirDoc.id;
+
+          await FirebaseFirestore.instance
+              .collection('teklifler').doc(projectId).collection('gelirler').add({
+            'kategori': 'Cari Tahsilat',
+            'altKategori': widget.cariAd,
+            'tutar': tutar,
+            'aciklama': 'Taksit #$sira',
+            'tarih': DateTime.now(),
+            'foto': null,
+          });
+        }
+
+        // Project Finance tablosuna kaydet
+        final transactionRef = FirebaseFirestore.instance
+            .collection('project_finance').doc(projectId).collection('transactions').doc();
+        financeTransactionId = transactionRef.id;
+
+        await transactionRef.set({
+          'id': transactionRef.id,
+          'type': tip == 'borc' ? 'expense' : 'income',
+          'amount': tutar,
+          'category': 'other',
+          'description': 'Taksit #$sira ${tip == "borc" ? "Ödeme" : "Tahsilat"}: ${widget.cariAd}',
+          'date': Timestamp.fromDate(DateTime.now()),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        // Proje finansmanını güncelle
+        final financeDoc = await FirebaseFirestore.instance
+            .collection('project_finance').doc(projectId).get();
+        final currentIncome = ((financeDoc.data()?['totalIncome'] ?? 0) as num).toDouble();
+        final currentExpenses = ((financeDoc.data()?['totalExpenses'] ?? 0) as num).toDouble();
+
+        if (tip == 'borc') {
+          await FirebaseFirestore.instance.collection('project_finance').doc(projectId)
+              .set({'totalExpenses': currentExpenses + tutar}, SetOptions(merge: true));
+        } else {
+          await FirebaseFirestore.instance.collection('project_finance').doc(projectId)
+              .set({'totalIncome': currentIncome + tutar}, SetOptions(merge: true));
+        }
+      }
+
+      // 2. Cari bakiye + hareket
+      final cariDoc = await FirebaseFirestore.instance
+          .collection('cari_hesaplar').doc(widget.cariId).get();
+      final mevcutBakiye = ((cariDoc.data()?['bakiye'] ?? 0) as num).toDouble();
+      final yeniBakiye = tip == 'alacak' ? mevcutBakiye + tutar : mevcutBakiye - tutar;
+
+      final hareketAdd = FirebaseFirestore.instance
+          .collection('cari_hesaplar').doc(widget.cariId).collection('hareketler').add({
+        'tip': tip,
+        'tutar': tutar,
+        'tutarTL': tutar,
+        'paraBirimi': 'TL',
+        'kur': 1.0,
+        'aciklama': 'Taksit #$sira${projeAd.isNotEmpty ? " ($projeAd)" : ""}',
+        'tarih': DateTime.now(),
+        'fotoUrls': [],
+        'giderId': giderId,
+        'financeTransactionId': financeTransactionId,
+        'projeId': projectId.isNotEmpty ? projectId : 'manuel',
+        'projeAd': projeAd,
+        'taksitPlanId': planId,
+        'taksitId': taksitId,
+      });
+
+      final bakiyeUpdate = FirebaseFirestore.instance
+          .collection('cari_hesaplar').doc(widget.cariId)
+          .update({'bakiye': yeniBakiye});
+
+      await Future.wait([hareketAdd, bakiyeUpdate]);
+
+      // 3. Taksiti ödendi olarak işaretle
+      await FirebaseFirestore.instance
+          .collection('cari_hesaplar').doc(widget.cariId)
+          .collection('taksit_planlari').doc(planId)
+          .collection('taksitler').doc(taksitId)
+          .update({
+        'odendi': true,
+        'odemeTarihi': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Taksit #$sira — ${formatTL(tutar)} ${isTahsilat ? "tahsilat" : "ödeme"} kaydedildi'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // ── Taksit Planı Sil ──
+  Future<void> _taksitPlanSil(String planId) async {
+    final onay = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Plan Sil'),
+        content: const Text('Bu taksit planı ve tüm taksitleri silinecek. Devam etmek istiyor musunuz?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('İptal')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(c, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+    if (onay != true || !mounted) return;
+
+    try {
+      // Önce taksitleri sil
+      final taksitler = await FirebaseFirestore.instance
+          .collection('cari_hesaplar').doc(widget.cariId)
+          .collection('taksit_planlari').doc(planId)
+          .collection('taksitler').get();
+      final batch = FirebaseFirestore.instance.batch();
+      for (var t in taksitler.docs) {
+        batch.delete(t.reference);
+      }
+      // Planı sil
+      batch.delete(FirebaseFirestore.instance
+          .collection('cari_hesaplar').doc(widget.cariId)
+          .collection('taksit_planlari').doc(planId));
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Taksit planı silindi')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
+        );
       }
     }
   }

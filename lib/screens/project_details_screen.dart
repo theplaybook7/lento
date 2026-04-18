@@ -17,7 +17,6 @@ import '../project_core.dart';
 import '../notification_service.dart';
 import '../utils/responsive_utils.dart' as resp;
 import '../web/web_utils.dart' as web_utils;
-import 'payment_plans_screen.dart';
 import 'cari_hesap_screen.dart';
 
 class ProjectDetailsScreen extends StatefulWidget {
@@ -551,38 +550,6 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         return SingleChildScrollView(
             child: Column(
               children: [
-                // Hızlı İşlemler Çubuğu
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  color: AppTheme.primaryColor.withValues(alpha: 0.05),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (c) => PaymentPlansScreen(
-                                  projectId: widget.projectId,
-                                  projectName: project.name,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.receipt_long),
-                          label: const Text('Ödeme Planları'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
                 // Ön Muhasebe Özeti
                 FutureBuilder<ProjectFinance>(
                   future: _firebase.getProjectFinanceSummary(widget.projectId),

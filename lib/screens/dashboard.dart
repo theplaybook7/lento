@@ -1422,23 +1422,20 @@ class _ProjectsTabState extends State<_ProjectsTab> {
     _akisCacheLoaded = true;
     final uncached = projects.where((p) => !_akisCache.containsKey(p.id)).toList();
     if (uncached.isEmpty) return;
-    // Paralel okuma (5'erli batch)
-    for (var start = 0; start < uncached.length; start += 5) {
-      final batch = uncached.skip(start).take(5);
-      await Future.wait(batch.map((p) async {
-        try {
-          final snap = await FirebaseFirestore.instance
-              .collection('ruhsat').doc(p.id)
-              .collection('akis_diyagrami').get();
-          _akisCache[p.id] = snap.docs
-              .where((d) => d.id != 'karar_kontrol' && d.id != 'yola_terk_kontrol')
-              .map((d) => d.data())
-              .toList();
-        } catch (_) {
-          _akisCache[p.id] = [];
-        }
-      }));
-    }
+    // Tüm projeleri paralel oku
+    await Future.wait(uncached.map((p) async {
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('ruhsat').doc(p.id)
+            .collection('akis_diyagrami').get();
+        _akisCache[p.id] = snap.docs
+            .where((d) => d.id != 'karar_kontrol' && d.id != 'yola_terk_kontrol')
+            .map((d) => d.data())
+            .toList();
+      } catch (_) {
+        _akisCache[p.id] = [];
+      }
+    }));
   }
 
   /// Tüm projelerin ruhsat özet + finans verilerini ön-yükle
@@ -1463,19 +1460,21 @@ class _ProjectsTabState extends State<_ProjectsTab> {
         }
       }
 
-      // 3) Finans verilerini paralel yükle (project_finance dokümanlarından hızlı okuma)
+      // 3) Finans verilerini toplu yükle (cari hareketlerinden hesapla)
       if (!_financeCacheLoaded && SistemYoneticisi().yetkiVarMi('muhasebe')) {
         _financeCacheLoaded = true;
         final uncached = projects.where((p) => !_financeCache.containsKey(p.id)).toList();
         if (uncached.isNotEmpty) {
           changed = true;
-          // Tüm projeleri paralel oku (her biri sadece 1 doc read)
-          await Future.wait(uncached.map((p) async {
-            if (!mounted) return;
-            try {
-              _financeCache[p.id] = await _firebase.getProjectFinanceSummary(p.id);
-            } catch (_) {}
-          }));
+          final sirketId = SistemYoneticisi().aktifSirket?.id ?? '';
+          final projectIds = uncached.map((p) => p.id).toList();
+          final summaries = await _firebase.getAllProjectFinanceSummaries(sirketId, projectIds);
+          if (!mounted) return;
+          _financeCache.addAll(summaries);
+          // project_finance'da olmayan projeler için boş kayıt ekle
+          for (final p in uncached) {
+            _financeCache.putIfAbsent(p.id, () => ProjectFinance(projectId: p.id));
+          }
         }
       }
 

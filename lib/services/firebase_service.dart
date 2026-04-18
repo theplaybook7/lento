@@ -280,8 +280,77 @@ class FirebaseService {
       );
     } catch (e) {
       developer.log('Proje finansmanı özet yükleme hatası: $e');
-      rethrow;
+      return ProjectFinance(projectId: projectId);
     }
+  }
+
+  /// Tüm projelerin finans özetlerini cari hareketlerinden toplu hesapla
+  /// Tek seferde tüm carileri okur, her carinin hareketlerini projeye göre gruplar
+  Future<Map<String, ProjectFinance>> getAllProjectFinanceSummaries(String sirketId, List<String> projectIds) async {
+    final result = <String, ProjectFinance>{};
+    try {
+      // 1) Tüm carileri tek sorguda al
+      final cariSnap = await _db
+          .collection('cari_hesaplar')
+          .where('sirketId', isEqualTo: sirketId)
+          .get();
+
+      // 2) Proje başına gelir/gider topla
+      final incomeMap = <String, double>{};
+      final expenseMap = <String, double>{};
+
+      // 3) Her carinin hareketlerini paralel oku
+      await Future.wait(cariSnap.docs.map((cariDoc) async {
+        try {
+          final cariData = cariDoc.data();
+          final pids = List<String>.from(cariData['projectIds'] ?? []);
+          final pid = cariData['projectId'] ?? '';
+          // Bu carinin projelerle ilişkisi var mı?
+          final hasProject = pids.any((id) => projectIds.contains(id)) || projectIds.contains(pid);
+          if (!hasProject) return;
+
+          final hareketSnap = await _db
+              .collection('cari_hesaplar')
+              .doc(cariDoc.id)
+              .collection('hareketler')
+              .get();
+
+          for (final hDoc in hareketSnap.docs) {
+            final hData = hDoc.data();
+            final projeId = hData['projeId'] as String? ?? '';
+            if (projeId.isEmpty || !projectIds.contains(projeId)) continue;
+            final tutarTL = ((hData['tutarTL'] ?? hData['tutar'] ?? 0.0) as num).toDouble();
+            final tip = hData['tip'] ?? 'borc';
+            if (tip == 'alacak') {
+              incomeMap[projeId] = (incomeMap[projeId] ?? 0) + tutarTL;
+            } else if (tip == 'borc') {
+              expenseMap[projeId] = (expenseMap[projeId] ?? 0) + tutarTL;
+            }
+          }
+        } catch (_) {}
+      }));
+
+      // 4) ProjectFinance nesnelerini oluştur + project_finance dokümanlarını güncelle
+      for (final pid in projectIds) {
+        final income = incomeMap[pid] ?? 0;
+        final expense = expenseMap[pid] ?? 0;
+        result[pid] = ProjectFinance(
+          projectId: pid,
+          totalIncome: income,
+          totalExpenses: expense,
+        );
+        // Arka planda project_finance dokümanını güncelle (gelecekte hızlı okuma için)
+        if (income > 0 || expense > 0) {
+          unawaited(_db.collection('project_finance').doc(pid).set({
+            'totalIncome': income,
+            'totalExpenses': expense,
+          }, SetOptions(merge: true)));
+        }
+      }
+    } catch (e) {
+      developer.log('Toplu finans hesaplama hatası: $e');
+    }
+    return result;
   }
 
   /// Proje finansmanını güncelle

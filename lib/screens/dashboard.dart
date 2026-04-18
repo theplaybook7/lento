@@ -1409,6 +1409,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   // Finans cache
   final Map<String, ProjectFinance> _financeCache = {};
   bool _financeCacheLoaded = false;
+  bool _preloadInProgress = false;
 
   @override
   void initState() {
@@ -1442,33 +1443,48 @@ class _ProjectsTabState extends State<_ProjectsTab> {
 
   /// Tüm projelerin ruhsat özet + finans verilerini ön-yükle
   Future<void> _preloadProjectData(List<Project> projects) async {
-    // 1) Akış cache'i (ruhsat özeti için gerekli)
-    await _loadAkisCache(projects);
-    if (!mounted) return;
+    if (_preloadInProgress) return;
+    _preloadInProgress = true;
+    bool changed = false;
 
-    // 2) Ruhsat özetlerini cache'den hesapla (Firestore okuması yok)
-    for (final p in projects) {
-      if (!_ruhsatOzetCache.containsKey(p.id)) {
-        _ruhsatOzetCache[p.id] = _hesaplaRuhsatOzet(p.id);
-      }
-    }
-
-    // 3) Finans verilerini paralel yükle
-    if (!_financeCacheLoaded && SistemYoneticisi().yetkiVarMi('muhasebe')) {
-      _financeCacheLoaded = true;
-      final uncached = projects.where((p) => !_financeCache.containsKey(p.id)).toList();
-      for (var start = 0; start < uncached.length; start += 5) {
+    try {
+      // 1) Akış cache'i (ruhsat özeti için gerekli)
+      if (!_akisCacheLoaded) {
+        await _loadAkisCache(projects);
         if (!mounted) return;
-        final batch = uncached.skip(start).take(5).toList();
-        await Future.wait(batch.map((p) async {
-          try {
-            _financeCache[p.id] = await _firebase.getProjectFinanceSummary(p.id);
-          } catch (_) {}
-        }));
+        changed = true;
       }
-    }
 
-    if (mounted) setState(() {});
+      // 2) Ruhsat özetlerini cache'den hesapla (Firestore okuması yok)
+      for (final p in projects) {
+        if (!_ruhsatOzetCache.containsKey(p.id)) {
+          _ruhsatOzetCache[p.id] = _hesaplaRuhsatOzet(p.id);
+          changed = true;
+        }
+      }
+
+      // 3) Finans verilerini paralel yükle
+      if (!_financeCacheLoaded && SistemYoneticisi().yetkiVarMi('muhasebe')) {
+        _financeCacheLoaded = true;
+        final uncached = projects.where((p) => !_financeCache.containsKey(p.id)).toList();
+        if (uncached.isNotEmpty) {
+          changed = true;
+          for (var start = 0; start < uncached.length; start += 5) {
+            if (!mounted) return;
+            final batch = uncached.skip(start).take(5).toList();
+            await Future.wait(batch.map((p) async {
+              try {
+                _financeCache[p.id] = await _firebase.getProjectFinanceSummary(p.id);
+              } catch (_) {}
+            }));
+          }
+        }
+      }
+
+      if (changed && mounted) setState(() {});
+    } finally {
+      _preloadInProgress = false;
+    }
   }
 
   /// Akış cache'inden ruhsat özeti hesapla (Firestore okuması yapmaz)
@@ -1871,6 +1887,8 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                         _filtreDurum = v;
                         _akisCacheLoaded = false;
                         _financeCacheLoaded = false;
+                        _preloadInProgress = false;
+                        _ruhsatOzetCache.clear();
                       }),
                     ),
                   ),
@@ -1902,6 +1920,8 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                         _filtreAsama = v;
                         _akisCacheLoaded = false;
                         _financeCacheLoaded = false;
+                        _preloadInProgress = false;
+                        _ruhsatOzetCache.clear();
                       }),
                     ),
                   ),
@@ -1916,6 +1936,8 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                     _filtreAsama = null;
                     _akisCacheLoaded = false;
                     _financeCacheLoaded = false;
+                    _preloadInProgress = false;
+                    _ruhsatOzetCache.clear();
                   }),
                 ),
             ],

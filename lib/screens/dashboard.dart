@@ -35,6 +35,8 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
 
   late String _companyId;
   StreamSubscription<User?>? _authSub;
+  // Bildirim stream'ini cache'le — AppBar ve dropdown aynı stream'i kullanır
+  late final Stream<QuerySnapshot> _bildirimStream = BildirimServisi.bildirimleriDinle();
 
   @override
   void initState() {
@@ -123,7 +125,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
         elevation: 1,
         actions: [
           StreamBuilder<QuerySnapshot>(
-            stream: BildirimServisi.bildirimleriDinle(),
+            stream: _bildirimStream,
             builder: (context, snapshot) {
               int okunmayanSayisi = 0;
               if (snapshot.hasData && !snapshot.hasError) {
@@ -677,7 +679,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
           child: SizedBox(
             width: (MediaQuery.of(context).size.width - 24).clamp(260, 360).toDouble(),
             child: StreamBuilder<QuerySnapshot>(
-              stream: BildirimServisi.bildirimleriDinle(),
+              stream: _bildirimStream,
               builder: (ctx, snap) {
                 if (snap.hasError || !snap.hasData || snap.data!.docs.isEmpty) {
                   return Padding(
@@ -828,9 +830,10 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     }
 
                     return InkWell(
-                      onTap: () async {
+                      onTap: () {
                         Navigator.pop(context);
-                        await FirebaseFirestore.instance
+                        // Arka planda okundu işaretle (UI'ı bloklamaz)
+                        FirebaseFirestore.instance
                             .collection('sirketler')
                             .doc(SistemYoneticisi().aktifSirket?.id)
                             .collection('bildirimler')
@@ -1405,26 +1408,30 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   @override
   void initState() {
     super.initState();
-    _ruhsatPasifBildirimKontrol();
-    _akisDiyagramiPasifBildirimKontrol();
+    _pasifBildirimKontrolleri();
   }
 
   Future<void> _loadAkisCache(List<Project> projects) async {
     if (_akisCacheLoaded) return;
     _akisCacheLoaded = true;
-    for (final p in projects) {
-      if (_akisCache.containsKey(p.id)) continue;
-      try {
-        final snap = await FirebaseFirestore.instance
-            .collection('ruhsat').doc(p.id)
-            .collection('akis_diyagrami').get();
-        _akisCache[p.id] = snap.docs
-            .where((d) => d.id != 'karar_kontrol' && d.id != 'yola_terk_kontrol')
-            .map((d) => d.data())
-            .toList();
-      } catch (_) {
-        _akisCache[p.id] = [];
-      }
+    final uncached = projects.where((p) => !_akisCache.containsKey(p.id)).toList();
+    if (uncached.isEmpty) return;
+    // Paralel okuma (5'erli batch)
+    for (var start = 0; start < uncached.length; start += 5) {
+      final batch = uncached.skip(start).take(5);
+      await Future.wait(batch.map((p) async {
+        try {
+          final snap = await FirebaseFirestore.instance
+              .collection('ruhsat').doc(p.id)
+              .collection('akis_diyagrami').get();
+          _akisCache[p.id] = snap.docs
+              .where((d) => d.id != 'karar_kontrol' && d.id != 'yola_terk_kontrol')
+              .map((d) => d.data())
+              .toList();
+        } catch (_) {
+          _akisCache[p.id] = [];
+        }
+      }));
     }
   }
 
@@ -1524,155 +1531,140 @@ class _ProjectsTabState extends State<_ProjectsTab> {
     }
   }
 
-  /// Tüm projeleri kontrol edip 10+ gün pasif olanlar için bildirim gönderir.
-  /// Günde bir kez çalışır (Firestore'da son kontrol tarihini tutar).
-  Future<void> _ruhsatPasifBildirimKontrol() async {
+  /// Ruhsat ve akış diyagramı pasif bildirim kontrollerini birleşik çalıştırır.
+  /// Proje listesi tek seferde çekilir, subcollection okumaları paralel yapılır.
+  Future<void> _pasifBildirimKontrolleri() async {
     if (!SistemYoneticisi().yetkiVarMi('ruhsat')) return;
     final sirketId = SistemYoneticisi().aktifSirket?.id;
     if (sirketId == null) return;
 
     try {
-      // Günde bir kez kontrol et
-      final kontrolRef = FirebaseFirestore.instance
-          .collection('sirketler').doc(sirketId)
+      final db = FirebaseFirestore.instance;
+      final ruhsatKontrolRef = db.collection('sirketler').doc(sirketId)
           .collection('sistem').doc('ruhsat_pasif_kontrol');
-      final kontrolDoc = await kontrolRef.get();
-      if (kontrolDoc.exists) {
-        final sonKontrol = kontrolDoc.data()?['sonKontrol'];
-        if (sonKontrol != null) {
-          final sonTarih = sonKontrol is Timestamp ? sonKontrol.toDate() : (sonKontrol is DateTime ? sonKontrol : null);
-          if (sonTarih != null && DateTime.now().difference(sonTarih).inHours < 24) {
-            return; // Son 24 saatte zaten kontrol edilmiş
-          }
-        }
-      }
-
-      // Tüm projeleri al
-      final projeler = await FirebaseFirestore.instance
-          .collection('projects')
-          .where('companyId', isEqualTo: sirketId)
-          .get();
-
-      for (final proje in projeler.docs) {
-        final projeData = proje.data();
-        if (projeData['isArchived'] == true) continue;
-        final projeAdi = projeData['name'] ?? 'Proje';
-
-        final islemler = await FirebaseFirestore.instance
-            .collection('ruhsat').doc(proje.id)
-            .collection('islemler').get();
-
-        if (islemler.docs.isEmpty) continue;
-
-        int tamamlanan = 0;
-        DateTime? sonIslem;
-        for (final doc in islemler.docs) {
-          final d = doc.data();
-          if ((d['durum'] as int? ?? 0) == 2) tamamlanan++;
-          final gt = d['guncellendiTarihi'];
-          if (gt != null) {
-            DateTime? t;
-            if (gt is Timestamp) {
-              t = gt.toDate();
-            } else if (gt is DateTime) {
-              t = gt;
-            }
-            if (t != null && (sonIslem == null || t.isAfter(sonIslem))) sonIslem = t;
-          }
-        }
-
-        // Tümü tamamlandıysa bildirim gerekmez
-        if (tamamlanan >= _ruhsatMaddeleri.length) continue;
-
-        if (sonIslem != null) {
-          final pasifGun = DateTime.now().difference(sonIslem).inDays;
-          if (pasifGun >= 4) {
-            await BildirimServisi.bildirimGonder(
-              baslik: '⚠️ Ruhsat İşlem Uyarısı',
-              mesaj: '$projeAdi projesinde $pasifGun gündür ruhsat işlemi yapılmadı!',
-              projeId: proje.id,
-              modul: 'ruhsat',
-            );
-          }
-        }
-      }
-
-      // Son kontrol tarihini güncelle
-      await kontrolRef.set({'sonKontrol': FieldValue.serverTimestamp()});
-    } catch (e) {
-      developer.log('Ruhsat pasif bildirim kontrol hatası: $e', name: 'dashboard');
-    }
-  }
-
-  // ── Akış Diyagramı 4+ Gün Pasif Bildirim Kontrolü ──
-  Future<void> _akisDiyagramiPasifBildirimKontrol() async {
-    if (!SistemYoneticisi().yetkiVarMi('ruhsat')) return;
-    final sirketId = SistemYoneticisi().aktifSirket?.id;
-    if (sirketId == null) return;
-
-    try {
-      final kontrolRef = FirebaseFirestore.instance
-          .collection('sirketler').doc(sirketId)
+      final akisKontrolRef = db.collection('sirketler').doc(sirketId)
           .collection('sistem').doc('akis_pasif_kontrol');
-      final kontrolDoc = await kontrolRef.get();
-      if (kontrolDoc.exists) {
-        final sonKontrol = kontrolDoc.data()?['sonKontrol'];
-        if (sonKontrol != null) {
-          final sonTarih = sonKontrol is Timestamp ? sonKontrol.toDate() : (sonKontrol is DateTime ? sonKontrol : null);
-          if (sonTarih != null && DateTime.now().difference(sonTarih).inHours < 24) return;
+
+      // Her iki kontrolü paralel oku
+      final kontroller = await Future.wait([
+        ruhsatKontrolRef.get(),
+        akisKontrolRef.get(),
+      ]);
+
+      bool ruhsatGerekli = true;
+      bool akisGerekli = true;
+
+      for (var i = 0; i < kontroller.length; i++) {
+        if (kontroller[i].exists) {
+          final sonKontrol = kontroller[i].data()?['sonKontrol'];
+          if (sonKontrol != null) {
+            final sonTarih = sonKontrol is Timestamp ? sonKontrol.toDate() : (sonKontrol is DateTime ? sonKontrol : null);
+            if (sonTarih != null && DateTime.now().difference(sonTarih).inHours < 24) {
+              if (i == 0) ruhsatGerekli = false;
+              if (i == 1) akisGerekli = false;
+            }
+          }
         }
       }
 
-      final projeler = await FirebaseFirestore.instance
-          .collection('projects')
+      if (!ruhsatGerekli && !akisGerekli) return;
+      if (!mounted) return;
+
+      // Tek seferde projeleri al
+      final projeler = await db.collection('projects')
           .where('companyId', isEqualTo: sirketId)
           .get();
 
-      for (final proje in projeler.docs) {
-        final projeData = proje.data();
-        if (projeData['isArchived'] == true) continue;
-        final projeAdi = projeData['name'] ?? 'Proje';
+      if (!mounted) return;
 
-        final islemler = await FirebaseFirestore.instance
-            .collection('ruhsat').doc(proje.id)
-            .collection('akis_diyagrami').get();
+      final aktifProjeler = projeler.docs.where((p) => p.data()['isArchived'] != true).toList();
 
-        if (islemler.docs.isEmpty) continue;
+      // 5'erli batchler halinde paralel subcollection okuma
+      for (var start = 0; start < aktifProjeler.length; start += 5) {
+        if (!mounted) return;
+        final batch = aktifProjeler.skip(start).take(5).toList();
+        await Future.wait(batch.map((proje) async {
+          final projeAdi = proje.data()['name'] ?? 'Proje';
 
-        int tamamlanan = 0;
-        DateTime? sonIslem;
-        for (final doc in islemler.docs) {
-          final d = doc.data();
-          if (doc.id == 'karar_kontrol') continue;
-          if ((d['durum'] as int? ?? 0) == 2) tamamlanan++;
-          final gt = d['guncellendiTarihi'];
-          if (gt != null) {
-            DateTime? t;
-            if (gt is Timestamp) {
-              t = gt.toDate();
-            } else if (gt is DateTime) t = gt;
-            if (t != null && (sonIslem == null || t.isAfter(sonIslem))) sonIslem = t;
+          // Ruhsat + akış diyagramı paralel oku
+          final subcols = await Future.wait([
+            if (ruhsatGerekli)
+              db.collection('ruhsat').doc(proje.id).collection('islemler').get(),
+            if (akisGerekli)
+              db.collection('ruhsat').doc(proje.id).collection('akis_diyagrami').get(),
+          ]);
+
+          int subIdx = 0;
+
+          // Ruhsat kontrolü
+          if (ruhsatGerekli) {
+            final islemler = subcols[subIdx++];
+            if (islemler.docs.isNotEmpty) {
+              int tamamlanan = 0;
+              DateTime? sonIslem;
+              for (final doc in islemler.docs) {
+                final d = doc.data();
+                if ((d['durum'] as int? ?? 0) == 2) tamamlanan++;
+                final gt = d['guncellendiTarihi'];
+                DateTime? t;
+                if (gt is Timestamp) t = gt.toDate();
+                else if (gt is DateTime) t = gt;
+                if (t != null && (sonIslem == null || t.isAfter(sonIslem))) sonIslem = t;
+              }
+              if (tamamlanan < _ruhsatMaddeleri.length && sonIslem != null) {
+                final pasifGun = DateTime.now().difference(sonIslem).inDays;
+                if (pasifGun >= 4) {
+                  await BildirimServisi.bildirimGonder(
+                    baslik: '⚠️ Ruhsat İşlem Uyarısı',
+                    mesaj: '$projeAdi projesinde $pasifGun gündür ruhsat işlemi yapılmadı!',
+                    projeId: proje.id,
+                    modul: 'ruhsat',
+                  );
+                }
+              }
+            }
           }
-        }
 
-        if (tamamlanan >= 37) continue;
-
-        if (sonIslem != null) {
-          final pasifGun = DateTime.now().difference(sonIslem).inDays;
-          if (pasifGun >= 4) {
-            await BildirimServisi.bildirimGonder(
-              baslik: '⚠️ Akış Diyagramı Uyarısı',
-              mesaj: '$projeAdi projesinde $pasifGun gündür akış diyagramında işlem yapılmadı!',
-              projeId: proje.id,
-              modul: 'ruhsat',
-            );
+          // Akış diyagramı kontrolü
+          if (akisGerekli && subIdx < subcols.length) {
+            final akisIslemler = subcols[subIdx];
+            if (akisIslemler.docs.isNotEmpty) {
+              int tamamlanan = 0;
+              DateTime? sonIslem;
+              for (final doc in akisIslemler.docs) {
+                if (doc.id == 'karar_kontrol') continue;
+                final d = doc.data();
+                if ((d['durum'] as int? ?? 0) == 2) tamamlanan++;
+                final gt = d['guncellendiTarihi'];
+                DateTime? t;
+                if (gt is Timestamp) t = gt.toDate();
+                else if (gt is DateTime) t = gt;
+                if (t != null && (sonIslem == null || t.isAfter(sonIslem))) sonIslem = t;
+              }
+              if (tamamlanan < 37 && sonIslem != null) {
+                final pasifGun = DateTime.now().difference(sonIslem).inDays;
+                if (pasifGun >= 4) {
+                  await BildirimServisi.bildirimGonder(
+                    baslik: '⚠️ Akış Diyagramı Uyarısı',
+                    mesaj: '$projeAdi projesinde $pasifGun gündür akış diyagramında işlem yapılmadı!',
+                    projeId: proje.id,
+                    modul: 'ruhsat',
+                  );
+                }
+              }
+            }
           }
-        }
+        }));
       }
 
-      await kontrolRef.set({'sonKontrol': FieldValue.serverTimestamp()});
+      // Son kontrol tarihlerini güncelle
+      if (!mounted) return;
+      await Future.wait([
+        if (ruhsatGerekli) ruhsatKontrolRef.set({'sonKontrol': FieldValue.serverTimestamp()}),
+        if (akisGerekli) akisKontrolRef.set({'sonKontrol': FieldValue.serverTimestamp()}),
+      ]);
     } catch (e) {
-      developer.log('Akış diyagramı pasif bildirim kontrol hatası: $e', name: 'dashboard');
+      developer.log('Pasif bildirim kontrol hatası: $e', name: 'dashboard');
     }
   }
 

@@ -1404,6 +1404,11 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   // Projelerin akış diyagramı cache
   final Map<String, List<Map<String, dynamic>>> _akisCache = {};
   bool _akisCacheLoaded = false;
+  // Ruhsat özet cache (FutureBuilder'ı ortadan kaldırmak için)
+  final Map<String, Map<String, dynamic>> _ruhsatOzetCache = {};
+  // Finans cache
+  final Map<String, ProjectFinance> _financeCache = {};
+  bool _financeCacheLoaded = false;
 
   @override
   void initState() {
@@ -1433,6 +1438,72 @@ class _ProjectsTabState extends State<_ProjectsTab> {
         }
       }));
     }
+  }
+
+  /// Tüm projelerin ruhsat özet + finans verilerini ön-yükle
+  Future<void> _preloadProjectData(List<Project> projects) async {
+    // 1) Akış cache'i (ruhsat özeti için gerekli)
+    await _loadAkisCache(projects);
+    if (!mounted) return;
+
+    // 2) Ruhsat özetlerini cache'den hesapla (Firestore okuması yok)
+    for (final p in projects) {
+      if (!_ruhsatOzetCache.containsKey(p.id)) {
+        _ruhsatOzetCache[p.id] = _hesaplaRuhsatOzet(p.id);
+      }
+    }
+
+    // 3) Finans verilerini paralel yükle
+    if (!_financeCacheLoaded && SistemYoneticisi().yetkiVarMi('muhasebe')) {
+      _financeCacheLoaded = true;
+      final uncached = projects.where((p) => !_financeCache.containsKey(p.id)).toList();
+      for (var start = 0; start < uncached.length; start += 5) {
+        if (!mounted) return;
+        final batch = uncached.skip(start).take(5).toList();
+        await Future.wait(batch.map((p) async {
+          try {
+            _financeCache[p.id] = await _firebase.getProjectFinanceSummary(p.id);
+          } catch (_) {}
+        }));
+      }
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  /// Akış cache'inden ruhsat özeti hesapla (Firestore okuması yapmaz)
+  Map<String, dynamic> _hesaplaRuhsatOzet(String projectId) {
+    final docs = _akisCache[projectId] ?? [];
+    int tamamlanan = 0;
+    int devamEden = 0;
+    DateTime? sonIslemTarihi;
+    String? aktifMadde;
+
+    for (var data in docs) {
+      final durum = data['durum'] as int? ?? 0;
+      if (durum == 2) tamamlanan++;
+      if (durum == 1) {
+        devamEden++;
+        final sira = data['sira'] as int? ?? 0;
+        aktifMadde ??= _akisNodeNames[sira] ?? data['madde'] as String?;
+      }
+      final gt = data['guncellendiTarihi'];
+      if (gt != null) {
+        DateTime? t;
+        if (gt is Timestamp) t = gt.toDate();
+        else if (gt is DateTime) t = gt;
+        if (t != null && (sonIslemTarihi == null || t.isAfter(sonIslemTarihi))) {
+          sonIslemTarihi = t;
+        }
+      }
+    }
+    return {
+      'tamamlanan': tamamlanan,
+      'devamEden': devamEden,
+      'toplam': 39,
+      'aktifMadde': aktifMadde,
+      'sonIslemTarihi': sonIslemTarihi,
+    };
   }
 
   bool _projeFiltreyeUygunMu(String projectId) {
@@ -1737,50 +1808,6 @@ class _ProjectsTabState extends State<_ProjectsTab> {
     45: 'Yola Terk Kontrolü', 46: 'Zemin Etütü Onayı', 47: 'Noter Evrakları',
   };
 
-  Future<Map<String, dynamic>> _getRuhsatOzet(String projectId) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('ruhsat')
-        .doc(projectId)
-        .collection('akis_diyagrami')
-        .get();
-
-    int tamamlanan = 0;
-    int devamEden = 0;
-    DateTime? sonIslemTarihi;
-    String? aktifMadde;
-
-    for (var doc in snapshot.docs) {
-      if (doc.id == 'karar_kontrol') continue;
-      final data = doc.data();
-      final durum = data['durum'] as int? ?? 0;
-      if (durum == 2) tamamlanan++;
-      if (durum == 1) {
-        devamEden++;
-        final sira = data['sira'] as int? ?? 0;
-        aktifMadde ??= _akisNodeNames[sira] ?? data['madde'] as String?;
-      }
-
-      final gt = data['guncellendiTarihi'];
-      if (gt != null) {
-        DateTime? t;
-        if (gt is Timestamp) {
-          t = gt.toDate();
-        } else if (gt is DateTime) t = gt;
-        if (t != null && (sonIslemTarihi == null || t.isAfter(sonIslemTarihi))) {
-          sonIslemTarihi = t;
-        }
-      }
-    }
-
-    return {
-      'tamamlanan': tamamlanan,
-      'devamEden': devamEden,
-      'toplam': 39,
-      'aktifMadde': aktifMadde,
-      'sonIslemTarihi': sonIslemTarihi,
-    };
-  }
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -1843,6 +1870,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                       onChanged: (v) => setState(() {
                         _filtreDurum = v;
                         _akisCacheLoaded = false;
+                        _financeCacheLoaded = false;
                       }),
                     ),
                   ),
@@ -1873,6 +1901,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                       onChanged: (v) => setState(() {
                         _filtreAsama = v;
                         _akisCacheLoaded = false;
+                        _financeCacheLoaded = false;
                       }),
                     ),
                   ),
@@ -1886,6 +1915,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                     _filtreDurum = null;
                     _filtreAsama = null;
                     _akisCacheLoaded = false;
+                    _financeCacheLoaded = false;
                   }),
                 ),
             ],
@@ -1924,24 +1954,22 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                   ? allProjects
                   : allProjects.where((p) => p.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
 
+              // Tüm proje verilerini ön-yükle (akış + finans)
+              _preloadProjectData(allProjects);
+
               // Akış diyagramı filtresi
               final hasAkisFilter = _filtreDurum != null || _filtreAsama != null;
               if (hasAkisFilter) {
-                return FutureBuilder<void>(
-                  future: _loadAkisCache(allProjects),
-                  builder: (context, _) {
-                    final filtered = projects.where((p) => _projeFiltreyeUygunMu(p.id)).toList();
-                    if (filtered.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'Filtreyle eşleşen proje bulunamadı',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      );
-                    }
-                    return _buildProjectList(filtered);
-                  },
-                );
+                final filtered = projects.where((p) => _projeFiltreyeUygunMu(p.id)).toList();
+                if (filtered.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Filtreyle eşleşen proje bulunamadı',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                  );
+                }
+                return _buildProjectList(filtered);
               }
 
               if (projects.isEmpty) {
@@ -1967,11 +1995,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
       itemCount: projects.length,
       itemBuilder: (context, index) {
         final project = projects[index];
-
-            return FutureBuilder<ProjectFinance>(
-              future: _firebase.getProjectFinanceSummary(project.id),
-              builder: (context, financeSnap) {
-                final finance = financeSnap.data;
+        final finance = _financeCache[project.id];
 
                 return Card(
                   elevation: 1,
@@ -2080,11 +2104,10 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                             ),
                           // Ruhsat ilerleme durumu
                           if (SistemYoneticisi().yetkiVarMi('ruhsat'))
-                            FutureBuilder<Map<String, dynamic>>(
-                              future: _getRuhsatOzet(project.id),
-                              builder: (context, ruhsatSnap) {
-                                if (!ruhsatSnap.hasData) return const SizedBox.shrink();
-                                final r = ruhsatSnap.data!;
+                            Builder(
+                              builder: (context) {
+                                final r = _ruhsatOzetCache[project.id];
+                                if (r == null) return const SizedBox.shrink();
                                 final tamamlanan = r['tamamlanan'] as int;
                                 final devamEden = r['devamEden'] as int;
                                 final toplam = r['toplam'] as int;
@@ -2203,8 +2226,6 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                     ),
                   ),
                 );
-              },
-            );
       },
     );
   }

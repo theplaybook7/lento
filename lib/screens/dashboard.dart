@@ -16,6 +16,7 @@ import 'company_finance_dashboard.dart';
 import 'bildirimler_screen.dart';
 import 'cari_hesap_screen.dart';
 import 'settings_screen.dart';
+import 'gorev_ata_dialog.dart';
 import '../services/firebase_service.dart';
 import '../utils/responsive_utils.dart' as resp;
 import '../main.dart' show AuthGate;
@@ -124,6 +125,16 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
         foregroundColor: Colors.white,
         elevation: 1,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.assignment_turned_in_outlined),
+            tooltip: 'Görev Ata',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (_) => const GorevAtaDialog(),
+              );
+            },
+          ),
           StreamBuilder<QuerySnapshot>(
             stream: _bildirimStream,
             builder: (context, snapshot) {
@@ -710,8 +721,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                 final okunmamis = BildirimServisi.okunmamisBildirimler(snap.data!);
                 final tumYetkiliBildirimler = snap.data!.docs.where((doc) {
                   final b = doc.data() as Map<String, dynamic>;
-                  final modul = b['modul'] as String?;
-                  return modul == null || modul.isEmpty || SistemYoneticisi().yetkiVarMi(modul);
+                  return BildirimServisi.yetkiliMi(b);
                 }).toList();
                 final onizlemeBildirimleri = tumYetkiliBildirimler.take(3).toList();
                 final kalanBildirimSayisi = tumYetkiliBildirimler.length - onizlemeBildirimleri.length;

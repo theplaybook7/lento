@@ -85,9 +85,8 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
     final email = SistemYoneticisi().girisYapanEmail;
     return _bildirimler.where((doc) {
       final b = doc.data() as Map<String, dynamic>;
-      // Yetki kontrolü
-      final modul = b['modul'] as String?;
-      if (modul != null && modul.isNotEmpty && !SistemYoneticisi().yetkiVarMi(modul)) {
+      // Yetki + hedefEmail kontrolü
+      if (!BildirimServisi.yetkiliMi(b)) {
         return false;
       }
       // Filtre kontrolü
@@ -118,8 +117,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
     final email = SistemYoneticisi().girisYapanEmail;
     return _bildirimler.where((doc) {
       final b = doc.data() as Map<String, dynamic>;
-      final modul = b['modul'] as String?;
-      if (modul != null && modul.isNotEmpty && !SistemYoneticisi().yetkiVarMi(modul)) {
+      if (!BildirimServisi.yetkiliMi(b)) {
         return false;
       }
       final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];

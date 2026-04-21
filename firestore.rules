@@ -151,6 +151,13 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    // Görevler (task assignment)
+    match /gorevler/{gorevId} {
+      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
+      allow create: if isAuthenticated() && hasUserSirketId() && request.resource.data.sirketId == userSirketId();
+      allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
+    }
+
     // Ödeme Planları
     match /payment_plans/{planId} {
       allow read, write: if isAuthenticated();

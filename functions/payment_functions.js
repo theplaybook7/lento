@@ -387,3 +387,7 @@ exports.dailyInactivityCheck = functions.pubsub
       return null;
     }
   });
+
+// ===== GÖREV ATAMA FCM PUSH =====
+Object.assign(module.exports, require('./gorev_functions'));
+

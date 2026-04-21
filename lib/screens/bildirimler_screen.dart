@@ -114,15 +114,52 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
     });
   }
 
+  List<QueryDocumentSnapshot> get _okunmamisYetkiliBildirimler {
+    final email = SistemYoneticisi().girisYapanEmail;
+    return _bildirimler.where((doc) {
+      final b = doc.data() as Map<String, dynamic>;
+      final modul = b['modul'] as String?;
+      if (modul != null && modul.isNotEmpty && !SistemYoneticisi().yetkiVarMi(modul)) {
+        return false;
+      }
+      final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
+      final okunmus = okuyanlar.contains(email) || _localOkunanlar.contains(doc.id);
+      return !okunmus;
+    }).toList();
+  }
+
+  Future<void> _hepsiniOkunduIsaretle() async {
+    final okunmamislar = _okunmamisYetkiliBildirimler;
+    if (okunmamislar.isEmpty) return;
+
+    await BildirimServisi.tumunuOkunduIsaretle(okunmamislar);
+    if (!mounted) return;
+
+    setState(() {
+      _localOkunanlar.addAll(okunmamislar.map((d) => d.id));
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${okunmamislar.length} bildirim okundu olarak işaretlendi')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final liste = _filtreliBildirimler;
     final email = SistemYoneticisi().girisYapanEmail;
+    final okunmamisSayisi = _okunmamisYetkiliBildirimler.length;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tüm Bildirimler'),
         actions: [
+          if (okunmamisSayisi > 0)
+            IconButton(
+              icon: const Icon(Icons.done_all),
+              tooltip: 'Hepsini okundu işaretle',
+              onPressed: _hepsiniOkunduIsaretle,
+            ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
             tooltip: 'Filtrele',

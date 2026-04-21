@@ -708,8 +708,15 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                 }
 
                 final okunmamis = BildirimServisi.okunmamisBildirimler(snap.data!);
+                final tumYetkiliBildirimler = snap.data!.docs.where((doc) {
+                  final b = doc.data() as Map<String, dynamic>;
+                  final modul = b['modul'] as String?;
+                  return modul == null || modul.isEmpty || SistemYoneticisi().yetkiVarMi(modul);
+                }).toList();
+                final onizlemeBildirimleri = tumYetkiliBildirimler.take(3).toList();
+                final kalanBildirimSayisi = tumYetkiliBildirimler.length - onizlemeBildirimleri.length;
 
-                if (okunmamis.isEmpty) {
+                if (tumYetkiliBildirimler.isEmpty) {
                   return Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
@@ -717,7 +724,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                       children: [
                         Icon(Icons.check_circle_outline, size: 40, color: Colors.green.shade300),
                         const SizedBox(height: 8),
-                        Text('Tüm bildirimler okundu', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                        Text('Gösterilecek bildirim yok', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
@@ -757,34 +764,13 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         ],
                       ),
                     ),
-                    if (okunmamis.length > 1)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              await BildirimServisi.tumunuOkunduIsaretle(okunmamis);
-                              if (context.mounted) Navigator.pop(context);
-                            },
-                            icon: const Icon(Icons.done_all, size: 14),
-                            label: const Text('Hepsini Okundu İşaretle', style: TextStyle(fontSize: 11)),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.deepOrange,
-                              side: const BorderSide(color: Colors.deepOrange),
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                          ),
-                        ),
-                      ),
                     Divider(height: 1, color: Colors.grey.shade200),
                     const SizedBox(height: 4),
                     ListView.builder(
                   shrinkWrap: true,
-                  itemCount: okunmamis.length,
+                  itemCount: onizlemeBildirimleri.length,
                   itemBuilder: (ctx, i) {
-                    final doc = okunmamis[i];
+                    final doc = onizlemeBildirimleri[i];
                     final b = doc.data() as Map<String, dynamic>;
                     final baslik = b['baslik'] ?? '';
                     final mesaj = b['mesaj'] ?? '';
@@ -792,6 +778,8 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     final projeId = b['projeId'] ?? '';
                     final modul = b['modul'] ?? '';
                     final tarih = b['tarih'] as Timestamp?;
+                    final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
+                    final okunmus = okuyanlar.contains(SistemYoneticisi().girisYapanEmail);
 
                     // Modüle göre renk ve ikon
                     Color modulRenk;
@@ -875,6 +863,16 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                                 children: [
                                   Row(
                                     children: [
+                                      if (!okunmus)
+                                        Container(
+                                          width: 7,
+                                          height: 7,
+                                          margin: const EdgeInsets.only(right: 6),
+                                          decoration: BoxDecoration(
+                                            color: modulRenk,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
                                       Expanded(
                                         child: Text(baslik, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: modulRenk)),
                                       ),
@@ -904,6 +902,14 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                     );
                   },
                 ),
+                    if (kalanBildirimSayisi > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 2),
+                        child: Text(
+                          '$kalanBildirimSayisi daha bildirim',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                        ),
+                      ),
                     Divider(height: 1, color: Colors.grey.shade200),
                     const SizedBox(height: 4),
                     SizedBox(

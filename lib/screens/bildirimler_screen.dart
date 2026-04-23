@@ -4,6 +4,7 @@ import '../project_core.dart';
 import '../notification_service.dart';
 import '../theme/app_theme.dart';
 import 'project_details_screen.dart';
+import 'gunluk_rapor_screen.dart';
 
 class BildirimlerScreen extends StatefulWidget {
   const BildirimlerScreen({super.key});
@@ -296,6 +297,17 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                           setState(() {});
                         }
                         if (!mounted) return;
+                        // Günlük rapor bildirimi -> rapor ekranı
+                        if (modul == 'gunluk_rapor') {
+                          final raporId = b['raporId'] as String?;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (c) => GunlukRaporScreen(raporId: raporId),
+                            ),
+                          );
+                          return;
+                        }
                         if (projeId.toString().isNotEmpty) {
                           Navigator.push(
                             context,

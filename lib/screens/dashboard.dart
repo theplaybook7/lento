@@ -17,6 +17,7 @@ import 'bildirimler_screen.dart';
 import 'cari_hesap_screen.dart';
 import 'settings_screen.dart';
 import 'gorev_ata_dialog.dart';
+import 'gunluk_rapor_screen.dart';
 import '../services/firebase_service.dart';
 import '../utils/responsive_utils.dart' as resp;
 import '../main.dart' show AuthGate;
@@ -807,6 +808,14 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                         modulRenk = Colors.blue;
                         modulIkon = Icons.account_balance_wallet;
                         break;
+                      case 'gunluk_rapor':
+                        modulRenk = Colors.deepPurple;
+                        modulIkon = Icons.summarize_outlined;
+                        break;
+                      case 'gorev':
+                        modulRenk = Colors.indigo;
+                        modulIkon = Icons.assignment_turned_in_outlined;
+                        break;
                       default:
                         modulRenk = Colors.teal;
                         modulIkon = Icons.notifications_active;
@@ -840,6 +849,17 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
                           'okuyanlar': FieldValue.arrayUnion([SistemYoneticisi().girisYapanEmail])
                         });
                         if (!mounted) return;
+                        // Günlük rapor bildirimi ise rapor ekranını aç
+                        if (modul == 'gunluk_rapor') {
+                          final raporId = b['raporId'] as String?;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (c) => GunlukRaporScreen(raporId: raporId),
+                            ),
+                          );
+                          return;
+                        }
                         Navigator.push(
                           context,
                           MaterialPageRoute(

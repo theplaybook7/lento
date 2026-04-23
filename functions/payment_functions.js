@@ -204,10 +204,10 @@ exports.checkPaymentStatus = functions.https.onCall(async (data, context) => {
  * 4+ gün işlem yapılmamış projeleri bulur ve FCM push bildirim gönderir.
  */
 exports.dailyInactivityCheck = functions.pubsub
-  .schedule("every day 09:00")
+  .schedule("every day 07:00")
   .timeZone("Europe/Istanbul")
   .onRun(async (context) => {
-    console.log("🔔 Günlük pasiflik kontrolü başladı");
+    console.log("📋 Günlük rapor oluşturuluyor (07:00)");
 
     try {
       // Tüm şirketleri al
@@ -272,36 +272,84 @@ exports.dailyInactivityCheck = functions.pubsub
               (now - sonIslemTarihi) / (1000 * 60 * 60 * 24)
             );
             if (diffDays >= 4) {
-              pasifProjeler.push({ ad: projeAd, gun: diffDays, id: projeId });
+              pasifProjeler.push({
+                ad: projeAd,
+                gun: diffDays,
+                id: projeId,
+                sonIslemTarihi: sonIslemTarihi.toISOString(),
+              });
             }
           }
         }
 
-        if (pasifProjeler.length === 0) continue;
-
-        // Firestore'a in-app bildirim yaz (zil ikonu için)
-        for (const proje of pasifProjeler) {
-          await db
-            .collection("sirketler")
-            .doc(sirketId)
-            .collection("bildirimler")
-            .add({
-              baslik: "⚠️ Ruhsat İşlem Uyarısı",
-              mesaj: `${proje.ad} projesinde ${proje.gun} gündür işlem yapılmadı!`,
-              projeId: proje.id || "",
-              gonderen: "Sistem",
-              modul: "ruhsat",
-              tarih: admin.firestore.FieldValue.serverTimestamp(),
-              okuyanlar: [],
-            });
+        if (pasifProjeler.length === 0) {
+          console.log(`✅ ${sirketAd}: pasif proje yok, rapor oluşturulmadı`);
+          continue;
         }
+
+        // En uzun süredir pasif olana göre sırala (azalan)
+        pasifProjeler.sort((a, b) => b.gun - a.gun);
+
+        // Rapor tarihi (YYYY-MM-DD, Europe/Istanbul)
+        const now = new Date();
+        const istDateStr = now.toLocaleDateString("tr-TR", {
+          timeZone: "Europe/Istanbul",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+
+        // 1) Günlük rapor dokümanını kaydet (görüntüleme + çıktı için)
+        const raporRef = await db.collection("gunluk_raporlar").add({
+          sirketId: sirketId,
+          sirketAd: sirketAd,
+          tarih: admin.firestore.FieldValue.serverTimestamp(),
+          tarihStr: istDateStr,
+          tip: "pasif_projeler",
+          baslik: "Günlük Rapor - Pasif Projeler",
+          pasifProjeler: pasifProjeler.map((p) => ({
+            projeId: p.id,
+            projeAd: p.ad,
+            gun: p.gun,
+            sonIslemTarihi: p.sonIslemTarihi,
+          })),
+          toplamProje: pasifProjeler.length,
+        });
+
+        // 2) Firestore'a TEK bir in-app bildirim yaz (zil ikonu için)
+        const ozetListe = pasifProjeler
+          .slice(0, 5)
+          .map((p) => `• ${p.ad} (${p.gun} gün)`)
+          .join("\n");
+        const daha =
+          pasifProjeler.length > 5
+            ? `\n…ve ${pasifProjeler.length - 5} proje daha`
+            : "";
+        const bildirimMesaj =
+          `${istDateStr} tarihli raporda ${pasifProjeler.length} pasif proje var:\n` +
+          ozetListe +
+          daha;
+
+        await db
+          .collection("sirketler")
+          .doc(sirketId)
+          .collection("bildirimler")
+          .add({
+            baslik: `📋 Günlük Rapor - ${pasifProjeler.length} pasif proje`,
+            mesaj: bildirimMesaj,
+            projeId: "",
+            gonderen: "Sistem",
+            modul: "gunluk_rapor",
+            raporId: raporRef.id,
+            tarih: admin.firestore.FieldValue.serverTimestamp(),
+            okuyanlar: [],
+          });
 
         // Bu şirketin kullanıcılarının FCM token'larını topla
         const emailler = sirketDoc.data().emailler || [];
         const tokens = [];
 
         for (const email of emailler) {
-          // Email ile kullanıcı bul
           try {
             const userRecord = await admin.auth().getUserByEmail(email);
             const userDoc = await db
@@ -318,25 +366,30 @@ exports.dailyInactivityCheck = functions.pubsub
 
         if (tokens.length === 0) {
           console.log(
-            `✅ ${sirketAd}: ${pasifProjeler.length} pasif proje, in-app bildirim yazıldı (FCM token yok)`
+            `✅ ${sirketAd}: ${pasifProjeler.length} pasif proje raporu yazıldı (FCM token yok)`
           );
           continue;
         }
 
-        // FCM Push bildirim gönder
-        const body =
-          pasifProjeler.length === 1
-            ? `${pasifProjeler[0].ad} - ${pasifProjeler[0].gun} gündür işlem yapılmadı!`
-            : `${pasifProjeler.length} projede ${pasifProjeler[0].gun}+ gündür işlem yapılmadı!`;
+        // 3) TEK bir FCM Push bildirim gönder (özetleyen)
+        const pushBody = `${pasifProjeler.length} pasif proje — en uzun: ${pasifProjeler[0].ad} (${pasifProjeler[0].gun} gün)`;
 
         const message = {
           notification: {
-            title: `⚠️ ${sirketAd} - Pasif Proje Uyarısı`,
-            body: body,
+            title: `📋 ${sirketAd} - Günlük Rapor`,
+            body: pushBody,
           },
           data: {
-            type: "inactivity_warning",
+            type: "gunluk_rapor",
             sirketId: sirketId,
+            raporId: raporRef.id,
+          },
+          android: {
+            priority: "high",
+            notification: { sound: "default", channelId: "high_importance_channel" },
+          },
+          apns: {
+            payload: { aps: { sound: "default", badge: 1 } },
           },
         };
 
@@ -344,10 +397,7 @@ exports.dailyInactivityCheck = functions.pubsub
         const invalidTokens = [];
         for (const token of tokens) {
           try {
-            await admin.messaging().send({
-              ...message,
-              token: token,
-            });
+            await admin.messaging().send({ ...message, token: token });
           } catch (err) {
             if (
               err.code === "messaging/invalid-registration-token" ||
@@ -376,14 +426,14 @@ exports.dailyInactivityCheck = functions.pubsub
         }
 
         console.log(
-          `✅ ${sirketAd}: ${pasifProjeler.length} pasif proje, ${tokens.length} cihaza bildirim gönderildi`
+          `✅ ${sirketAd}: ${pasifProjeler.length} pasif proje, ${tokens.length} cihaza TEK rapor bildirimi gönderildi`
         );
       }
 
-      console.log("🔔 Günlük pasiflik kontrolü tamamlandı");
+      console.log("📋 Günlük rapor oluşturma tamamlandı");
       return null;
     } catch (error) {
-      console.error("❌ Pasiflik kontrolü hatası:", error);
+      console.error("❌ Günlük rapor hatası:", error);
       return null;
     }
   });

@@ -46,7 +46,7 @@ class _GorevAtaDialogState extends State<GorevAtaDialog> {
         final data = d.data();
         return {
           'id': d.id,
-          'ad': (data['projeAdi'] ?? data['ad'] ?? 'Proje') as String,
+          'ad': (data['name'] ?? data['projeAdi'] ?? data['ad'] ?? 'Proje') as String,
         };
       }).toList();
       list.sort((a, b) => (a['ad'] ?? '').compareTo(b['ad'] ?? ''));

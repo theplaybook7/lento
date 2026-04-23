@@ -224,30 +224,75 @@ class _GorevAtaDialogState extends State<GorevAtaDialog> {
                   child: LinearProgressIndicator(),
                 )
               else
-                DropdownButtonFormField<String>(
-                  initialValue: _seciliProjeId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    prefixIcon: Icon(Icons.business_outlined),
-                  ),
-                  hint: const Text('Proje seçin (opsiyonel)'),
-                  items: [
-                    const DropdownMenuItem(value: '', child: Text('-- Proje seçilmedi --')),
-                    ..._projeler.map((p) => DropdownMenuItem(
-                          value: p['id'],
-                          child: Text(p['ad'] ?? '', overflow: TextOverflow.ellipsis),
-                        )),
-                  ],
-                  onChanged: (v) {
+                Autocomplete<Map<String, String>>(
+                  initialValue: TextEditingValue(text: _seciliProjeAdi ?? ''),
+                  optionsBuilder: (TextEditingValue value) {
+                    final q = value.text.trim().toLowerCase();
+                    if (q.isEmpty) return _projeler.take(50);
+                    return _projeler.where((p) =>
+                        (p['ad'] ?? '').toLowerCase().contains(q));
+                  },
+                  displayStringForOption: (p) => p['ad'] ?? '',
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onSubmitted) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        prefixIcon: const Icon(Icons.search),
+                        hintText: 'Proje ara... (opsiyonel)',
+                        suffixIcon: controller.text.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () {
+                                  controller.clear();
+                                  setState(() {
+                                    _seciliProjeId = null;
+                                    _seciliProjeAdi = null;
+                                  });
+                                },
+                              ),
+                      ),
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    final list = options.toList();
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(6),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                              maxHeight: 240, maxWidth: 380),
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: list.length,
+                            itemBuilder: (_, i) {
+                              final p = list[i];
+                              return ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.business_outlined,
+                                    size: 18),
+                                title: Text(p['ad'] ?? '',
+                                    style: const TextStyle(fontSize: 13)),
+                                onTap: () => onSelected(p),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  onSelected: (p) {
                     setState(() {
-                      _seciliProjeId = v == '' ? null : v;
-                      final found = _projeler.firstWhere(
-                        (p) => p['id'] == v,
-                        orElse: () => const {'ad': ''},
-                      );
-                      _seciliProjeAdi = found['ad'];
+                      _seciliProjeId = p['id'];
+                      _seciliProjeAdi = p['ad'];
                     });
                   },
                 ),

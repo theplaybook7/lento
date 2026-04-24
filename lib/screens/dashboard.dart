@@ -1622,23 +1622,82 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   }
 
   Future<void> _projeIsimDuzenle(Project project) async {
-    final controller = TextEditingController(text: project.name);
-    final yeniIsim = await showDialog<String>(
+    // Mevcut değerleri Firestore'dan oku
+    String mevcutMalSahibi = '';
+    String mevcutAdaParsel = '';
+    String mevcutMuteahhit = '';
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(project.id)
+          .get();
+      final data = doc.data() ?? {};
+      mevcutMalSahibi = (data['malSahibi'] ?? '').toString();
+      mevcutAdaParsel = (data['adaParsel'] ?? '').toString();
+      mevcutMuteahhit = (data['muteahhit'] ?? '').toString();
+    } catch (_) {}
+
+    final malCtrl = TextEditingController(text: mevcutMalSahibi);
+    final adaCtrl = TextEditingController(text: mevcutAdaParsel);
+    final mutCtrl = TextEditingController(text: mevcutMuteahhit);
+    final formKey = GlobalKey<FormState>();
+
+    if (!mounted) return;
+    final sonuc = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(
-          'Proje İsmini Düzenle',
+          'Proje Bilgilerini Düzenle',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppTheme.primaryColor,
-          ),
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
+              ),
         ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Proje Adı',
-            border: OutlineInputBorder(),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: malCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Mal Sahibi *',
+                    prefixIcon: Icon(Icons.person),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Mal sahibi gerekli'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: adaCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Ada / Parsel *',
+                    hintText: 'Örn: 1234 / 56',
+                    prefixIcon: Icon(Icons.grid_on),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Ada / parsel gerekli'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: mutCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Müteahhit *',
+                    prefixIcon: Icon(Icons.engineering),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Müteahhit gerekli'
+                      : null,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -1648,8 +1707,12 @@ class _ProjectsTabState extends State<_ProjectsTab> {
           ),
           ElevatedButton(
             onPressed: () {
-              final text = controller.text.trim();
-              if (text.isNotEmpty) Navigator.pop(context, text);
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              Navigator.pop(context, {
+                'malSahibi': malCtrl.text.trim(),
+                'adaParsel': adaCtrl.text.trim(),
+                'muteahhit': mutCtrl.text.trim(),
+              });
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
@@ -1660,14 +1723,23 @@ class _ProjectsTabState extends State<_ProjectsTab> {
         ],
       ),
     );
-    controller.dispose();
-    if (yeniIsim != null && yeniIsim != project.name && mounted) {
+    malCtrl.dispose();
+    adaCtrl.dispose();
+    mutCtrl.dispose();
+    if (sonuc != null && mounted) {
       try {
-        await _firebase.updateProject(project.id, {'name': yeniIsim});
+        final yeniIsim =
+            '${sonuc['malSahibi']} / ${sonuc['adaParsel']} / ${sonuc['muteahhit']}';
+        await _firebase.updateProject(project.id, {
+          'name': yeniIsim,
+          'malSahibi': sonuc['malSahibi'],
+          'adaParsel': sonuc['adaParsel'],
+          'muteahhit': sonuc['muteahhit'],
+        });
         if (!mounted) return;
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Proje ismi güncellendi')),
+          const SnackBar(content: Text('Proje bilgileri güncellendi')),
         );
       } catch (e) {
         if (!mounted) return;

@@ -1439,6 +1439,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   int? _filtreAsama;       // akış diyagramı node sıra numarası (null=hepsi)
   // Projelerin akış diyagramı cache
   final Map<String, List<Map<String, dynamic>>> _akisCache = {};
+  final Map<String, Map<String, dynamic>> _akisMetaCache = {};
   bool _akisCacheLoaded = false;
   // Ruhsat özet cache (FutureBuilder'ı ortadan kaldırmak için)
   final Map<String, Map<String, dynamic>> _ruhsatOzetCache = {};
@@ -1464,8 +1465,15 @@ class _ProjectsTabState extends State<_ProjectsTab> {
         final snap = await FirebaseFirestore.instance
             .collection('ruhsat').doc(p.id)
             .collection('akis_diyagrami').get();
+        // Meta dokümanı ayrı cache'le
+        for (final d in snap.docs) {
+          if (d.id == '_meta') {
+            _akisMetaCache[p.id] = d.data();
+            break;
+          }
+        }
         _akisCache[p.id] = snap.docs
-            .where((d) => d.id != 'karar_kontrol' && d.id != 'yola_terk_kontrol')
+            .where((d) => d.id != 'karar_kontrol' && d.id != 'yola_terk_kontrol' && d.id != '_meta')
             .map((d) => d.data())
             .toList();
       } catch (_) {
@@ -1523,6 +1531,9 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   /// Akış cache'inden ruhsat özeti hesapla (Firestore okuması yapmaz)
   Map<String, dynamic> _hesaplaRuhsatOzet(String projectId) {
     final docs = _akisCache[projectId] ?? [];
+    final meta = _akisMetaCache[projectId];
+    final baslatildi = meta?['baslatildi'] == true;
+    final ruhsatTamamlandi = meta?['ruhsatTamamlandi'] == true;
     int tamamlanan = 0;
     int devamEden = 0;
     DateTime? sonIslemTarihi;
@@ -1539,19 +1550,35 @@ class _ProjectsTabState extends State<_ProjectsTab> {
       final gt = data['guncellendiTarihi'];
       if (gt != null) {
         DateTime? t;
-        if (gt is Timestamp) t = gt.toDate();
-        else if (gt is DateTime) t = gt;
+        if (gt is Timestamp) {
+          t = gt.toDate();
+        } else if (gt is DateTime) {
+          t = gt;
+        }
         if (t != null && (sonIslemTarihi == null || t.isAfter(sonIslemTarihi))) {
           sonIslemTarihi = t;
         }
       }
     }
+    // Meta'daki sonGuncellemeTarihi daha güncel olabilir
+    final metaGun = meta?['sonGuncellemeTarihi'] ?? meta?['baslatmaTarihi'];
+    DateTime? metaDate;
+    if (metaGun is Timestamp) {
+      metaDate = metaGun.toDate();
+    } else if (metaGun is DateTime) {
+      metaDate = metaGun;
+    }
+    if (metaDate != null && (sonIslemTarihi == null || metaDate.isAfter(sonIslemTarihi))) {
+      sonIslemTarihi = metaDate;
+    }
     return {
       'tamamlanan': tamamlanan,
       'devamEden': devamEden,
-      'toplam': 39,
+      'toplam': _akisNodeNames.length,
       'aktifMadde': aktifMadde,
       'sonIslemTarihi': sonIslemTarihi,
+      'baslatildi': baslatildi,
+      'ruhsatTamamlandi': ruhsatTamamlandi,
     };
   }
 
@@ -1841,21 +1868,18 @@ class _ProjectsTabState extends State<_ProjectsTab> {
 
   static const Map<int, String> _akisNodeNames = {
     1: 'LİHKAP', 2: 'İmar Durumu', 3: 'İstikamet Memuru',
-    4: 'İstikamet Çizimi', 5: 'Karar Kontrolü', 6: 'Folyo Hazırlanması', 7: 'Etüt Çalışması',
-    8: 'Karot Alımı', 9: 'RBT', 10: 'Kesim Yazıları', 11: 'Muafiyet',
-    12: 'Boş Yazısı', 13: 'Yıkım', 14: 'Zemin Etütü',
-    15: 'Mimari Proje', 16: 'Statik Taslak', 17: 'Statik Proje',
-    18: 'YİBF Girişi', 19: 'Elektrik Proje', 20: 'Mekanik Proje',
-    21: 'Akustik Proje', 22: 'EKB', 23: 'Müellif Evrakları', 24: 'İSKİ',
-    25: 'Eksiklerin Giderilmesi', 26: 'Ruhsat Dilekçesi',
-    27: 'YD Proje Onayı', 28: 'Belediye Proje Onayı', 29: 'Fen İşleri',
-    30: 'Müteahhit Belgeleri', 31: 'Harçlar', 32: 'Otopark',
-    33: 'Teminat Mektubu', 34: 'Numarataj', 35: 'Ruhsat Yazımı',
-    36: 'Ruhsat Teslimi', 37: 'Kat İrtifakı',
-    38: 'Encümen Girişi', 39: 'Encümen Çıkışı', 40: 'Kadastro', 41: 'Tapu İşlemi',
-    42: '2. LİHKAP', 43: '2. İmar Durumu', 44: '2. İstikamet Çizimi',
-    45: 'Yola Terk Kontrolü', 46: 'Zemin Etütü Onayı', 47: 'Noter Evrakları',
+    4: 'İstikamet Çizimi', 5: 'Folyo Hazırlanması', 6: 'Etüt Çalışması',
+    7: 'Karot Alımı', 8: 'RBT', 9: 'Kesim Yazıları', 10: 'Muafiyet',
+    11: 'Boş Yazısı', 12: 'Yıkım', 13: 'Zemin Etütü',
+    14: 'Mimari Proje', 15: 'Statik Taslak', 16: 'Statik Proje',
+    17: 'YİBF Girişi', 18: 'Elektrik Proje', 19: 'Mekanik Proje',
+    20: 'Akustik Proje', 21: 'EKB', 22: 'Müellif Evrakları', 23: 'İSKİ',
+    24: 'Ruhsat Dilekçesi', 25: 'YD Proje Onayı', 26: 'Belediye Proje Onayı',
+    27: 'Fen İşleri', 28: 'Müellif Taahhütnameleri', 29: 'Müteahhit Belgeleri',
+    30: 'Harçlar', 31: 'Otopark', 32: 'Teminat Mektubu', 33: 'Numarataj',
+    34: 'Ruhsat Yazımı',
   };
+  static const int _akisSonMaddeDb = 34;
 
   @override
   void dispose() {
@@ -2155,8 +2179,13 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                 final devamEden = r['devamEden'] as int;
                                 final toplam = r['toplam'] as int;
                                 final aktifMadde = r['aktifMadde'] as String?;
+                                final baslatildi = r['baslatildi'] == true;
+                                final ruhsatTamamlandi = r['ruhsatTamamlandi'] == true;
 
-                                if (tamamlanan == 0 && devamEden == 0) return const SizedBox.shrink();
+                                // Süreç hiç başlatılmamışsa kart gösterme
+                                if (!baslatildi && tamamlanan == 0 && devamEden == 0) {
+                                  return const SizedBox.shrink();
+                                }
 
                                 final sonIslemTarihi = r['sonIslemTarihi'] as DateTime?;
                                 int pasifGunSayisi = 0;
@@ -2165,7 +2194,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                 }
 
                                 final aktifMaddeStr = aktifMadde;
-                                final tamamlandi = tamamlanan == toplam;
+                                final tamamlandi = ruhsatTamamlandi;
 
                                 return Padding(
                                   padding: const EdgeInsets.only(top: 10),

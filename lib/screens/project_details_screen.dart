@@ -1262,7 +1262,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       sayacRenk = Colors.red;
     } else if (sayacGun >= 7) {
       sayacRenk = Colors.orange;
-    } else if (sayacGun >= 4) {
+    } else if (sayacGun >= 2) {
       sayacRenk = Colors.amber.shade700;
     } else {
       sayacRenk = Colors.blue;

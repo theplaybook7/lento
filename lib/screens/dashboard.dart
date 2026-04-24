@@ -1733,7 +1733,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
               }
               if (tamamlanan < _ruhsatMaddeleri.length && sonIslem != null) {
                 final pasifGun = DateTime.now().difference(sonIslem).inDays;
-                if (pasifGun >= 4) {
+                if (pasifGun >= 2) {
                   await BildirimServisi.bildirimGonder(
                     baslik: '⚠️ Ruhsat İşlem Uyarısı',
                     mesaj: '$projeAdi projesinde $pasifGun gündür ruhsat işlemi yapılmadı!',
@@ -1763,7 +1763,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
               }
               if (tamamlanan < 37 && sonIslem != null) {
                 final pasifGun = DateTime.now().difference(sonIslem).inDays;
-                if (pasifGun >= 4) {
+                if (pasifGun >= 2) {
                   await BildirimServisi.bildirimGonder(
                     baslik: '⚠️ Akış Diyagramı Uyarısı',
                     mesaj: '$projeAdi projesinde $pasifGun gündür akış diyagramında işlem yapılmadı!',
@@ -2223,7 +2223,7 @@ class _ProjectsTabState extends State<_ProjectsTab> {
                                             minHeight: 5,
                                           ),
                                         ),
-                                        if (pasifGunSayisi >= 4 && !tamamlandi) ...[
+                                        if (pasifGunSayisi >= 2 && !tamamlandi) ...[
                                           const SizedBox(height: 6),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

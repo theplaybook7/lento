@@ -111,7 +111,7 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
           ),
           pw.Paragraph(
             text:
-                'Aşağıdaki projelerde 4 gün veya daha uzun süredir ruhsat/akış diyagramı işlemi yapılmamıştır.',
+                'Aşağıdaki projelerde 2 gün veya daha uzun süredir ruhsat/akış diyagramı işlemi yapılmamıştır.',
             style: const pw.TextStyle(fontSize: 11),
           ),
           pw.SizedBox(height: 8),
@@ -307,7 +307,7 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
                 ),
                 const Divider(height: 24),
                 Text(
-                  '4 gün veya daha uzun süredir işlem yapılmayan projeler:',
+                  '2 gün veya daha uzun süredir işlem yapılmayan projeler:',
                   style: TextStyle(color: Colors.grey.shade700),
                 ),
                 const SizedBox(height: 4),

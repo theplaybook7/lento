@@ -281,7 +281,7 @@ exports.dailyInactivityCheck = functions.pubsub
             const diffDays = Math.floor(
               (now - sonIslemTarihi) / (1000 * 60 * 60 * 24)
             );
-            if (diffDays >= 4) {
+            if (diffDays >= 2) {
               // Akış diyagramındaki notları topla (sadece boş olmayanlar)
               const notlar = [];
               for (const m of akisMaddeler) {

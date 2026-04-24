@@ -441,3 +441,6 @@ exports.dailyInactivityCheck = functions.pubsub
 // ===== GÖREV ATAMA FCM PUSH =====
 Object.assign(module.exports, require('./gorev_functions'));
 
+// ===== TAKSİT VADE BİLDİRİMLERİ =====
+Object.assign(module.exports, require('./taksit_functions'));
+

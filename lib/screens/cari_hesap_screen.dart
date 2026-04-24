@@ -2207,11 +2207,12 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                   builder: (context, taksitSnap) {
                     final taksitler = taksitSnap.data?.docs ?? [];
                     int odenen = taksitler.where((t) => (t.data() as Map)['odendi'] == true).length;
-                    double odenenTutar = 0;
+                    double odenenTutarToplam = 0;
                     for (var t in taksitler) {
                       final td = t.data() as Map<String, dynamic>;
-                      if (td['odendi'] == true) odenenTutar += ((td['tutar'] ?? 0) as num).toDouble();
+                      odenenTutarToplam += ((td['odenenTutar'] ?? 0) as num).toDouble();
                     }
+                    final kalanTutar = (toplamTutar - odenenTutarToplam).clamp(0.0, double.infinity);
                     final tamamlandi = odenen == taksitSayisi && taksitSayisi > 0;
 
                     return Card(
@@ -2233,9 +2234,9 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                         subtitle: Text(
-                          '${projeAd.isNotEmpty ? "$projeAd • " : ""}$odenen/$taksitSayisi taksit ödendi${aciklama.isNotEmpty ? " • $aciklama" : ""}',
+                          '${projeAd.isNotEmpty ? "$projeAd • " : ""}$odenen/$taksitSayisi taksit • Kalan: ${formatTL(kalanTutar)}${aciklama.isNotEmpty ? " • $aciklama" : ""}',
                           style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         children: [
@@ -2244,27 +2245,35 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                               final t = taksitDoc.data() as Map<String, dynamic>;
                               final sira = t['sira'] ?? 0;
                               final tutar = ((t['tutar'] ?? 0) as num).toDouble();
+                              final odenenTutarT = ((t['odenenTutar'] ?? 0) as num).toDouble();
                               final odendi = t['odendi'] == true;
+                              final kismi = !odendi && odenenTutarT > 0;
                               final vadeTarihi = t['vadeTarihi'] is Timestamp
                                   ? (t['vadeTarihi'] as Timestamp).toDate()
                                   : DateTime.now();
                               final gecikmi = !odendi && vadeTarihi.isBefore(DateTime.now());
 
+                              Color bg;
+                              Widget leading;
+                              if (odendi) {
+                                bg = Colors.green.shade100;
+                                leading = Icon(Icons.check, size: 16, color: Colors.green.shade700);
+                              } else if (kismi) {
+                                bg = Colors.amber.shade100;
+                                leading = Icon(Icons.adjust, size: 16, color: Colors.amber.shade800);
+                              } else if (gecikmi) {
+                                bg = Colors.red.shade100;
+                                leading = Text('$sira', style: TextStyle(
+                                    fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red));
+                              } else {
+                                bg = Colors.grey.shade100;
+                                leading = Text('$sira', style: TextStyle(
+                                    fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade700));
+                              }
+
                               return ListTile(
                                 dense: true,
-                                leading: CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: odendi
-                                      ? Colors.green.shade100
-                                      : (gecikmi ? Colors.red.shade100 : Colors.grey.shade100),
-                                  child: odendi
-                                      ? Icon(Icons.check, size: 16, color: Colors.green.shade700)
-                                      : Text('$sira', style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: gecikmi ? Colors.red : Colors.grey.shade700,
-                                        )),
-                                ),
+                                leading: CircleAvatar(radius: 14, backgroundColor: bg, child: leading),
                                 title: Text(
                                   '${formatTL(tutar)} — ${DateFormat('dd.MM.yyyy').format(vadeTarihi)}',
                                   style: TextStyle(
@@ -2273,23 +2282,36 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                                     color: odendi ? Colors.grey : (gecikmi ? Colors.red : null),
                                   ),
                                 ),
+                                subtitle: kismi
+                                    ? Text('Yatan: ${formatTL(odenenTutarT)} • Kalan: ${formatTL(tutar - odenenTutarT)}',
+                                        style: TextStyle(fontSize: 10, color: Colors.amber.shade800, fontWeight: FontWeight.w600))
+                                    : null,
                                 trailing: odendi
                                     ? Text('Ödendi', style: TextStyle(fontSize: 10, color: Colors.green.shade700, fontWeight: FontWeight.bold))
-                                    : SizedBox(
-                                        height: 28,
-                                        child: ElevatedButton(
-                                          onPressed: () => _taksitOde(planDoc.id, taksitDoc.id, t, isTahsilat, plan),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: isTahsilat ? Colors.green : Colors.red,
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                                            textStyle: const TextStyle(fontSize: 11),
-                                          ),
-                                          child: Text(gecikmi ? (isTahsilat ? 'Gecikmiş — Tahsil Et' : 'Gecikmiş — Öde') : (isTahsilat ? 'Tahsil Et' : 'Öde')),
-                                        ),
-                                      ),
+                                    : (gecikmi
+                                        ? Text('Gecikmiş', style: TextStyle(fontSize: 10, color: Colors.red.shade700, fontWeight: FontWeight.bold))
+                                        : null),
                               );
                             }),
+                          // Tek buton: Tahsilat / Ödeme Yap
+                          if (!tamamlandi)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _taksitliPlanaTopluTahsilat(
+                                      planDoc.id, plan, taksitler, kalanTutar),
+                                  icon: Icon(isTahsilat ? Icons.payments_outlined : Icons.upload_outlined, size: 18),
+                                  label: Text(isTahsilat ? 'Tahsilat Yap' : 'Ödeme Yap'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isTahsilat ? Colors.green : Colors.red,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                ),
+                              ),
+                            ),
                           // Plan sil butonu
                           if (!tamamlandi)
                             Padding(
@@ -2513,6 +2535,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
                     batch.set(taksitRef, {
                       'sira': i + 1,
                       'tutar': double.parse(taksitTutar.toStringAsFixed(2)),
+                      'odenenTutar': 0.0,
                       'vadeTarihi': Timestamp.fromDate(vadeTarihi),
                       'odendi': false,
                       'odemeTarihi': null,
@@ -2548,37 +2571,65 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
     );
   }
 
-  // ── Taksit Öde — Cari hareket olarak kaydeder (muhasebeye işler) ──
-  Future<void> _taksitOde(
+  // ── Taksitli Plana Toplu Tahsilat / Ödeme ──
+  // Kullanıcı bir tutar girer, sıraya göre ödenmemiş/kısmi taksitlere dağıtılır.
+  // Kalan veya fazla tutar bir sonraki taksitlere uygulanır. Tek bir cari hareket
+  // ve tek bir gelir/gider kaydı oluşturur. Fotoğraf eklenebilir.
+  Future<void> _taksitliPlanaTopluTahsilat(
     String planId,
-    String taksitId,
-    Map<String, dynamic> taksitData,
-    bool isTahsilat,
     Map<String, dynamic> planData,
+    List<QueryDocumentSnapshot> taksitDocs,
+    double kalanToplam,
   ) async {
-    final tutar = ((taksitData['tutar'] ?? 0) as num).toDouble();
-    final tip = isTahsilat ? 'alacak' : 'borc';
+    final isTahsilat = (planData['tip'] ?? 'tahsilat') == 'tahsilat';
     final projeId = planData['projeId'] ?? '';
     final projeAd = planData['projeAd'] ?? '';
-    final sira = taksitData['sira'] ?? 0;
 
-    // Dekont fotoğrafları için dialog
+    final tutarCtrl = TextEditingController(text: formatNumber(kalanToplam));
+    final aciklamaCtrl = TextEditingController();
     List<XFile> dekontImages = [];
+
     final result = await showDialog<bool>(
       context: context,
       builder: (c) => StatefulBuilder(
         builder: (c, setDialogState) => AlertDialog(
-          title: Text(isTahsilat ? 'Tahsilat Onayla' : 'Ödeme Onayla'),
+          title: Text(isTahsilat ? 'Tahsilat Yap' : 'Ödeme Yap'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Taksit #$sira — ${formatTL(tutar)}\n\n'
-                  'Bu tutar cari hesaba ${isTahsilat ? "tahsilat" : "ödeme"} olarak kaydedilecek ve muhasebeye işlenecektir.',
+                  'Plan kalan tutarı: ${formatTL(kalanToplam)}\n'
+                  'Girilen tutar sıraya göre taksitlere dağıtılır. '
+                  'Eksik yatırılırsa kısmi olarak işlenir, fazla yatırılırsa sonraki taksitlere geçer.',
+                  style: const TextStyle(fontSize: 12),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                const Text('Tutar (TL)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: tutarCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    prefixText: '₺ ',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Açıklama (opsiyonel)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: aciklamaCtrl,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Örn: 3 taksit birden',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 const Divider(),
                 const Text('Dekont / Fotoğraf (opsiyonel)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                 const SizedBox(height: 8),
@@ -2669,8 +2720,52 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
 
     if (result != true || !mounted) return;
 
+    final girilenTutar = parseFormatted(tutarCtrl.text);
+    if (girilenTutar <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Geçerli bir tutar girin')),
+      );
+      return;
+    }
+
+    final tip = isTahsilat ? 'alacak' : 'borc';
+
     try {
-      // Fotoğrafları yükle
+      // 1) Tutarı sıraya göre dağıt
+      double kalan = girilenTutar;
+      final List<Map<String, dynamic>> dagilim = []; // [{taksitDocRef, eklenenTutar, taksitTumOdendi, sira}]
+      for (final taksitDoc in taksitDocs) {
+        if (kalan <= 0.001) break;
+        final t = taksitDoc.data() as Map<String, dynamic>;
+        if (t['odendi'] == true) continue;
+        final taksitTutar = ((t['tutar'] ?? 0) as num).toDouble();
+        final mevcutOdenen = ((t['odenenTutar'] ?? 0) as num).toDouble();
+        final taksitKalan = (taksitTutar - mevcutOdenen).clamp(0.0, double.infinity);
+        if (taksitKalan <= 0.001) continue;
+        final eklenecek = kalan >= taksitKalan ? taksitKalan : kalan;
+        final yeniOdenen = mevcutOdenen + eklenecek;
+        final tumOdendi = (yeniOdenen + 0.01) >= taksitTutar;
+        dagilim.add({
+          'docRef': taksitDoc.reference,
+          'sira': t['sira'] ?? 0,
+          'eklenen': eklenecek,
+          'yeniOdenen': yeniOdenen,
+          'tumOdendi': tumOdendi,
+        });
+        kalan -= eklenecek;
+      }
+
+      if (dagilim.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ödenecek taksit kalmadı veya tüm taksitler ödendi')),
+        );
+        return;
+      }
+
+      final dagitilanTutar = girilenTutar - kalan;
+      final fazlaTutar = kalan; // dağıtılamayan kısım — uyarı gösteririz
+
+      // 2) Fotoğraf yükle
       final List<String> photoUrls = [];
       if (dekontImages.isNotEmpty) {
         for (var i = 0; i < dekontImages.length; i++) {
@@ -2682,17 +2777,23 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
           photoUrls.add(url);
         }
       }
-      // 1. Cari hareket oluştur (aynı _yeniHareketDialog mantığı)
+
+      // 3) Açıklama metnini oluştur
+      final siralar = dagilim.map((d) => '#${d['sira']}').join(', ');
+      final aciklamaTxt = aciklamaCtrl.text.trim().isNotEmpty
+          ? aciklamaCtrl.text.trim()
+          : 'Taksit $siralar${projeAd.isNotEmpty ? " ($projeAd)" : ""}';
+
+      // 4) Proje seçiliyse gelir/gider + project_finance kaydet (tek seferde)
       String giderId = '';
       String financeTransactionId = '';
-      String projectId = projeId;
+      final projectId = projeId;
 
       if (projectId.isNotEmpty) {
-        // Proje seçiliyse gelir/gider kaydet
         if (tip == 'borc') {
           final giderDoc = await FirebaseFirestore.instance.collection('giderler').add({
-            'aciklama': 'Taksit #$sira Ödeme: ${widget.cariAd}',
-            'tutar': tutar,
+            'aciklama': '$aciklamaTxt - ${widget.cariAd}',
+            'tutar': dagitilanTutar,
             'kategori': 'Cari Ödeme',
             'tarih': DateTime.now(),
             'olusturmaTarihi': FieldValue.serverTimestamp(),
@@ -2700,25 +2801,24 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
             'cariId': widget.cariId,
             'cariAd': widget.cariAd,
             'paraBirimi': 'TL',
-            'orijinalTutar': tutar,
+            'orijinalTutar': dagitilanTutar,
             'kur': 1.0,
             'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
           });
           giderId = giderDoc.id;
-
           await FirebaseFirestore.instance
               .collection('teklifler').doc(projectId).collection('giderler').add({
             'kategori': 'Cari Ödeme',
             'altKategori': widget.cariAd,
-            'tutar': tutar,
-            'aciklama': 'Taksit #$sira',
+            'tutar': dagitilanTutar,
+            'aciklama': aciklamaTxt,
             'tarih': DateTime.now(),
             'foto': null,
           });
         } else {
           final gelirDoc = await FirebaseFirestore.instance.collection('gelirler').add({
-            'aciklama': 'Taksit #$sira Tahsilat: ${widget.cariAd}',
-            'tutar': tutar,
+            'aciklama': '$aciklamaTxt - ${widget.cariAd}',
+            'tutar': dagitilanTutar,
             'kategori': 'Cari Tahsilat',
             'tarih': DateTime.now(),
             'olusturmaTarihi': FieldValue.serverTimestamp(),
@@ -2726,67 +2826,62 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
             'cariId': widget.cariId,
             'cariAd': widget.cariAd,
             'paraBirimi': 'TL',
-            'orijinalTutar': tutar,
+            'orijinalTutar': dagitilanTutar,
             'kur': 1.0,
             'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
           });
           giderId = gelirDoc.id;
-
           await FirebaseFirestore.instance
               .collection('teklifler').doc(projectId).collection('gelirler').add({
             'kategori': 'Cari Tahsilat',
             'altKategori': widget.cariAd,
-            'tutar': tutar,
-            'aciklama': 'Taksit #$sira',
+            'tutar': dagitilanTutar,
+            'aciklama': aciklamaTxt,
             'tarih': DateTime.now(),
             'foto': null,
           });
         }
 
-        // Project Finance tablosuna kaydet
         final transactionRef = FirebaseFirestore.instance
             .collection('project_finance').doc(projectId).collection('transactions').doc();
         financeTransactionId = transactionRef.id;
-
         await transactionRef.set({
           'id': transactionRef.id,
           'type': tip == 'borc' ? 'expense' : 'income',
-          'amount': tutar,
+          'amount': dagitilanTutar,
           'category': 'other',
-          'description': 'Taksit #$sira ${tip == "borc" ? "Ödeme" : "Tahsilat"}: ${widget.cariAd}',
+          'description': '$aciklamaTxt: ${widget.cariAd}',
           'date': Timestamp.fromDate(DateTime.now()),
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // Proje finansmanını güncelle
         final financeDoc = await FirebaseFirestore.instance
             .collection('project_finance').doc(projectId).get();
         final currentIncome = ((financeDoc.data()?['totalIncome'] ?? 0) as num).toDouble();
         final currentExpenses = ((financeDoc.data()?['totalExpenses'] ?? 0) as num).toDouble();
-
         if (tip == 'borc') {
           await FirebaseFirestore.instance.collection('project_finance').doc(projectId)
-              .set({'totalExpenses': currentExpenses + tutar}, SetOptions(merge: true));
+              .set({'totalExpenses': currentExpenses + dagitilanTutar}, SetOptions(merge: true));
         } else {
           await FirebaseFirestore.instance.collection('project_finance').doc(projectId)
-              .set({'totalIncome': currentIncome + tutar}, SetOptions(merge: true));
+              .set({'totalIncome': currentIncome + dagitilanTutar}, SetOptions(merge: true));
         }
       }
 
-      // 2. Cari bakiye + hareket
+      // 5) Cari hareket + bakiye
       final cariDoc = await FirebaseFirestore.instance
           .collection('cari_hesaplar').doc(widget.cariId).get();
       final mevcutBakiye = ((cariDoc.data()?['bakiye'] ?? 0) as num).toDouble();
-      final yeniBakiye = tip == 'alacak' ? mevcutBakiye + tutar : mevcutBakiye - tutar;
+      final yeniBakiye = tip == 'alacak' ? mevcutBakiye + dagitilanTutar : mevcutBakiye - dagitilanTutar;
 
-      final hareketAdd = FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection('cari_hesaplar').doc(widget.cariId).collection('hareketler').add({
         'tip': tip,
-        'tutar': tutar,
-        'tutarTL': tutar,
+        'tutar': dagitilanTutar,
+        'tutarTL': dagitilanTutar,
         'paraBirimi': 'TL',
         'kur': 1.0,
-        'aciklama': 'Taksit #$sira${projeAd.isNotEmpty ? " ($projeAd)" : ""}',
+        'aciklama': aciklamaTxt,
         'tarih': DateTime.now(),
         'fotoUrls': photoUrls,
         'giderId': giderId,
@@ -2794,30 +2889,41 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
         'projeId': projectId.isNotEmpty ? projectId : 'manuel',
         'projeAd': projeAd,
         'taksitPlanId': planId,
-        'taksitId': taksitId,
+        'taksitDagilimi': dagilim.map((d) => {
+          'sira': d['sira'],
+          'eklenen': d['eklenen'],
+        }).toList(),
       });
 
-      final bakiyeUpdate = FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection('cari_hesaplar').doc(widget.cariId)
           .update({'bakiye': yeniBakiye});
 
-      await Future.wait([hareketAdd, bakiyeUpdate]);
-
-      // 3. Taksiti ödendi olarak işaretle
-      await FirebaseFirestore.instance
-          .collection('cari_hesaplar').doc(widget.cariId)
-          .collection('taksit_planlari').doc(planId)
-          .collection('taksitler').doc(taksitId)
-          .update({
-        'odendi': true,
-        'odemeTarihi': FieldValue.serverTimestamp(),
-      });
+      // 6) Taksit dokümanlarını güncelle (batch)
+      final batch = FirebaseFirestore.instance.batch();
+      for (final d in dagilim) {
+        final ref = d['docRef'] as DocumentReference;
+        batch.update(ref, {
+          'odenenTutar': d['yeniOdenen'],
+          if (d['tumOdendi'] == true) 'odendi': true,
+          if (d['tumOdendi'] == true) 'odemeTarihi': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
 
       if (mounted) {
+        final mesajParts = <String>[
+          '${formatTL(dagitilanTutar)} ${isTahsilat ? "tahsilat" : "ödeme"} kaydedildi',
+          '${dagilim.length} taksite dağıtıldı',
+        ];
+        if (fazlaTutar > 0.01) {
+          mesajParts.add('${formatTL(fazlaTutar)} dağıtılamadı (taksit kalmadı)');
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Taksit #$sira — ${formatTL(tutar)} ${isTahsilat ? "tahsilat" : "ödeme"} kaydedildi'),
+            content: Text(mesajParts.join(' • ')),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

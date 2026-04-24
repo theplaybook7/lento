@@ -1,6 +1,20 @@
 {
   "indexes": [
     {
+      "collectionGroup": "taksitler",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "odendi",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "vadeTarihi",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "projects",
       "queryScope": "COLLECTION",
       "fields": [

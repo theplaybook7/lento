@@ -154,6 +154,43 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
           pw.SizedBox(height: 12),
           pw.Text('Toplam pasif proje: ${pasifProjeler.length}',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          // Akış diyagramı notları detayı
+          ...pasifProjeler.expand((p) {
+            final notlar = (p['akisNotlari'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            if (notlar.isEmpty) return <pw.Widget>[];
+            return [
+              pw.SizedBox(height: 14),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(6),
+                color: PdfColors.amber50,
+                child: pw.Text(
+                  '${p['projeAd'] ?? ''} - Akış Diyagramı Notları',
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              ...notlar.map((n) {
+                final sira = n['sira'] ?? 0;
+                final madde = n['madde']?.toString() ?? '';
+                final not = n['not']?.toString() ?? '';
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.only(left: 8, bottom: 3),
+                  child: pw.RichText(
+                    text: pw.TextSpan(
+                      style: const pw.TextStyle(fontSize: 10),
+                      children: [
+                        pw.TextSpan(
+                          text: '$sira. $madde: ',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                        pw.TextSpan(text: not),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ];
+          }),
         ],
         footer: (ctx) => pw.Container(
           alignment: pw.Alignment.centerRight,
@@ -310,38 +347,107 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
 
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: renk.withValues(alpha: 0.15),
-                foregroundColor: renk,
-                child: Text('${i + 1}',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              title: Text(projeAd,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(sonIslemStr),
-              trailing: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: renk.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: renk.withValues(alpha: 0.15),
+                    foregroundColor: renk,
+                    child: Text('${i + 1}',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  title: Text(projeAd,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(sonIslemStr),
+                  trailing: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: renk.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text('$gun gün',
+                        style: TextStyle(
+                            color: renk, fontWeight: FontWeight.bold)),
+                  ),
+                  onTap: projeId.isEmpty
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ProjectDetailsScreen(projectId: projeId),
+                            ),
+                          );
+                        },
                 ),
-                child: Text('$gun gün',
-                    style: TextStyle(
-                        color: renk, fontWeight: FontWeight.bold)),
-              ),
-              onTap: projeId.isEmpty
-                  ? null
-                  : () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ProjectDetailsScreen(projectId: projeId),
+                if (p['akisNotlari'] is List && (p['akisNotlari'] as List).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.sticky_note_2_outlined, size: 13, color: Colors.amber.shade800),
+                              const SizedBox(width: 4),
+                              Text('Akış Diyagramı Notları',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber.shade900)),
+                            ],
+                          ),
                         ),
-                      );
-                    },
+                        const SizedBox(height: 6),
+                        ...((p['akisNotlari'] as List).cast<dynamic>().map((n) {
+                          final m = n as Map<String, dynamic>;
+                          final sira = m['sira'] ?? 0;
+                          final madde = m['madde']?.toString() ?? '';
+                          final not = m['not']?.toString() ?? '';
+                          final durum = m['durum'] ?? 0;
+                          Color dot = durum == 2
+                              ? Colors.green
+                              : (durum == 1 ? Colors.orange : Colors.blueGrey);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(top: 5, right: 6),
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+                                ),
+                                Expanded(
+                                  child: RichText(
+                                    text: TextSpan(
+                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                      children: [
+                                        TextSpan(
+                                          text: '$sira. $madde: ',
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                        ),
+                                        TextSpan(text: not),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        })),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           );
         }),

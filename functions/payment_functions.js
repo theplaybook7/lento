@@ -230,10 +230,37 @@ exports.dailyInactivityCheck = functions.pubsub
           const projeId = projeDoc.id;
           const projeAd = projeDoc.data().name || "Proje";
 
-          // Ruhsat islemler koleksiyonundan en son güncelleme tarihini bul
-          let sonIslemTarihi = null;
+          // Akış diyagramı meta ve maddelerini oku
+          const akisColSnap = await db
+            .collection("ruhsat")
+            .doc(projeId)
+            .collection("akis_diyagrami")
+            .get();
 
-          // islemler kontrol (top-level ruhsat koleksiyonu)
+          let meta = null;
+          const akisMaddeler = [];
+          for (const d of akisColSnap.docs) {
+            if (d.id === "_meta") {
+              meta = d.data();
+            } else if (d.id !== "karar_kontrol" && d.id !== "yola_terk_kontrol") {
+              akisMaddeler.push({ id: d.id, data: d.data() });
+            }
+          }
+
+          // Ruhsat süreci başlatılmamışsa rapora dahil etme
+          if (!meta || meta.baslatildi !== true) continue;
+          // Ruhsat tamamlandıysa sayaç durduğu için rapora dahil etme
+          if (meta.ruhsatTamamlandi === true) continue;
+
+          // Son işlem tarihi = meta.sonGuncellemeTarihi ya da baslatmaTarihi
+          let sonIslemTarihi = null;
+          if (meta.sonGuncellemeTarihi && meta.sonGuncellemeTarihi.toDate) {
+            sonIslemTarihi = meta.sonGuncellemeTarihi.toDate();
+          } else if (meta.baslatmaTarihi && meta.baslatmaTarihi.toDate) {
+            sonIslemTarihi = meta.baslatmaTarihi.toDate();
+          }
+
+          // Eski islemler koleksiyonundan da en son tarihi kontrol et (geri uyum)
           const islemlerSnap = await db
             .collection("ruhsat")
             .doc(projeId)
@@ -241,28 +268,11 @@ exports.dailyInactivityCheck = functions.pubsub
             .orderBy("guncellendiTarihi", "desc")
             .limit(1)
             .get();
-
           if (!islemlerSnap.empty) {
             const t = islemlerSnap.docs[0].data().guncellendiTarihi;
-            if (t) sonIslemTarihi = t.toDate();
-          }
-
-          // akis_diyagrami kontrol
-          const akisSnap = await db
-            .collection("ruhsat")
-            .doc(projeId)
-            .collection("akis_diyagrami")
-            .orderBy("guncellendiTarihi", "desc")
-            .limit(1)
-            .get();
-
-          if (!akisSnap.empty) {
-            const t = akisSnap.docs[0].data().guncellendiTarihi;
-            if (t) {
-              const akisTarih = t.toDate();
-              if (!sonIslemTarihi || akisTarih > sonIslemTarihi) {
-                sonIslemTarihi = akisTarih;
-              }
+            if (t && t.toDate) {
+              const it = t.toDate();
+              if (!sonIslemTarihi || it > sonIslemTarihi) sonIslemTarihi = it;
             }
           }
 
@@ -272,11 +282,28 @@ exports.dailyInactivityCheck = functions.pubsub
               (now - sonIslemTarihi) / (1000 * 60 * 60 * 24)
             );
             if (diffDays >= 4) {
+              // Akış diyagramındaki notları topla (sadece boş olmayanlar)
+              const notlar = [];
+              for (const m of akisMaddeler) {
+                const d = m.data || {};
+                const not = (d.not || "").toString().trim();
+                if (not.length > 0) {
+                  notlar.push({
+                    sira: d.sira || 0,
+                    madde: d.madde || "",
+                    not: not,
+                    durum: d.durum || 0,
+                  });
+                }
+              }
+              notlar.sort((a, b) => a.sira - b.sira);
+
               pasifProjeler.push({
                 ad: projeAd,
                 gun: diffDays,
                 id: projeId,
                 sonIslemTarihi: sonIslemTarihi.toISOString(),
+                akisNotlari: notlar,
               });
             }
           }
@@ -312,6 +339,7 @@ exports.dailyInactivityCheck = functions.pubsub
             projeAd: p.ad,
             gun: p.gun,
             sonIslemTarihi: p.sonIslemTarihi,
+            akisNotlari: p.akisNotlari || [],
           })),
           toplamProje: pasifProjeler.length,
         });

@@ -66,6 +66,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   bool _tapuSureciGerekli = false; // Karar Kontrolü Evet/Hayır
   bool _yolaTerkMi = false; // Yola Terk Kontrolü
   bool _yolaTerkKararVerildi = false; // Karar verildi mi?
+  // Yeni sade akış diyagramı meta
+  bool _akisBaslatildi = false;
+  DateTime? _akisBaslatmaTarihi;
+  DateTime? _akisSonGuncelleme;
+  bool _akisRuhsatTamamlandi = false;
+  DateTime? _akisTamamlanmaTarihi;
+  int _akisSecilenSira = 1;
 
   // Proje adı
   String _projeAdi = '';
@@ -106,6 +113,21 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           .get();
       for (var doc in snapshot.docs) {
         final data = doc.data();
+        if (doc.id == '_meta') {
+          if (mounted) {
+            setState(() {
+              _akisBaslatildi = data['baslatildi'] == true;
+              final bt = data['baslatmaTarihi'];
+              if (bt is Timestamp) _akisBaslatmaTarihi = bt.toDate();
+              final sg = data['sonGuncellemeTarihi'];
+              if (sg is Timestamp) _akisSonGuncelleme = sg.toDate();
+              _akisRuhsatTamamlandi = data['ruhsatTamamlandi'] == true;
+              final tt = data['tamamlanmaTarihi'];
+              if (tt is Timestamp) _akisTamamlanmaTarihi = tt.toDate();
+            });
+          }
+          continue;
+        }
         if (doc.id == 'karar_kontrol') {
           if (mounted) setState(() { _tapuSureciGerekli = data['tapuGerekli'] == true; });
           continue;
@@ -131,6 +153,144 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       }
     } catch (e) {
       developer.log('Akış diyagramı yükleme hatası: $e');
+    }
+  }
+
+  // ── Yeni sade akış diyagramı yardımcıları ──
+  Future<void> _akisBaslat() async {
+    final now = DateTime.now();
+    try {
+      await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .collection('akis_diyagrami')
+          .doc('_meta')
+          .set({
+        'baslatildi': true,
+        'baslatmaTarihi': Timestamp.fromDate(now),
+        'sonGuncellemeTarihi': Timestamp.fromDate(now),
+        'ruhsatTamamlandi': false,
+      }, SetOptions(merge: true));
+      if (mounted) {
+        setState(() {
+          _akisBaslatildi = true;
+          _akisBaslatmaTarihi = now;
+          _akisSonGuncelleme = now;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Başlatma hatası: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _akisSonGuncellemeYenile() async {
+    if (_akisRuhsatTamamlandi) return; // tamamlandıysa sayaç durur
+    final now = DateTime.now();
+    try {
+      await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .collection('akis_diyagrami')
+          .doc('_meta')
+          .set({'sonGuncellemeTarihi': Timestamp.fromDate(now)}, SetOptions(merge: true));
+      if (mounted) setState(() => _akisSonGuncelleme = now);
+    } catch (_) {}
+  }
+
+  Future<void> _akisNotKaydetYeni(int sira, String not) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .collection('akis_diyagrami')
+          .doc('madde_$sira')
+          .set({
+        'sira': sira,
+        'not': not,
+        'madde': _akisNodeNames[sira] ?? '',
+        'guncellendiTarihi': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (mounted) {
+        setState(() {
+          if (not.isEmpty) {
+            _akisNotlari.remove(sira);
+          } else {
+            _akisNotlari[sira] = not;
+          }
+        });
+      }
+      await _akisSonGuncellemeYenile();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Not kaydetme hatası: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _akisDurumDegistirYeni(int sira, int yeniDurum) async {
+    try {
+      final isSonMadde = sira == _akisSonMadde;
+      await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .collection('akis_diyagrami')
+          .doc('madde_$sira')
+          .set({
+        'sira': sira,
+        'durum': yeniDurum,
+        'madde': _akisNodeNames[sira] ?? '',
+        'guncellendiTarihi': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (mounted) setState(() => _akisDurumlari[sira] = yeniDurum);
+
+      // Ruhsat Yazımı tamamlandıysa sayaç durur
+      if (isSonMadde && yeniDurum == 2) {
+        final now = DateTime.now();
+        await FirebaseFirestore.instance
+            .collection('ruhsat')
+            .doc(widget.projectId)
+            .collection('akis_diyagrami')
+            .doc('_meta')
+            .set({
+          'ruhsatTamamlandi': true,
+          'tamamlanmaTarihi': Timestamp.fromDate(now),
+        }, SetOptions(merge: true));
+        if (mounted) {
+          setState(() {
+            _akisRuhsatTamamlandi = true;
+            _akisTamamlanmaTarihi = now;
+          });
+        }
+      } else if (isSonMadde && yeniDurum != 2 && _akisRuhsatTamamlandi) {
+        // Tekrar devam ediyora döndüyse tamamlandı bayrağını kaldır
+        await FirebaseFirestore.instance
+            .collection('ruhsat')
+            .doc(widget.projectId)
+            .collection('akis_diyagrami')
+            .doc('_meta')
+            .set({'ruhsatTamamlandi': false, 'tamamlanmaTarihi': null}, SetOptions(merge: true));
+        if (mounted) {
+          setState(() {
+            _akisRuhsatTamamlandi = false;
+            _akisTamamlanmaTarihi = null;
+          });
+        }
+        await _akisSonGuncellemeYenile();
+      } else {
+        await _akisSonGuncellemeYenile();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Durum güncelleme hatası: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -981,22 +1141,20 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   };
 
   static const Map<int, String> _akisNodeNames = {
-    1: 'LİHKAP', 2: 'İmar Durumu', 3: 'İstikamet Memuru',
-    4: 'İstikamet Çizimi', 5: 'Karar Kontrolü', 6: 'Folyo Hazırlanması', 7: 'Etüt Çalışması',
-    8: 'Karot Alımı', 9: 'RBT', 10: 'Kesim Yazıları', 11: 'Muafiyet',
-    12: 'Boş Yazısı', 13: 'Yıkım', 14: 'Zemin Etütü',
-    15: 'Mimari Proje', 16: 'Statik Taslak', 17: 'Statik Proje',
-    18: 'YİBF Girişi', 19: 'Elektrik Proje', 20: 'Mekanik Proje',
-    21: 'Akustik Proje', 22: 'EKB', 23: 'Müellif Evrakları', 24: 'İSKİ',
-    25: 'Eksiklerin Giderilmesi', 26: 'Ruhsat Dilekçesi',
-    27: 'YD Proje Onayı', 28: 'Belediye Proje Onayı', 29: 'Fen İşleri',
-    30: 'Müteahhit Belgeleri', 31: 'Harçlar', 32: 'Otopark',
-    33: 'Teminat Mektubu', 34: 'Numarataj', 35: 'Ruhsat Yazımı',
-    36: 'Ruhsat Teslimi', 37: 'Kat İrtifakı',
-    38: 'Encümen Girişi', 39: 'Encümen Çıkışı', 40: 'Kadastro', 41: 'Tapu İşlemi',
-    45: 'Yola Terk Kontrolü', 42: '2. LİHKAP', 43: '2. İmar Durumu', 44: '2. İstikamet Çizimi',
-    46: 'Zemin Etütü Onayı', 47: 'Noter Evrakları',
+    1: 'Aplikasyon Krokisi',
+    2: 'İmar Durumu',
+    3: 'İstikamet-Kot Kesit',
+    4: 'Folyo',
+    5: 'RBT',
+    6: 'Muafiyet',
+    7: 'Zemin Etüdü',
+    8: 'Mimari',
+    9: 'Statik',
+    10: 'Elektrik',
+    11: 'Mekanik',
+    12: 'Ruhsat Yazımı',
   };
+  static const int _akisSonMadde = 12; // Ruhsat Yazımı
 
   bool _akisDepsComplete(int id) {
     final deps = _akisBagimliliklari[id];
@@ -1013,270 +1171,566 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Widget _buildAkisDiyagramiTab() {
-    final toplam = _tapuSureciGerekli ? (_yolaTerkMi ? 44 : 47) : 39;
+    // Başlatılmamışsa: merkezi Başlat butonu
+    if (!_akisBaslatildi) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Colors.blue.shade400, Colors.blue.shade700],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blue.shade200.withValues(alpha: 0.6),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.rocket_launch_rounded, size: 72, color: Colors.white),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Ruhsat Sürecini Başlat',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Başlat\'a basarak akış diyagramını aktifleştirin.\nGün sayacı bu andan itibaren başlar.',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: 220,
+                child: ElevatedButton.icon(
+                  onPressed: _akisBaslat,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 26),
+                  label: const Text('BAŞLAT', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Sayaç hesapla
+    final now = DateTime.now();
+    final baslatmaGun = _akisBaslatmaTarihi != null
+        ? now.difference(_akisBaslatmaTarihi!).inDays
+        : 0;
+    final sonGuncellemeGun = _akisSonGuncelleme != null
+        ? now.difference(_akisSonGuncelleme!).inDays
+        : baslatmaGun;
+    final sayacDurdu = _akisRuhsatTamamlandi;
+    final sayacGun = sayacDurdu
+        ? (_akisTamamlanmaTarihi != null && _akisBaslatmaTarihi != null
+            ? _akisTamamlanmaTarihi!.difference(_akisBaslatmaTarihi!).inDays
+            : baslatmaGun)
+        : sonGuncellemeGun;
+
     final tamamlanan = _akisDurumlari.values.where((d) => d == 2).length;
-    final devamEden = _akisDurumlari.values.where((d) => d == 1).length;
+    final toplam = _akisNodeNames.length;
     final yuzde = toplam > 0 ? tamamlanan / toplam : 0.0;
+
+    Color sayacRenk;
+    if (sayacDurdu) {
+      sayacRenk = Colors.green;
+    } else if (sayacGun >= 14) {
+      sayacRenk = Colors.red;
+    } else if (sayacGun >= 7) {
+      sayacRenk = Colors.orange;
+    } else if (sayacGun >= 4) {
+      sayacRenk = Colors.amber.shade700;
+    } else {
+      sayacRenk = Colors.blue;
+    }
 
     return Column(
       children: [
-        // ── İlerleme Barı ──
+        // ── Üst durum kartı ──
         Container(
-          margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.white, Colors.blue.shade50.withValues(alpha: 0.3)],
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: sayacDurdu
+                  ? [Colors.green.shade50, Colors.green.shade100]
+                  : [Colors.white, sayacRenk.withValues(alpha: 0.08)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 3))],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: sayacRenk.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             children: [
-              Row(children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text('$tamamlanan/$toplam', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primaryColor)),
-                ),
-                const SizedBox(width: 8),
-                Text('tamamlandı', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                const Spacer(),
-                if (devamEden > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(12)),
-                    child: Text('$devamEden devam ediyor', style: TextStyle(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.w500)),
-                  ),
-              ]),
-              const SizedBox(height: 12),
-              Stack(
+              Row(
                 children: [
-                  Container(height: 8, decoration: BoxDecoration(color: const Color(0xFFE8EAF0), borderRadius: BorderRadius.circular(4))),
-                  FractionallySizedBox(
-                    widthFactor: yuzde,
-                    child: Container(
-                      height: 8,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [Colors.green.shade400, Colors.green.shade600]),
-                        borderRadius: BorderRadius.circular(4),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: sayacRenk.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      sayacDurdu ? Icons.verified_rounded : Icons.timer_outlined,
+                      color: sayacRenk,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sayacDurdu
+                              ? 'Ruhsat Tamamlandı'
+                              : (sayacGun == 0 ? 'Bugün işlem yapıldı' : '$sayacGun gün önce işlem yapıldı'),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: sayacRenk.withValues(alpha: 0.95),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          sayacDurdu
+                              ? 'Sayaç durduruldu — süreç $sayacGun günde tamamlandı'
+                              : 'Başlangıç: ${_tarihBicim(_akisBaslatmaTarihi)} • Toplam $baslatmaGun gün',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$tamamlanan/$toplam',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primaryColor,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                _buildLegendDot(Colors.blueGrey.shade300, 'Başlamadı'),
-                const SizedBox(width: 16),
-                _buildLegendDot(Colors.orange.shade500, 'Devam Ediyor'),
-                const SizedBox(width: 16),
-                _buildLegendDot(Colors.green.shade500, 'Tamamlandı'),
-              ]),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: yuzde,
+                  minHeight: 6,
+                  backgroundColor: Colors.grey.shade200,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    sayacDurdu ? Colors.green : Colors.blue.shade500,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
-        // ── Ağaç Görünümü ──
+
+        // ── Ana içerik: Sol not paneli + sağ adım listesi ──
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            child: Column(
-              children: [
-                _akisNodeStart('BAŞLA', Icons.play_arrow_rounded),
-                _connDownStyled(),
-
-                // ══════ PARALEL DALLAR ══════
-                LayoutBuilder(builder: (ctx, boxConstraints) {
-                  final isMobileLayout = boxConstraints.maxWidth < 500;
-                  Widget lihkapKolu = Container(
-                          margin: isMobileLayout ? const EdgeInsets.only(bottom: 8) : const EdgeInsets.only(right: 3),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.blue.shade100),
-                          ),
-                          child: Column(children: [
-                            _branchLabel('LİHKAP Kolu', Colors.blue, Icons.description),
-                            _akisNode(1, 'LİHKAP'),
-                            _connDownStyled(),
-                            _akisNode(2, 'İmar Durumu'),
-                            _connDownStyled(),
-                            _akisNode(3, 'İstikamet Memuru'),
-                            _connDownStyled(),
-                            _akisNode(4, 'İstikamet Çizimi'),
-                            _connDownStyled(),
-
-                            // ── KARAR KONTROLÜ (Evet / Hayır) ──
-                            _buildKararKontrolNode(),
-
-                            _connDownStyled(),
-                            _akisNode(7, 'Etüt Çalışması'),
-                          ]),
-                        );
-
-                  Widget? tapuKolu = _tapuSureciGerekli ? Container(
-                            margin: isMobileLayout ? const EdgeInsets.only(bottom: 8) : const EdgeInsets.symmetric(horizontal: 3),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.orange.shade200),
-                            ),
-                            child: Column(children: [
-                              _branchLabel('Tapu Kolu', Colors.orange, Icons.account_balance),
-                              _akisNode(6, 'Folyo Hazırlanması'),
-                              _connDownStyled(),
-                              _akisNodeCompact(38, 'Encümen Girişi'),
-                              _connDownStyled(height: 14),
-                              _akisNodeCompact(39, 'Encümen Çıkışı'),
-                              _connDownStyled(height: 14),
-                              _akisNodeCompact(40, 'Kadastro'),
-                              _connDownStyled(height: 14),
-                              _akisNodeCompact(41, 'Tapu İşlemi'),
-                              _buildCompactExpandedPanel([38, 39, 40, 41]),
-                              _connDownStyled(height: 14),
-                              _buildYolaTerkKontrolNode(),
-                              if (!_yolaTerkMi && _yolaTerkKararVerildi) ...[
-                                _connDownStyled(height: 14),
-                                _sectionLabel('2. Süreç', Icons.refresh),
-                                _akisNodeCompact(42, '2. LİHKAP'),
-                                _connDownStyled(height: 14),
-                                _akisNodeCompact(43, '2. İmar Durumu'),
-                                _connDownStyled(height: 14),
-                                _akisNodeCompact(44, '2. İstikamet Çizimi'),
-                                _buildCompactExpandedPanel([42, 43, 44]),
-                              ],
-                            ]),
-                          ) : null;
-
-                  Widget karotKolu = Container(
-                          margin: isMobileLayout ? EdgeInsets.zero : const EdgeInsets.only(left: 3),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.purple.shade50.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.purple.shade100),
-                          ),
-                          child: Column(children: [
-                            _branchLabel('Karot Kolu', Colors.purple, Icons.build_circle),
-                            _akisNode(8, 'Karot Alımı'),
-                            _splitConnStyled(),
-                            Wrap(
-                              alignment: WrapAlignment.center,
-                              spacing: 5, runSpacing: 5,
-                              children: [
-                                _akisNodeCompact(9, 'RBT'),
-                                _akisNodeCompact(10, 'Kesim Yazıları'),
-                                _akisNodeCompact(11, 'Muafiyet'),
-                                _akisNodeCompact(12, 'Boş Yazısı'),
-                                _akisNodeCompact(13, 'Yıkım'),
-                              ],
-                            ),
-                            _buildCompactExpandedPanel([9, 10, 11, 12, 13]),
-                            _mergeConnStyled(),
-                            _akisNode(14, 'Zemin Etütü'),
-                          ]),
-                        );
-
-                  if (isMobileLayout) {
-                    return Column(children: [
-                      lihkapKolu,
-                      if (tapuKolu != null) tapuKolu,
-                      karotKolu,
-                    ]);
-                  }
-                  return IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: lihkapKolu),
-                        if (tapuKolu != null) Expanded(child: tapuKolu),
-                        Expanded(child: karotKolu),
-                      ],
-                    ),
-                  );
-                }),
-
-                // ══════ BİRLEŞME ══════
-                _mergeConnStyled(),
-
-                // ── PROJE AŞAMASI ──
-                _sectionLabel('Proje Aşaması', Icons.architecture),
-                Row(children: [
-                  Expanded(child: _akisNode(15, 'Mimari Proje')),
-                  const SizedBox(width: 6),
-                  Expanded(child: _akisNode(16, 'Statik Taslak')),
-                ]),
-                _connDownStyled(),
-                _akisNode(17, 'Statik Proje'),
-
-                _mergeConnStyled(),
-
-                // ── YAPI DENETİM ──
-                _sectionLabel('Yapı Denetim', Icons.verified_user),
-                _akisNode(18, 'YİBF Girişi'),
-                _splitConnStyled(),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 5, runSpacing: 5,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 720;
+              final notPanel = _buildAkisNotPanel();
+              final adimListesi = _buildAkisAdimListesi();
+              if (isWide) {
+                return Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 5, child: notPanel),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 4, child: adimListesi),
+                    ],
+                  ),
+                );
+              }
+              // Mobilde: üstte not paneli, altında liste
+              return Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
                   children: [
-                    _akisNodeCompact(19, 'Elektrik Proje'),
-                    _akisNodeCompact(20, 'Mekanik Proje'),
-                    _akisNodeCompact(21, 'Akustik Proje'),
-                    _akisNodeCompact(22, 'EKB'),
-                    _akisNodeCompact(23, 'Müellif Evrakları'),
-                    _akisNodeCompact(24, 'İSKİ'),
-                    _akisNodeCompact(46, 'Zemin Etütü Onayı'),
-                    _akisNodeCompact(47, 'Noter Evrakları'),
+                    SizedBox(height: 220, child: notPanel),
+                    const SizedBox(height: 12),
+                    Expanded(child: adimListesi),
                   ],
                 ),
-                _buildCompactExpandedPanel([19, 20, 21, 22, 23, 24, 46, 47]),
-                _mergeConnStyled(),
-                _akisNode(25, 'Eksiklerin Giderilmesi'),
-
-                _connDownStyled(),
-
-                // ── RUHSAT ──
-                _sectionLabel('Ruhsat', Icons.gavel),
-                _akisNode(26, 'Ruhsat Dilekçesi'),
-                _splitConnStyled(),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 5, runSpacing: 5,
-                  children: [
-                    _akisNodeCompact(27, 'YD Proje Onayı'),
-                    _akisNodeCompact(28, 'Belediye Proje Onayı'),
-                    _akisNodeCompact(29, 'Fen İşleri'),
-                    _akisNodeCompact(30, 'Müteahhit Belgeleri'),
-                    _akisNodeCompact(31, 'Harçların Yatırılması'),
-                    _akisNodeCompact(32, 'Otopark'),
-                    _akisNodeCompact(33, 'Teminat Mektubu'),
-                    _akisNodeCompact(34, 'Numarataj'),
-                  ],
-                ),
-                _buildCompactExpandedPanel([27, 28, 29, 30, 31, 32, 33, 34]),
-                _mergeConnStyled(),
-                _akisNode(35, 'Ruhsat Yazımı'),
-                _connDownStyled(),
-
-                // ── KAPANIŞ ──
-                _sectionLabel('Kapanış', Icons.flag),
-                _akisNode(36, 'Ruhsat ve Projelerin Teslimi'),
-                _connDownStyled(),
-                _akisNode(37, 'Kat İrtifakı'),
-                _connDownStyled(),
-                _akisNodeStart('BİTİŞ', Icons.check_rounded),
-                const SizedBox(height: 24),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ],
+    );
+  }
+
+  String _tarihBicim(DateTime? d) {
+    if (d == null) return '-';
+    return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+  }
+
+  Widget _buildAkisNotPanel() {
+    final sira = _akisSecilenSira;
+    final baslik = _akisNodeNames[sira] ?? '';
+    final mevcutNot = _akisNotlari[sira] ?? '';
+    final durum = _akisDurumlari[sira] ?? 0;
+    // Her seçimde controller'ı güncelle (tek seferlik uyum için setState'den ayrı tutuyoruz)
+    if (_akisNotEditController.text != mevcutNot && !_akisNotEditController.selection.isValid) {
+      _akisNotEditController.text = mevcutNot;
+    }
+    Color durumRenk = durum == 2
+        ? Colors.green
+        : (durum == 1 ? Colors.orange : Colors.blueGrey.shade400);
+    String durumText = durum == 2
+        ? 'Tamamlandı'
+        : (durum == 1 ? 'Devam Ediyor' : 'Başlamadı');
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: durumRenk.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$sira',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: durumRenk),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  baslik,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: durumRenk.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  durumText,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: durumRenk),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Durum seçimi
+          Row(
+            children: [
+              _akisDurumButton(0, 'Başlamadı', Colors.blueGrey.shade400, sira, durum),
+              const SizedBox(width: 6),
+              _akisDurumButton(1, 'Devam Ediyor', Colors.orange.shade600, sira, durum),
+              const SizedBox(width: 6),
+              _akisDurumButton(2, 'Tamamlandı', Colors.green.shade600, sira, durum),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text('Notlar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
+          const SizedBox(height: 6),
+          Expanded(
+            child: TextField(
+              controller: _akisNotEditController,
+              maxLines: null,
+              expands: true,
+              textAlignVertical: TextAlignVertical.top,
+              decoration: InputDecoration(
+                hintText: 'Bu adıma ait notları yazın...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.all(10),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () {
+                  _akisNotEditController.text = mevcutNot;
+                  setState(() {});
+                },
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Geri Al', style: TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(width: 6),
+              ElevatedButton.icon(
+                onPressed: () {
+                  _akisNotKaydetYeni(sira, _akisNotEditController.text.trim());
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Not kaydedildi, sayaç sıfırlandı'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
+                  );
+                },
+                icon: const Icon(Icons.save_outlined, size: 16),
+                label: const Text('Kaydet'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _akisDurumButton(int durumDegeri, String label, Color color, int sira, int aktifDurum) {
+    final secili = aktifDurum == durumDegeri;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          _akisDurumDegistirYeni(sira, durumDegeri);
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: secili ? color : color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: secili ? 1 : 0.3)),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: secili ? Colors.white : color,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAkisAdimListesi() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+            child: Row(
+              children: [
+                Icon(Icons.list_alt_rounded, size: 18, color: Colors.grey.shade700),
+                const SizedBox(width: 6),
+                const Text('Adımlar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              itemCount: _akisNodeNames.length,
+              separatorBuilder: (_, __) => Divider(
+                height: 1,
+                indent: 54,
+                color: Colors.grey.shade100,
+              ),
+              itemBuilder: (c, i) {
+                final sira = i + 1;
+                final ad = _akisNodeNames[sira] ?? '';
+                final durum = _akisDurumlari[sira] ?? 0;
+                final not = _akisNotlari[sira] ?? '';
+                final secili = _akisSecilenSira == sira;
+                Color circleColor;
+                IconData? circleIcon;
+                if (durum == 2) {
+                  circleColor = Colors.green;
+                  circleIcon = Icons.check;
+                } else if (durum == 1) {
+                  circleColor = Colors.orange;
+                  circleIcon = null;
+                } else {
+                  circleColor = Colors.blueGrey.shade300;
+                  circleIcon = null;
+                }
+                final isSonMadde = sira == _akisSonMadde;
+                return Material(
+                  color: secili ? Colors.blue.shade50 : Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _akisSecilenSira = sira;
+                        _akisNotEditController.text = _akisNotlari[sira] ?? '';
+                        _akisNotEditController.selection = TextSelection.collapsed(
+                          offset: _akisNotEditController.text.length,
+                        );
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: circleColor,
+                              shape: BoxShape.circle,
+                              boxShadow: secili
+                                  ? [
+                                      BoxShadow(
+                                        color: circleColor.withValues(alpha: 0.45),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: circleIcon != null
+                                ? Icon(circleIcon, size: 16, color: Colors.white)
+                                : Text(
+                                    '$sira',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        ad,
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: secili ? FontWeight.w700 : FontWeight.w500,
+                                          color: durum == 2 ? Colors.grey.shade600 : Colors.black87,
+                                          decoration: durum == 2 ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isSonMadde)
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 6),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.purple.shade50,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Text(
+                                          'SON',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.purple.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                if (not.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    not,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (not.isNotEmpty)
+                            Icon(Icons.sticky_note_2_outlined, size: 14, color: Colors.amber.shade700),
+                          const SizedBox(width: 4),
+                          Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade400),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 

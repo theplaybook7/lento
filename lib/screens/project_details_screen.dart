@@ -1141,57 +1141,24 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   };
 
   static const Map<int, String> _akisNodeNames = {
-    1: 'Aplikasyon Krokisi',
-    2: 'LİHKAP',
-    3: 'İmar Durumu',
-    4: 'İstikamet Memuru',
-    5: 'İstikamet Çizimi',
-    6: 'İstikamet-Kot Kesit',
-    7: 'Karar Kontrolü',
-    8: 'Folyo',
-    9: 'Etüt Çalışması',
-    10: 'Karot Alımı',
-    11: 'RBT',
-    12: 'Kesim Yazıları',
-    13: 'Muafiyet',
-    14: 'Boş Yazısı',
-    15: 'Yıkım',
-    16: 'Zemin Etüdü',
-    17: 'Zemin Etüdü Onayı',
-    18: 'Mimari',
-    19: 'Statik Taslak',
-    20: 'Statik',
-    21: 'YİBF Girişi',
-    22: 'Elektrik',
-    23: 'Mekanik',
-    24: 'Akustik Proje',
-    25: 'EKB',
-    26: 'Müellif Evrakları',
-    27: 'İSKİ',
-    28: 'Eksiklerin Giderilmesi',
-    29: 'Ruhsat Dilekçesi',
-    30: 'YD Proje Onayı',
-    31: 'Belediye Proje Onayı',
-    32: 'Fen İşleri',
-    33: 'Müteahhit Belgeleri',
-    34: 'Harçlar',
-    35: 'Otopark',
-    36: 'Teminat Mektubu',
-    37: 'Numarataj',
-    38: 'Noter Evrakları',
-    39: '2. LİHKAP',
-    40: '2. İmar Durumu',
-    41: '2. İstikamet Çizimi',
-    42: 'Yola Terk Kontrolü',
-    43: 'Ruhsat Yazımı',
-    44: 'Ruhsat Teslimi',
-    45: 'Kat İrtifakı',
-    46: 'Encümen Girişi',
-    47: 'Encümen Çıkışı',
-    48: 'Kadastro',
-    49: 'Tapu İşlemi',
+    1: 'LİHKAP', 2: 'İmar Durumu', 3: 'İstikamet Memuru',
+    4: 'İstikamet Çizimi', 5: 'Karar Kontrolü', 6: 'Folyo Hazırlanması',
+    7: 'Etüt Çalışması',
+    8: 'Karot Alımı', 9: 'RBT', 10: 'Kesim Yazıları', 11: 'Muafiyet',
+    12: 'Boş Yazısı', 13: 'Yıkım', 14: 'Zemin Etütü',
+    15: 'Mimari Proje', 16: 'Statik Taslak', 17: 'Statik Proje',
+    18: 'YİBF Girişi', 19: 'Elektrik Proje', 20: 'Mekanik Proje',
+    21: 'Akustik Proje', 22: 'EKB', 23: 'Müellif Evrakları', 24: 'İSKİ',
+    25: 'Eksiklerin Giderilmesi', 26: 'Ruhsat Dilekçesi',
+    27: 'YD Proje Onayı', 28: 'Belediye Proje Onayı', 29: 'Fen İşleri',
+    30: 'Müteahhit Belgeleri', 31: 'Harçlar', 32: 'Otopark',
+    33: 'Teminat Mektubu', 34: 'Numarataj', 35: 'Ruhsat Yazımı',
+    36: 'Ruhsat Teslimi', 37: 'Kat İrtifakı',
+    38: 'Encümen Girişi', 39: 'Encümen Çıkışı', 40: 'Kadastro', 41: 'Tapu İşlemi',
+    42: '2. LİHKAP', 43: '2. İmar Durumu', 44: '2. İstikamet Çizimi',
+    45: 'Yola Terk Kontrolü', 46: 'Zemin Etütü Onayı', 47: 'Noter Evrakları',
   };
-  static const int _akisSonMadde = 43; // Ruhsat Yazımı (sayaç burada durur)
+  static const int _akisSonMadde = 35; // Ruhsat Yazımı (sayaç burada durur)
 
   bool _akisDepsComplete(int id) {
     final deps = _akisBagimliliklari[id];
@@ -1404,9 +1371,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           child: LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth >= 720;
-              final notPanel = _buildAkisNotPanel();
-              final adimListesi = _buildAkisAdimListesi();
               if (isWide) {
+                final notPanel = _buildAkisNotPanel();
+                final adimListesi = _buildAkisAdimListesi(isMobile: false);
                 return Padding(
                   padding: const EdgeInsets.all(12),
                   child: Row(
@@ -1419,16 +1386,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   ),
                 );
               }
-              // Mobilde: üstte not paneli, altında liste
+              // Mobilde: yalnız liste; bir adıma tıklanınca alt sayfa (bottom sheet) açılır
               return Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    SizedBox(height: 220, child: notPanel),
-                    const SizedBox(height: 12),
-                    Expanded(child: adimListesi),
-                  ],
-                ),
+                padding: const EdgeInsets.all(8),
+                child: _buildAkisAdimListesi(isMobile: true),
               );
             },
           ),
@@ -1440,6 +1401,58 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   String _tarihBicim(DateTime? d) {
     if (d == null) return '-';
     return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+  }
+
+  void _akisNotBottomSheetAc() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocalState) {
+            final viewInsets = MediaQuery.of(ctx).viewInsets.bottom;
+            return Padding(
+              padding: EdgeInsets.only(bottom: viewInsets),
+              child: DraggableScrollableSheet(
+                expand: false,
+                initialChildSize: 0.75,
+                minChildSize: 0.4,
+                maxChildSize: 0.95,
+                builder: (ctx, scrollCtrl) {
+                  return Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(top: 8, bottom: 4),
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade400,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            controller: scrollCtrl,
+                            padding: const EdgeInsets.all(12),
+                            child: _buildAkisNotPanel(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildAkisNotPanel() {
@@ -1558,6 +1571,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Not kaydedildi, sayaç sıfırlandı'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
                   );
+                  if (Navigator.of(context).canPop() &&
+                      ModalRoute.of(context)?.isCurrent != true) {
+                    Navigator.of(context).pop();
+                  }
                 },
                 icon: const Icon(Icons.save_outlined, size: 16),
                 label: const Text('Kaydet'),
@@ -1605,7 +1622,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     );
   }
 
-  Widget _buildAkisAdimListesi() {
+  Widget _buildAkisAdimListesi({bool isMobile = false}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1672,6 +1689,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                           offset: _akisNotEditController.text.length,
                         );
                       });
+                      if (isMobile) {
+                        _akisNotBottomSheetAc();
+                      }
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

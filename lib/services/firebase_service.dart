@@ -28,6 +28,9 @@ class FirebaseService {
     required DateTime startDate,
     DateTime? endDate,
     double totalBudget = 0,
+    required String malSahibi,
+    required String adaParsel,
+    required String muteahhit,
   }) async {
     try {
       final docRef = await _db.collection('projects').add({
@@ -39,6 +42,9 @@ class FirebaseService {
         'status': ProjectStatus.planning.name,
         'currentPhase': 'planning',
         'totalBudget': totalBudget,
+        'malSahibi': malSahibi,
+        'adaParsel': adaParsel,
+        'muteahhit': muteahhit,
         'createdAt': DateTime.now(),
         'isArchived': false,
       });

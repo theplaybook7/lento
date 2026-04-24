@@ -17,6 +17,9 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
   late TextEditingController _nameCtrl;
   late TextEditingController _descCtrl;
   late TextEditingController _budgetCtrl;
+  late TextEditingController _malSahibiCtrl;
+  late TextEditingController _adaParselCtrl;
+  late TextEditingController _muteahhitCtrl;
   DateTime _startDate = DateTime.now();
   DateTime? _endDate;
   bool _isLoading = false;
@@ -27,6 +30,9 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
     _nameCtrl = TextEditingController();
     _descCtrl = TextEditingController();
     _budgetCtrl = TextEditingController();
+    _malSahibiCtrl = TextEditingController();
+    _adaParselCtrl = TextEditingController();
+    _muteahhitCtrl = TextEditingController();
   }
 
   @override
@@ -34,6 +40,9 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _budgetCtrl.dispose();
+    _malSahibiCtrl.dispose();
+    _adaParselCtrl.dispose();
+    _muteahhitCtrl.dispose();
     super.dispose();
   }
 
@@ -70,6 +79,9 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
         startDate: _startDate,
         endDate: _endDate,
         totalBudget: budget,
+        malSahibi: _malSahibiCtrl.text.trim(),
+        adaParsel: _adaParselCtrl.text.trim(),
+        muteahhit: _muteahhitCtrl.text.trim(),
       );
 
       if (!mounted) return;
@@ -123,6 +135,49 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                   fillColor: Colors.white,
                 ),
                 validator: (v) => v?.isEmpty ?? true ? 'Proje adı gerekli' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Mal Sahibi
+              TextFormField(
+                controller: _malSahibiCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Mal Sahibi *',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon: Icon(Icons.person, color: AppTheme.primaryColor),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Mal sahibi gerekli' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Ada Parsel
+              TextFormField(
+                controller: _adaParselCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Ada / Parsel *',
+                  hintText: 'Örn: 1234 / 56',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon: Icon(Icons.grid_on, color: AppTheme.primaryColor),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Ada / parsel gerekli' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Müteahhit
+              TextFormField(
+                controller: _muteahhitCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Müteahhit *',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon: Icon(Icons.engineering, color: AppTheme.primaryColor),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Müteahhit gerekli' : null,
               ),
               const SizedBox(height: 16),
 

@@ -14,7 +14,6 @@ class NewProjectScreen extends StatefulWidget {
 
 class _NewProjectScreenState extends State<NewProjectScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameCtrl;
   late TextEditingController _descCtrl;
   late TextEditingController _budgetCtrl;
   late TextEditingController _malSahibiCtrl;
@@ -27,7 +26,6 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl = TextEditingController();
     _descCtrl = TextEditingController();
     _budgetCtrl = TextEditingController();
     _malSahibiCtrl = TextEditingController();
@@ -37,7 +35,6 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
     _descCtrl.dispose();
     _budgetCtrl.dispose();
     _malSahibiCtrl.dispose();
@@ -74,7 +71,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
 
       final projectId = await firebase.createProject(
         companyId: widget.companyId,
-        name: _nameCtrl.text.trim(),
+        name: '${_malSahibiCtrl.text.trim()} / ${_adaParselCtrl.text.trim()} / ${_muteahhitCtrl.text.trim()}',
         description: _descCtrl.text.trim(),
         startDate: _startDate,
         endDate: _endDate,
@@ -116,28 +113,6 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Proje Adı
-              TextFormField(
-                controller: _nameCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Proje Adı *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
-                  ),
-                  prefixIcon: Icon(Icons.business, color: AppTheme.primaryColor),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-                validator: (v) => v?.isEmpty ?? true ? 'Proje adı gerekli' : null,
-              ),
-              const SizedBox(height: 16),
-
               // Mal Sahibi
               TextFormField(
                 controller: _malSahibiCtrl,

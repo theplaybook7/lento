@@ -1142,23 +1142,18 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
   static const Map<int, String> _akisNodeNames = {
     1: 'LİHKAP', 2: 'İmar Durumu', 3: 'İstikamet Memuru',
-    4: 'İstikamet Çizimi', 5: 'Karar Kontrolü', 6: 'Folyo Hazırlanması',
-    7: 'Etüt Çalışması',
-    8: 'Karot Alımı', 9: 'RBT', 10: 'Kesim Yazıları', 11: 'Muafiyet',
-    12: 'Boş Yazısı', 13: 'Yıkım', 14: 'Zemin Etütü',
-    15: 'Mimari Proje', 16: 'Statik Taslak', 17: 'Statik Proje',
-    18: 'YİBF Girişi', 19: 'Elektrik Proje', 20: 'Mekanik Proje',
-    21: 'Akustik Proje', 22: 'EKB', 23: 'Müellif Evrakları', 24: 'İSKİ',
-    25: 'Eksiklerin Giderilmesi', 26: 'Ruhsat Dilekçesi',
-    27: 'YD Proje Onayı', 28: 'Belediye Proje Onayı', 29: 'Fen İşleri',
-    30: 'Müteahhit Belgeleri', 31: 'Harçlar', 32: 'Otopark',
-    33: 'Teminat Mektubu', 34: 'Numarataj', 35: 'Ruhsat Yazımı',
-    36: 'Ruhsat Teslimi', 37: 'Kat İrtifakı',
-    38: 'Encümen Girişi', 39: 'Encümen Çıkışı', 40: 'Kadastro', 41: 'Tapu İşlemi',
-    42: '2. LİHKAP', 43: '2. İmar Durumu', 44: '2. İstikamet Çizimi',
-    45: 'Yola Terk Kontrolü', 46: 'Zemin Etütü Onayı', 47: 'Noter Evrakları',
+    4: 'İstikamet Çizimi', 5: 'Folyo Hazırlanması', 6: 'Etüt Çalışması',
+    7: 'Karot Alımı', 8: 'RBT', 9: 'Kesim Yazıları', 10: 'Muafiyet',
+    11: 'Boş Yazısı', 12: 'Yıkım', 13: 'Zemin Etütü',
+    14: 'Mimari Proje', 15: 'Statik Taslak', 16: 'Statik Proje',
+    17: 'YİBF Girişi', 18: 'Elektrik Proje', 19: 'Mekanik Proje',
+    20: 'Akustik Proje', 21: 'EKB', 22: 'Müellif Evrakları', 23: 'İSKİ',
+    24: 'Ruhsat Dilekçesi', 25: 'YD Proje Onayı', 26: 'Belediye Proje Onayı',
+    27: 'Fen İşleri', 28: 'Müellif Taahhütnameleri', 29: 'Müteahhit Belgeleri',
+    30: 'Harçlar', 31: 'Otopark', 32: 'Teminat Mektubu', 33: 'Numarataj',
+    34: 'Ruhsat Yazımı',
   };
-  static const int _akisSonMadde = 35; // Ruhsat Yazımı (sayaç burada durur)
+  static const int _akisSonMadde = 34; // Ruhsat Yazımı (sayaç burada durur, liste burada biter)
 
   bool _akisDepsComplete(int id) {
     final deps = _akisBagimliliklari[id];

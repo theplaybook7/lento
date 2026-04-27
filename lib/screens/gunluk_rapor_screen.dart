@@ -269,6 +269,12 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
     final tarihStr = rapor['tarihStr'] ?? '';
     final pasifProjeler =
         (rapor['pasifProjeler'] as List?)?.cast<dynamic>() ?? [];
+    // Güvence: en uzun süredir pasif olan en üstte
+    pasifProjeler.sort((a, b) {
+      final ag = (a is Map && a['gun'] is num) ? (a['gun'] as num).toInt() : 0;
+      final bg = (b is Map && b['gun'] is num) ? (b['gun'] as num).toInt() : 0;
+      return bg.compareTo(ag);
+    });
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -346,108 +352,174 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
           }
 
           return Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: renk.withValues(alpha: 0.15),
-                    foregroundColor: renk,
-                    child: Text('${i + 1}',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                  title: Text(projeAd,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text(sonIslemStr),
-                  trailing: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 10),
+            elevation: 1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: renk.withValues(alpha: 0.3), width: 1),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: projeId.isEmpty
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ProjectDetailsScreen(projectId: projeId),
+                        ),
+                      );
+                    },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ÜST: Büyük gün rozeti + proje adı
+                  Container(
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: renk.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(20),
+                      color: renk.withValues(alpha: 0.08),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                     ),
-                    child: Text('$gun gün',
-                        style: TextStyle(
-                            color: renk, fontWeight: FontWeight.bold)),
-                  ),
-                  onTap: projeId.isEmpty
-                      ? null
-                      : () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ProjectDetailsScreen(projectId: projeId),
-                            ),
-                          );
-                        },
-                ),
-                if (p['akisNotlari'] is List && (p['akisNotlari'] as List).isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          width: 64,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                           decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
-                            borderRadius: BorderRadius.circular(6),
+                            color: renk,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: renk.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          child: Column(
                             children: [
-                              Icon(Icons.sticky_note_2_outlined, size: 13, color: Colors.amber.shade800),
-                              const SizedBox(width: 4),
-                              Text('Akış Diyagramı Notları',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.amber.shade900)),
+                              Text(
+                                '$gun',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  height: 1.0,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'GÜN',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        ...((p['akisNotlari'] as List).cast<dynamic>().map((n) {
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '#${i + 1} • $projeAd',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (sonIslemStr.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  sonIslemStr,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // ALT: Notlar (madde başlığı + not metni)
+                  if (p['akisNotlari'] is List &&
+                      (p['akisNotlari'] as List).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: ((p['akisNotlari'] as List).cast<dynamic>())
+                            .map((n) {
                           final m = n as Map<String, dynamic>;
                           final sira = m['sira'] ?? 0;
                           final madde = m['madde']?.toString() ?? '';
                           final not = m['not']?.toString() ?? '';
                           final durum = m['durum'] ?? 0;
-                          Color dot = durum == 2
+                          final Color dotColor = durum == 2
                               ? Colors.green
                               : (durum == 1 ? Colors.orange : Colors.blueGrey);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade200),
+                            ),
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  margin: const EdgeInsets.only(top: 5, right: 6),
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-                                ),
-                                Expanded(
-                                  child: RichText(
-                                    text: TextSpan(
-                                      style: const TextStyle(fontSize: 12, color: Colors.black87),
-                                      children: [
-                                        TextSpan(
-                                          text: '$sira. $madde: ',
-                                          style: const TextStyle(fontWeight: FontWeight.w600),
-                                        ),
-                                        TextSpan(text: not),
-                                      ],
+                                // Başlık satırı: madde adı + durum noktası
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: dotColor,
+                                        shape: BoxShape.circle,
+                                      ),
                                     ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        '$sira. $madde',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.amber.shade900,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                // Not metni
+                                Text(
+                                  not,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.black87,
+                                    height: 1.35,
                                   ),
                                 ),
                               ],
                             ),
                           );
-                        })),
-                      ],
+                        }).toList(),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           );
         }),

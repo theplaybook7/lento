@@ -1451,7 +1451,9 @@ class _ProjectsTabState extends State<_ProjectsTab> {
   @override
   void initState() {
     super.initState();
-    _pasifBildirimKontrolleri();
+    // Pasif proje bildirimleri artık günlük rapor (07:00 cloud function) ile gönderiliyor.
+    // Uygulama içinden ekstra bildirim atmıyoruz.
+    // _pasifBildirimKontrolleri();
   }
 
   Future<void> _loadAkisCache(List<Project> projects) async {

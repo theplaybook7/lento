@@ -193,17 +193,6 @@ class FirebaseService {
 
   // ============== PROJE AŞAMALARI ==============
 
-  Future<List<ProjectPhase>> _getProjectPhases(String projectId) async {
-    final doc = await _db.collection('project_phases').doc(projectId).get();
-    if (doc.exists) {
-      final phases = doc.data()?['phases'] as List<dynamic>? ?? [];
-      return phases
-          .map((p) => ProjectPhase.fromMap(p as Map<String, dynamic>))
-          .toList();
-    }
-    return [];
-  }
-
   // ============== FİNANSMAN İŞLEMLERİ ==============
 
   /// Finansal işlem ekle

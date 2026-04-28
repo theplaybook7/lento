@@ -4,7 +4,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:developer' as developer;
-import 'firebase_service.dart';
 
 const String _paymentBackgroundTaskName = 'payment_check';
 
@@ -15,7 +14,6 @@ class PaymentNotificationService {
   PaymentNotificationService._internal();
 
   late FlutterLocalNotificationsPlugin _notificationsPlugin;
-  final _firebase = FirebaseService();
 
   Future<void> initialize() async {
     _notificationsPlugin = FlutterLocalNotificationsPlugin();

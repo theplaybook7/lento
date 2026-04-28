@@ -77,6 +77,13 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
     }
   }
 
+  String _bugunDosyaAdi() {
+    final now = DateTime.now();
+    final dd = now.day.toString().padLeft(2, '0');
+    final mm = now.month.toString().padLeft(2, '0');
+    return '$dd.$mm.${now.year}';
+  }
+
   Future<Uint8List> _pdfOlustur() async {
     final pdf = pw.Document();
     final font = await PdfGoogleFonts.notoSansRegular();
@@ -237,7 +244,7 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
               onPressed: () async {
                 await Printing.layoutPdf(
                   onLayout: (format) async => _pdfOlustur(),
-                  name: 'gunluk_rapor_${_rapor?['tarihStr'] ?? ''}.pdf',
+                  name: '${_bugunDosyaAdi()}.pdf',
                 );
               },
             ),
@@ -249,7 +256,7 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
                 final bytes = await _pdfOlustur();
                 await Printing.sharePdf(
                   bytes: bytes,
-                  filename: 'gunluk_rapor_${_rapor?['tarihStr'] ?? ''}.pdf',
+                  filename: '${_bugunDosyaAdi()}.pdf',
                 );
               },
             ),

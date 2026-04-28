@@ -276,36 +276,36 @@ exports.dailyInactivityCheck = functions.pubsub
             }
           }
 
-          if (sonIslemTarihi) {
+          {
             const now = new Date();
-            const diffDays = Math.floor(
-              (now - sonIslemTarihi) / (1000 * 60 * 60 * 24)
-            );
-            if (diffDays >= 2) {
-              // Akış diyagramındaki notları topla (sadece boş olmayanlar)
-              const notlar = [];
-              for (const m of akisMaddeler) {
-                const d = m.data || {};
-                const not = (d.not || "").toString().trim();
-                if (not.length > 0) {
-                  notlar.push({
-                    sira: d.sira || 0,
-                    madde: d.madde || "",
-                    not: not,
-                    durum: d.durum || 0,
-                  });
-                }
+            const diffDays = sonIslemTarihi
+              ? Math.floor((now - sonIslemTarihi) / (1000 * 60 * 60 * 24))
+              : 0;
+            // Akış diyagramındaki notları topla (sadece boş olmayanlar)
+            const notlar = [];
+            for (const m of akisMaddeler) {
+              const d = m.data || {};
+              const not = (d.not || "").toString().trim();
+              if (not.length > 0) {
+                notlar.push({
+                  sira: d.sira || 0,
+                  madde: d.madde || "",
+                  not: not,
+                  durum: d.durum || 0,
+                });
               }
-              notlar.sort((a, b) => a.sira - b.sira);
-
-              pasifProjeler.push({
-                ad: projeAd,
-                gun: diffDays,
-                id: projeId,
-                sonIslemTarihi: sonIslemTarihi.toISOString(),
-                akisNotlari: notlar,
-              });
             }
+            notlar.sort((a, b) => a.sira - b.sira);
+
+            pasifProjeler.push({
+              ad: projeAd,
+              gun: diffDays,
+              id: projeId,
+              sonIslemTarihi: sonIslemTarihi
+                ? sonIslemTarihi.toISOString()
+                : null,
+              akisNotlari: notlar,
+            });
           }
         }
 
@@ -333,7 +333,7 @@ exports.dailyInactivityCheck = functions.pubsub
           tarih: admin.firestore.FieldValue.serverTimestamp(),
           tarihStr: istDateStr,
           tip: "pasif_projeler",
-          baslik: "Günlük Rapor - Pasif Projeler",
+          baslik: "Günlük Rapor",
           pasifProjeler: pasifProjeler.map((p) => ({
             projeId: p.id,
             projeAd: p.ad,
@@ -354,7 +354,7 @@ exports.dailyInactivityCheck = functions.pubsub
             ? `\n…ve ${pasifProjeler.length - 5} proje daha`
             : "";
         const bildirimMesaj =
-          `${istDateStr} tarihli raporda ${pasifProjeler.length} pasif proje var:\n` +
+          `${istDateStr} tarihli günlük raporda ${pasifProjeler.length} proje var:\n` +
           ozetListe +
           daha;
 
@@ -363,7 +363,7 @@ exports.dailyInactivityCheck = functions.pubsub
           .doc(sirketId)
           .collection("bildirimler")
           .add({
-            baslik: `📋 Günlük Rapor - ${pasifProjeler.length} pasif proje`,
+            baslik: `📋 Günlük Rapor - ${pasifProjeler.length} proje`,
             mesaj: bildirimMesaj,
             projeId: "",
             gonderen: "Sistem",
@@ -400,7 +400,7 @@ exports.dailyInactivityCheck = functions.pubsub
         }
 
         // 3) TEK bir FCM Push bildirim gönder (özetleyen)
-        const pushBody = `${pasifProjeler.length} pasif proje — en uzun: ${pasifProjeler[0].ad} (${pasifProjeler[0].gun} gün)`;
+        const pushBody = `${pasifProjeler.length} proje — en uzun: ${pasifProjeler[0].ad} (${pasifProjeler[0].gun} gün)`;
 
         const message = {
           notification: {

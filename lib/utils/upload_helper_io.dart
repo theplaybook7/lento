@@ -13,7 +13,9 @@ Future<void> platformUploadBytes(
   await tempFile.writeAsBytes(bytes, flush: true);
   await ref.putFile(tempFile, metadata);
   // Dosyayı hemen silme — iOS SDK arka planda kullanıyor olabilir
-  Future.delayed(const Duration(seconds: 10), () {
-    tempFile.delete().catchError((_) {});
+  Future.delayed(const Duration(seconds: 10), () async {
+    try {
+      await tempFile.delete();
+    } catch (_) {}
   });
 }

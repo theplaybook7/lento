@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/project_model.dart';
-import '../project_core.dart';
 import 'dart:developer' as developer;
 
 class FirebaseService {

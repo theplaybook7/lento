@@ -88,6 +88,22 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
     final baslik = rapor['baslik'] ?? 'Günlük Rapor';
     final pasifProjeler =
         (rapor['pasifProjeler'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    // Gün sayısına göre azalan sırala (en pasif proje üstte)
+    pasifProjeler.sort((a, b) {
+      final ag = (a['gun'] is num) ? (a['gun'] as num).toInt() : 0;
+      final bg = (b['gun'] is num) ? (b['gun'] as num).toInt() : 0;
+      return bg.compareTo(ag);
+    });
+
+    String _sonIslemStr(dynamic s) {
+      if (s is String && s.isNotEmpty) {
+        try {
+          final dt = DateTime.parse(s);
+          return '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
+        } catch (_) {}
+      }
+      return '-';
+    }
 
     pdf.addPage(
       pw.MultiPage(
@@ -114,81 +130,81 @@ class _GunlukRaporScreenState extends State<GunlukRaporScreen> {
                 'Aşağıdaki projelerde 2 gün veya daha uzun süredir ruhsat/akış diyagramı işlemi yapılmamıştır.',
             style: const pw.TextStyle(fontSize: 11),
           ),
-          pw.SizedBox(height: 8),
-          pw.TableHelper.fromTextArray(
-            headers: ['#', 'Proje Adı', 'Gün', 'Son İşlem'],
-            data: List.generate(pasifProjeler.length, (i) {
-              final p = pasifProjeler[i];
-              String sonStr = '-';
-              final s = p['sonIslemTarihi'];
-              if (s is String && s.isNotEmpty) {
-                try {
-                  final dt = DateTime.parse(s);
-                  sonStr =
-                      '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}';
-                } catch (_) {}
-              }
-              return [
-                '${i + 1}',
-                p['projeAd']?.toString() ?? '',
-                '${p['gun'] ?? ''}',
-                sonStr,
-              ];
-            }),
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-            headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
-            cellAlignment: pw.Alignment.centerLeft,
-            cellAlignments: {
-              0: pw.Alignment.center,
-              2: pw.Alignment.center,
-              3: pw.Alignment.center,
-            },
-            columnWidths: {
-              0: const pw.FixedColumnWidth(30),
-              1: const pw.FlexColumnWidth(3),
-              2: const pw.FixedColumnWidth(50),
-              3: const pw.FixedColumnWidth(80),
-            },
-            cellStyle: const pw.TextStyle(fontSize: 10),
-          ),
-          pw.SizedBox(height: 12),
           pw.Text('Toplam pasif proje: ${pasifProjeler.length}',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          // Akış diyagramı notları detayı
-          ...pasifProjeler.expand((p) {
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+          pw.SizedBox(height: 10),
+          // Her proje: başlık (sıra, ad, gün, son işlem) + notlar
+          ...pasifProjeler.asMap().entries.expand((entry) {
+            final i = entry.key;
+            final p = entry.value;
             final notlar = (p['akisNotlari'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-            if (notlar.isEmpty) return <pw.Widget>[];
+            final projeAd = p['projeAd']?.toString() ?? '';
+            final gun = p['gun'] ?? '';
+            final sonStr = _sonIslemStr(p['sonIslemTarihi']);
             return [
-              pw.SizedBox(height: 14),
+              pw.SizedBox(height: i == 0 ? 0 : 10),
               pw.Container(
-                padding: const pw.EdgeInsets.all(6),
-                color: PdfColors.amber50,
-                child: pw.Text(
-                  '${p['projeAd'] ?? ''} - Akış Diyagramı Notları',
-                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Text(
+                        '${i + 1}. $projeAd',
+                        style: pw.TextStyle(
+                          fontSize: 11,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.white,
+                        ),
+                      ),
+                    ),
+                    pw.SizedBox(width: 8),
+                    pw.Text(
+                      '$gun gün  •  Son: $sonStr',
+                      style: const pw.TextStyle(fontSize: 10, color: PdfColors.white),
+                    ),
+                  ],
                 ),
               ),
-              pw.SizedBox(height: 4),
-              ...notlar.map((n) {
-                final sira = n['sira'] ?? 0;
-                final madde = n['madde']?.toString() ?? '';
-                final not = n['not']?.toString() ?? '';
-                return pw.Padding(
-                  padding: const pw.EdgeInsets.only(left: 8, bottom: 3),
-                  child: pw.RichText(
-                    text: pw.TextSpan(
-                      style: const pw.TextStyle(fontSize: 10),
-                      children: [
-                        pw.TextSpan(
-                          text: '$sira. $madde: ',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.TextSpan(text: not),
-                      ],
-                    ),
+              if (notlar.isEmpty)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.fromLTRB(8, 4, 8, 0),
+                  child: pw.Text(
+                    'Akış diyagramı notu bulunmuyor.',
+                    style: pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColors.grey700,
+                        fontStyle: pw.FontStyle.italic),
                   ),
-                );
-              }),
+                )
+              else
+                pw.Padding(
+                  padding: const pw.EdgeInsets.fromLTRB(8, 4, 8, 0),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: notlar.map((n) {
+                      final sira = n['sira'] ?? 0;
+                      final madde = n['madde']?.toString() ?? '';
+                      final not = n['not']?.toString() ?? '';
+                      return pw.Padding(
+                        padding: const pw.EdgeInsets.only(bottom: 3),
+                        child: pw.RichText(
+                          text: pw.TextSpan(
+                            style: const pw.TextStyle(fontSize: 10),
+                            children: [
+                              pw.TextSpan(
+                                text: '$sira. $madde: ',
+                                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                              ),
+                              pw.TextSpan(text: not),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
             ];
           }),
         ],

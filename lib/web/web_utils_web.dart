@@ -30,25 +30,41 @@ Widget buildWebPreview({
 }
 
 Future<void> downloadFile(String url, String fileName) async {
-  final anchor = html.AnchorElement(href: url)
-    ..setAttribute('download', fileName)
-    ..style.display = 'none';
-
-  html.document.body?.children.add(anchor);
-  anchor.click();
-
-  await Future.delayed(const Duration(milliseconds: 100));
-  html.document.body?.children.remove(anchor);
+  await _fetchAndDownload(url, fileName);
 }
 
 Future<void> downloadImage(String url, {String? fileName}) async {
-  final anchor = html.AnchorElement(href: url)
-    ..setAttribute('download', fileName ?? 'image.jpg')
-    ..style.display = 'none';
+  await _fetchAndDownload(url, fileName ?? 'image.jpg');
+}
 
-  html.document.body?.children.add(anchor);
-  anchor.click();
-
-  await Future.delayed(const Duration(milliseconds: 100));
-  html.document.body?.children.remove(anchor);
+/// Cross-origin (Firebase Storage) URL'leri için: önce fetch ile bytes indir,
+/// sonra blob URL üzerinden download anchor tetikle. Doğrudan `<a download href=...>`
+/// yöntemi cross-origin'de çalışmaz; tarayıcı dosyayı yeni sekmede açar.
+Future<void> _fetchAndDownload(String url, String fileName) async {
+  try {
+    final response = await html.HttpRequest.request(
+      url,
+      responseType: 'blob',
+    );
+    final blob = response.response as html.Blob;
+    final blobUrl = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: blobUrl)
+      ..setAttribute('download', fileName)
+      ..style.display = 'none';
+    html.document.body?.children.add(anchor);
+    anchor.click();
+    await Future.delayed(const Duration(milliseconds: 100));
+    html.document.body?.children.remove(anchor);
+    html.Url.revokeObjectUrl(blobUrl);
+  } catch (_) {
+    // Fallback: doğrudan link (yeni sekmede açabilir)
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', fileName)
+      ..setAttribute('target', '_blank')
+      ..style.display = 'none';
+    html.document.body?.children.add(anchor);
+    anchor.click();
+    await Future.delayed(const Duration(milliseconds: 100));
+    html.document.body?.children.remove(anchor);
+  }
 }

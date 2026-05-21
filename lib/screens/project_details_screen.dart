@@ -2213,7 +2213,25 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         return;
       }
 
-      final fileName = belge['başlık'] ?? 'belge';
+      final baslik = belge['başlık'] ?? 'belge';
+      // Başlıkta uzantı yoksa URL'den (path veya content-type) çıkarmaya çalış
+      String fileName = baslik;
+      if (!RegExp(r'\.[A-Za-z0-9]{1,5}$').hasMatch(baslik)) {
+        final lowerUrl = url.toLowerCase();
+        String ext = '';
+        if (lowerUrl.contains('.pdf')) {
+          ext = '.pdf';
+        } else if (lowerUrl.contains('.png')) {
+          ext = '.png';
+        } else if (lowerUrl.contains('.jpeg')) {
+          ext = '.jpeg';
+        } else if (lowerUrl.contains('.jpg')) {
+          ext = '.jpg';
+        } else if (lowerUrl.contains('.webp')) {
+          ext = '.webp';
+        }
+        fileName = '$baslik$ext';
+      }
       if (kIsWeb) {
         await web_utils.downloadFile(url, fileName);
       } else {

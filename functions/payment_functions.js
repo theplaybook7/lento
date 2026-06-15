@@ -14,6 +14,66 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 const db = admin.firestore();
 
+const APPLE_VERIFY_RECEIPT_PROD_URL = "https://buy.itunes.apple.com/verifyReceipt";
+const APPLE_VERIFY_RECEIPT_SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
+
+function subscriptionTypeFromProductId(productId) {
+  if (
+    productId === "company_enterprise_monthly_subscription" ||
+    productId === "company_yearly_subscription"
+  ) {
+    return "enterprise_monthly";
+  }
+  if (
+    productId === "company_solo_monthly_subscription" ||
+    productId === "company_monthly_subscription"
+  ) {
+    return "solo_monthly";
+  }
+  return null;
+}
+
+function planTierFromSubscriptionType(type) {
+  if (type === "enterprise_monthly") return "enterprise";
+  if (type === "solo_monthly") return "solo";
+  return "free";
+}
+
+function subscriptionEndDateForType(type) {
+  // Is kurali: su anda tum ucretli planlar aylik tahsilata mapleniyor.
+  if (type === "trial") {
+    return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  }
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+}
+
+async function verifyAppleReceipt(receipt) {
+  const requestBody = {
+    "receipt-data": receipt,
+    password: process.env.APPLE_APP_PASSWORD,
+  };
+
+  let response = await fetch(APPLE_VERIFY_RECEIPT_PROD_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
+  });
+
+  let result = await response.json();
+
+  // Sandbox makbuzu production endpointine giderse 21007 doner.
+  if (result && result.status === 21007) {
+    response = await fetch(APPLE_VERIFY_RECEIPT_SANDBOX_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+    result = await response.json();
+  }
+
+  return result;
+}
+
 // ===== İN-APP PURCHASE DOĞRULAMA (İOS/Android) =====
 
 /**
@@ -28,7 +88,7 @@ exports.verifyAppStoreReceipt = functions.https.onCall(async (data, context) => 
     );
   }
 
-  const { receipt } = data;
+  const { receipt, productId, purchaseId } = data;
   if (!receipt) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -37,48 +97,76 @@ exports.verifyAppStoreReceipt = functions.https.onCall(async (data, context) => 
   }
 
   try {
-    // Apple App Store Receipt Doğrulama
-    // https://developer.apple.com/documentation/appstorereceipts/verifying_app_store_receipts
-    
-    const requestBody = {
-      "receipt-data": receipt,
-      password: process.env.APPLE_APP_PASSWORD,
-    };
-
-    const response = await fetch(
-      "https://buy.itunes.apple.com/verifyReceipt", // Production
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      }
-    );
-
-    const result = await response.json();
+    const result = await verifyAppleReceipt(receipt);
 
     if (result.status === 0) {
-      // Başarılı
+      const rawList = Array.isArray(result.latest_receipt_info)
+        ? result.latest_receipt_info
+        : [];
+      if (rawList.length === 0) {
+        throw new Error("Apple receipt icerigi bos.");
+      }
+
+      const normalizedProductId = typeof productId === "string" ? productId : "";
+      const matched = normalizedProductId
+        ? rawList.filter((item) => item.product_id === normalizedProductId)
+        : rawList;
+      if (matched.length === 0) {
+        throw new Error("Receipt icinde beklenen urun bulunamadi.");
+      }
+
+      matched.sort((a, b) => Number(b.purchase_date_ms || 0) - Number(a.purchase_date_ms || 0));
+      const latest = matched[0];
+      const verifiedProductId = latest.product_id;
+      const subscriptionType = subscriptionTypeFromProductId(verifiedProductId);
+      if (!subscriptionType) {
+        throw new Error(`Desteklenmeyen urun kimligi: ${verifiedProductId}`);
+      }
+      const subscriptionEndDate = subscriptionEndDateForType(subscriptionType);
+
       await db.collection("payments").add({
         userId: context.auth.uid,
         type: "ios_app_store",
-        transactionId: result.latest_receipt_info[0].transaction_id,
-        productId: result.latest_receipt_info[0].product_id,
+        transactionId: latest.transaction_id || purchaseId || null,
+        productId: verifiedProductId,
         purchaseDate: new Date(
-          parseInt(result.latest_receipt_info[0].purchase_date_ms)
+          parseInt(latest.purchase_date_ms || Date.now(), 10)
         ),
+        subscriptionType,
+        subscriptionEndDate: admin.firestore.Timestamp.fromDate(subscriptionEndDate),
+        source: "verifyAppStoreReceipt",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         verified: true,
       });
 
-      // Kullanıcıya şirket oluşturma yetkisi ver
-      await db.collection("users").doc(context.auth.uid).update({
+      await db.collection("users").doc(context.auth.uid).set({
         companyCreationPaid: true,
         paidAt: admin.firestore.FieldValue.serverTimestamp(),
-        productId: "create_company_payment",
-        transactionId: result.latest_receipt_info[0].transaction_id,
-      });
+        productId: verifiedProductId,
+        transactionId: latest.transaction_id || purchaseId || null,
+        subscriptionType,
+        subscriptionEndDate: admin.firestore.Timestamp.fromDate(subscriptionEndDate),
+        autoRenew: true,
+        lastPurchaseStatus: "verified",
+      }, { merge: true });
 
-      return { success: true, message: "✅ Ödeme doğrulandı!" };
+      const userDoc = await db.collection("users").doc(context.auth.uid).get();
+      const sirketId = userDoc.data()?.sirketId;
+      if (typeof sirketId === "string" && sirketId.length > 0) {
+        await db.collection("sirketler").doc(sirketId).set({
+          subscriptionType,
+          subscriptionEndDate: admin.firestore.Timestamp.fromDate(subscriptionEndDate),
+          autoRenew: true,
+          planTier: planTierFromSubscriptionType(subscriptionType),
+        }, { merge: true });
+      }
+
+      return {
+        success: true,
+        message: "Odeme dogrulandi.",
+        subscriptionType,
+        subscriptionEndDate: subscriptionEndDate.toISOString(),
+      };
     } else {
       throw new Error("Apple receipt doğrulaması başarısız: " + result.status);
     }
@@ -197,12 +285,157 @@ exports.checkPaymentStatus = functions.https.onCall(async (data, context) => {
   }
 });
 
-// ===== PROJE PASİFLİK BİLDİRİMLERİ (Günlük) =====
+/**
+ * Guvenli ucretsiz deneme aktivasyonu
+ */
+exports.activateFreeTrial = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Kullanıcı girişi gerekli"
+    );
+  }
+
+  const userRef = db.collection("users").doc(context.auth.uid);
+  const userDoc = await userRef.get();
+  const userData = userDoc.data() || {};
+
+  if (userData.trialUsed === true) {
+    throw new functions.https.HttpsError(
+      "failed-precondition",
+      "Ucretsiz deneme daha once kullanilmis."
+    );
+  }
+
+  const endDate = subscriptionEndDateForType("trial");
+
+  await userRef.set({
+    companyCreationPaid: true,
+    paidAt: admin.firestore.FieldValue.serverTimestamp(),
+    subscriptionType: "trial",
+    subscriptionEndDate: admin.firestore.Timestamp.fromDate(endDate),
+    autoRenew: false,
+    trialUsed: true,
+    trialStartDate: admin.firestore.FieldValue.serverTimestamp(),
+    lastPurchaseStatus: "trial",
+  }, { merge: true });
+
+  const sirketId = userData.sirketId;
+  if (typeof sirketId === "string" && sirketId.length > 0) {
+    await db.collection("sirketler").doc(sirketId).set({
+      subscriptionType: "trial",
+      subscriptionEndDate: admin.firestore.Timestamp.fromDate(endDate),
+      autoRenew: false,
+      planTier: "free",
+    }, { merge: true });
+  }
+
+  return {
+    success: true,
+    subscriptionType: "trial",
+    subscriptionEndDate: endDate.toISOString(),
+  };
+});
 
 /**
- * Her gün sabah 09:00'da (Türkiye saati) çalışır.
- * 4+ gün işlem yapılmamış projeleri bulur ve FCM push bildirim gönderir.
+ * Legacy abonelikleri yeni aylik plan tiplerine donusturur.
+ * - monthly => solo_monthly
+ * - yearly => enterprise_monthly
+ * 15 dakikada bir calisir; idempotent tasarlanmistir.
  */
+exports.migrateLegacyPlansToEnterprise = functions.pubsub
+  .schedule("every 15 minutes")
+  .timeZone("Europe/Istanbul")
+  .onRun(async () => {
+    try {
+      const now = new Date();
+      const snap = await db
+        .collection("sirketler")
+        .where("subscriptionType", "in", ["monthly", "yearly"])
+        .get();
+
+      if (snap.empty) {
+        console.log("migrateLegacyPlansToEnterprise: uygun sirket bulunamadi");
+        return null;
+      }
+
+      let updated = 0;
+      let skippedExpired = 0;
+      let skippedAlready = 0;
+      let batch = db.batch();
+      let opCount = 0;
+
+      for (const doc of snap.docs) {
+        const data = doc.data() || {};
+        const endTs = data.subscriptionEndDate;
+        const endDate = endTs && typeof endTs.toDate === "function" ? endTs.toDate() : null;
+
+        if (!endDate || endDate <= now) {
+          skippedExpired += 1;
+          continue;
+        }
+
+        const legacyType = data.subscriptionType;
+        const normalizedType = subscriptionTypeFromProductId(
+          legacyType === "yearly"
+            ? "company_yearly_subscription"
+            : legacyType === "monthly"
+              ? "company_monthly_subscription"
+              : ""
+        );
+
+        if (!normalizedType) {
+          continue;
+        }
+
+        const targetPlanTier = planTierFromSubscriptionType(normalizedType);
+
+        if (
+          data.planTier === targetPlanTier &&
+          data.subscriptionType === normalizedType
+        ) {
+          skippedAlready += 1;
+          continue;
+        }
+
+        batch.set(
+          db.collection("sirketler").doc(doc.id),
+          {
+            subscriptionType: normalizedType,
+            planTier: targetPlanTier,
+            migrationLegacyPlanAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+        opCount += 1;
+        updated += 1;
+
+        if (opCount >= 450) {
+          await batch.commit();
+          batch = db.batch();
+          opCount = 0;
+        }
+      }
+
+      if (opCount > 0) {
+        await batch.commit();
+      }
+
+      console.log(
+        `migrateLegacyPlansToEnterprise: updated=${updated}, skippedExpired=${skippedExpired}, skippedAlready=${skippedAlready}`
+      );
+      return null;
+    } catch (error) {
+      console.error("migrateLegacyPlansToEnterprise hatasi:", error);
+      return null;
+    }
+  });
+
+// ===== PROJE PASİFLİK BİLDİRİMLERİ (Günlük) =====
+
+// dailyInactivityCheck kaldırıldı — günlük rapor bildirimleri devre dışı.
+// Eski fonksiyon her gün 07:00'da çalışıp bildirim gönderiyordu; artık aktif değil.
+/*  KALDIRILDI:
 exports.dailyInactivityCheck = functions.pubsub
   .schedule("every day 07:00")
   .timeZone("Europe/Istanbul")
@@ -465,6 +698,7 @@ exports.dailyInactivityCheck = functions.pubsub
       return null;
     }
   });
+*/ // KALDIRILDI SONU
 
 // ===== GÖREV ATAMA FCM PUSH =====
 Object.assign(module.exports, require('./gorev_functions'));

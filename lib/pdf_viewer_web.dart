@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 import 'dart:developer' as developer;
-import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import 'package:web/web.dart' as web;
 import 'utils/error_handler.dart';
 
 class PdfViewerWeb extends StatefulWidget {
@@ -34,14 +34,14 @@ class _PdfViewerWebState extends State<PdfViewerWeb> {
 
   void _createPdfBlob() {
     try {
-      final blob = html.Blob([widget.pdfBytes], 'application/pdf');
-      _iframeUrl = html.Url.createObjectUrlFromBlob(blob);
+      final base64 = Uri.dataFromBytes(widget.pdfBytes, mimeType: 'application/pdf').toString();
+      _iframeUrl = base64;
       
       // Register iframe view with unique name each time
       ui_web.platformViewRegistry.registerViewFactory(
         _viewType,
         (int viewId) {
-          final iframe = html.IFrameElement()
+          final iframe = web.HTMLIFrameElement()
             ..src = _iframeUrl!
             ..style.border = 'none'
             ..style.width = '100%'
@@ -58,9 +58,7 @@ class _PdfViewerWebState extends State<PdfViewerWeb> {
 
   @override
   void dispose() {
-    if (_iframeUrl != null) {
-      html.Url.revokeObjectUrl(_iframeUrl!);
-    }
+    _iframeUrl = null;
     super.dispose();
   }
 

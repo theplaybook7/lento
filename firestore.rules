@@ -18,6 +18,10 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId;
     }
 
+    function userEmail() {
+      return request.auth.token.email;
+    }
+
     // Kullanıcının sirketId'si var mı kontrol et
     // exists() kontrolü ile yeni kayıt olan kullanıcıların doc'u yoksa hata vermesini engeller
     function hasUserSirketId() {
@@ -27,16 +31,72 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.sirketId != '';
     }
 
+    function protectedUserFields() {
+      return [
+        'companyCreationPaid',
+        'paidAt',
+        'productId',
+        'transactionId',
+        'subscriptionType',
+        'subscriptionEndDate',
+        'autoRenew',
+        'trialUsed',
+        'trialStartDate',
+        'lastPurchaseStatus'
+      ];
+    }
+
+    function canReadProject(projectId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/projects/$(projectId))
+        && (
+        (
+          hasUserSirketId()
+          && (
+            get(/databases/$(database)/documents/projects/$(projectId)).data.companyId == userSirketId()
+            || (
+              'sirketId' in get(/databases/$(database)/documents/projects/$(projectId)).data
+              && get(/databases/$(database)/documents/projects/$(projectId)).data.sirketId == userSirketId()
+            )
+          )
+        )
+        || (
+          'paylasilanEmailler' in get(/databases/$(database)/documents/projects/$(projectId)).data
+          && userEmail() in get(/databases/$(database)/documents/projects/$(projectId)).data.paylasilanEmailler
+        )
+      );
+    }
+
+    function canWriteProject(projectId) {
+      return isAuthenticated()
+        && hasUserSirketId()
+        && exists(/databases/$(database)/documents/projects/$(projectId))
+        && (
+          get(/databases/$(database)/documents/projects/$(projectId)).data.companyId == userSirketId()
+          || (
+            'sirketId' in get(/databases/$(database)/documents/projects/$(projectId)).data
+            && get(/databases/$(database)/documents/projects/$(projectId)).data.sirketId == userSirketId()
+          )
+        );
+    }
+
     // Users koleksiyonu
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId);
-      allow write: if isAuthenticated() && (request.auth.uid == userId);
+      allow create: if isAuthenticated()
+        && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(protectedUserFields());
+      allow update: if isAuthenticated()
+        && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).changedKeys().hasAny(protectedUserFields());
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
     }
 
     // Payments koleksiyonu
     match /payments/{paymentId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow write: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
     }
 
     // Şirketler koleksiyonu
@@ -67,23 +127,44 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
 
       match /hareketler/{hareketId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isAuthenticated()
+          && hasUserSirketId()
+          && get(/databases/$(database)/documents/cari_hesaplar/$(cariId)).data.sirketId == userSirketId();
       }
 
       match /taksit_planlari/{planId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isAuthenticated()
+          && hasUserSirketId()
+          && get(/databases/$(database)/documents/cari_hesaplar/$(cariId)).data.sirketId == userSirketId();
 
         match /taksitler/{taksitId} {
-          allow read, write: if isAuthenticated();
+          allow read, write: if isAuthenticated()
+            && hasUserSirketId()
+            && get(/databases/$(database)/documents/cari_hesaplar/$(cariId)).data.sirketId == userSirketId();
         }
       }
     }
 
     // Projeler koleksiyonu
     match /projects/{projectId} {
-      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.companyId == userSirketId();
-      allow create: if isAuthenticated() && hasUserSirketId() && request.resource.data.companyId == userSirketId();
-      allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.companyId == userSirketId();
+      allow read: if isAuthenticated() && (
+        (
+          hasUserSirketId()
+          && (
+            resource.data.companyId == userSirketId()
+            || ('sirketId' in resource.data && resource.data.sirketId == userSirketId())
+          )
+        )
+        || ('paylasilanEmailler' in resource.data && request.auth.token.email in resource.data.paylasilanEmailler)
+      );
+      allow create: if isAuthenticated() && hasUserSirketId() && (
+        request.resource.data.companyId == userSirketId()
+        || ('sirketId' in request.resource.data && request.resource.data.sirketId == userSirketId())
+      );
+      allow update, delete: if isAuthenticated() && hasUserSirketId() && (
+        resource.data.companyId == userSirketId()
+        || ('sirketId' in resource.data && resource.data.sirketId == userSirketId())
+      );
 
       match /phases/{phaseId} {
         allow read, write: if hasUserSirketId() && get(/databases/$(database)/documents/projects/$(projectId)).data.companyId == userSirketId();
@@ -96,16 +177,19 @@ service cloud.firestore {
 
     // Proje Finansmanı
     match /project_finance/{projectId} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadProject(projectId);
+      allow write: if canWriteProject(projectId);
 
       match /transactions/{transactionId} {
-        allow read, write: if isAuthenticated();
+        allow read: if canReadProject(projectId);
+        allow write: if canWriteProject(projectId);
       }
     }
 
     // Proje Aşamaları
     match /project_phases/{projectId} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadProject(projectId);
+      allow write: if canWriteProject(projectId);
     }
 
     // Şirket Finansmanı
@@ -116,39 +200,56 @@ service cloud.firestore {
 
     // Teklifler
     match /teklifler/{teklifId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated();
+      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
+      allow create: if isAuthenticated() && hasUserSirketId() && request.resource.data.sirketId == userSirketId();
+      allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
 
       match /gelirler/{gelirId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isAuthenticated()
+          && hasUserSirketId()
+          && get(/databases/$(database)/documents/teklifler/$(teklifId)).data.sirketId == userSirketId();
       }
       match /giderler/{giderId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isAuthenticated()
+          && hasUserSirketId()
+          && get(/databases/$(database)/documents/teklifler/$(teklifId)).data.sirketId == userSirketId();
       }
       match /odemeler/{odemeId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isAuthenticated()
+          && hasUserSirketId()
+          && get(/databases/$(database)/documents/teklifler/$(teklifId)).data.sirketId == userSirketId();
       }
     }
 
     // Teklif Arşivi
     match /teklif_arsivi/{arsivId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
+      allow create: if isAuthenticated() && hasUserSirketId() && request.resource.data.sirketId == userSirketId();
+      allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
     }
 
     // Giderler (global)
     match /giderler/{giderId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
+      allow create: if isAuthenticated() && hasUserSirketId() && request.resource.data.sirketId == userSirketId();
+      allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
     }
 
     // Gelirler (global)
     match /gelirler/{gelirId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
+      allow create: if isAuthenticated() && hasUserSirketId() && request.resource.data.sirketId == userSirketId();
+      allow update, delete: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
     }
 
     // Audit Log
     match /auditLog/{logId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && hasUserSirketId() && resource.data.sirketId == userSirketId();
+      allow create: if isAuthenticated()
+        && hasUserSirketId()
+        && request.resource.data.sirketId == userSirketId()
+        && request.resource.data.email == userEmail();
+      allow update, delete: if false;
     }
 
     // Görevler (task assignment)
@@ -166,42 +267,49 @@ service cloud.firestore {
 
     // Ödeme Planları
     match /payment_plans/{planId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if false;
     }
 
     // Taksitler
     match /payment_installments/{installmentId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if false;
 
       match /payment_records/{recordId} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if false;
       }
     }
 
     // Ruhsat Dosyaları
     match /ruhsat/{projectId} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadProject(projectId);
+      allow write: if canWriteProject(projectId);
 
       match /islemler/{islemId} {
-        allow read, write: if isAuthenticated();
+        allow read: if canReadProject(projectId);
+        allow write: if canWriteProject(projectId);
       }
       match /akis_diyagrami/{docId} {
-        allow read, write: if isAuthenticated();
+        allow read: if canReadProject(projectId);
+        allow write: if canWriteProject(projectId);
       }
       match /belgeler/{belgeId} {
-        allow read, write: if isAuthenticated();
+        allow read: if canReadProject(projectId);
+        allow write: if canWriteProject(projectId);
       }
     }
 
     // Şantiye Dosyaları
     match /santiye/{projectId} {
-      allow read, write: if isAuthenticated();
+      allow read: if canReadProject(projectId);
+      allow write: if canWriteProject(projectId);
 
       match /islemler/{islemId} {
-        allow read, write: if isAuthenticated();
+        allow read: if canReadProject(projectId);
+        allow write: if canWriteProject(projectId);
       }
       match /fotograflar/{fotoId} {
-        allow read, write: if isAuthenticated();
+        allow read: if canReadProject(projectId);
+        allow write: if canWriteProject(projectId);
       }
     }
 

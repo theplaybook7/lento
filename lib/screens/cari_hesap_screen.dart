@@ -13,7 +13,9 @@ import '../utils/image_utils.dart';
 import '../utils/upload_helper.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
-import '../project_core.dart' show SistemYoneticisi;
+import '../project_core.dart' show SistemYoneticisi, PlanTier, SirketPlanExt, planTierFromRaw, planLimitleriFor;
+import '../payment_service.dart';
+import 'paywall_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../web/web_utils.dart' as web_utils;
 import '../utils/responsive_utils.dart' as resp;
@@ -28,6 +30,42 @@ class CariHesapScreen extends StatefulWidget {
 class _CariHesapScreenState extends State<CariHesapScreen> {
   String _filtre = 'tum';
   String _arama = '';
+
+  bool _isPlanLimitError(String message) {
+    final m = message.toLowerCase();
+    return m.contains('ucretsiz planda') ||
+        m.contains('planinizi yukseltin') ||
+        m.contains('yukseltme yaparak');
+  }
+
+  bool _canOfferUpgrade() {
+    final activePlan = SistemYoneticisi().aktifSirket?.aktifPlan ?? PlanTier.free;
+    return PaymentService().isPaymentSupported && activePlan != PlanTier.enterprise;
+  }
+
+  void _showErrorWithUpgradeOption(String message, BuildContext ctx) {
+    final showUpgrade = _isPlanLimitError(message) && _canOfferUpgrade();
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        action: showUpgrade
+            ? SnackBarAction(
+                label: 'Aboneligi Yukselt',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PaywallScreen(mode: PaywallMode.subscription),
+                    ),
+                  );
+                },
+              )
+            : null,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -370,24 +408,56 @@ class _CariHesapScreenState extends State<CariHesapScreen> {
                   return;
                 }
 
-                await FirebaseFirestore.instance.collection('cari_hesaplar').add({
-                  'ad': adCtrl.text.trim(),
-                  'tip': tip,
-                  'telefon': telefonCtrl.text.trim(),
-                  'email': emailCtrl.text.trim(),
-                  'adres': adresCtrl.text.trim(),
-                  'bakiye': 0.0,
-                  'projectId': '',
-                  'projectIds': <String>[],
-                  'olusturmaTarihi': FieldValue.serverTimestamp(),
-                  'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
-                });
+                try {
+                  final sirketId = SistemYoneticisi().aktifSirket?.id ?? '';
+                  if (sirketId.isEmpty) {
+                    throw Exception('Sirket bilgisi bulunamadi. Lutfen tekrar giris yapin.');
+                  }
 
-                if (context.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Cari hesap oluşturuldu')),
+                  final sirket = SistemYoneticisi().aktifSirket;
+                  final tier = planTierFromRaw(
+                    sirket?.planTier,
+                    subscriptionType: sirket?.subscriptionType,
+                    subscriptionEndDate: sirket?.subscriptionEndDate,
                   );
+                  final limitler = planLimitleriFor(tier);
+                  if (limitler.maxCariSayisi != null) {
+                    final countResult = await FirebaseFirestore.instance
+                        .collection('cari_hesaplar')
+                        .where('sirketId', isEqualTo: sirketId)
+                        .count()
+                        .get();
+                    final toplamCari = countResult.count ?? 0;
+                    if (toplamCari >= limitler.maxCariSayisi!) {
+                      throw Exception(
+                        'Ucretsiz planda en fazla ${limitler.maxCariSayisi} cari hesap olusturabilirsiniz. Daha fazla cari icin planinizi yukseltin.',
+                      );
+                    }
+                  }
+
+                  await FirebaseFirestore.instance.collection('cari_hesaplar').add({
+                    'ad': adCtrl.text.trim(),
+                    'tip': tip,
+                    'telefon': telefonCtrl.text.trim(),
+                    'email': emailCtrl.text.trim(),
+                    'adres': adresCtrl.text.trim(),
+                    'bakiye': 0.0,
+                    'projectId': '',
+                    'projectIds': <String>[],
+                    'olusturmaTarihi': FieldValue.serverTimestamp(),
+                    'sirketId': sirketId,
+                  });
+
+                  if (context.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cari hesap oluşturuldu')),
+                    );
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    _showErrorWithUpgradeOption(hataCevir(e), ctx);
+                  }
                 }
               },
               child: const Text('Kaydet'),

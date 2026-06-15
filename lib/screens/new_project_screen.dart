@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/firebase_service.dart';
+import '../payment_service.dart';
 import '../project_core.dart';
+import 'paywall_screen.dart';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
 
@@ -22,6 +24,18 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
   DateTime _startDate = DateTime.now();
   DateTime? _endDate;
   bool _isLoading = false;
+
+  bool _isPlanLimitError(String message) {
+    final m = message.toLowerCase();
+    return m.contains('ucretsiz planda') ||
+        m.contains('planinizi yukseltin') ||
+        m.contains('yukseltme yaparak');
+  }
+
+  bool _canOfferUpgrade() {
+    final activePlan = SistemYoneticisi().aktifSirket?.aktifPlan ?? PlanTier.free;
+    return PaymentService().isPaymentSupported && activePlan != PlanTier.enterprise;
+  }
 
   @override
   void initState() {
@@ -88,8 +102,27 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      final mesaj = hataCevir(e);
+      final showUpgrade = _isPlanLimitError(mesaj) && _canOfferUpgrade();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(mesaj),
+          backgroundColor: Colors.red,
+          action: showUpgrade
+              ? SnackBarAction(
+                  label: 'Aboneligi Yukselt',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PaywallScreen(mode: PaywallMode.subscription),
+                      ),
+                    );
+                  },
+                )
+              : null,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

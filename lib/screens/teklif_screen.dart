@@ -200,6 +200,31 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
     );
   }
 
+  Widget _responsivePair(
+    BuildContext context,
+    Widget left,
+    Widget right,
+  ) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    if (isMobile) {
+      return Column(
+        children: [
+          left,
+          const SizedBox(height: 10),
+          right,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 10),
+        Expanded(child: right),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final editMod = widget.mevcutDocId != null;
@@ -224,25 +249,53 @@ class _TeklifSayfasiState extends State<TeklifSayfasi> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _bolumBaslik('Proje Konumu'),
-            Row(children: [Expanded(child: _input(ilceCtrl, 'İlçe')), const SizedBox(width: 10), Expanded(child: _input(mahalleCtrl, 'Mahalle'))]),
+            _responsivePair(
+              context,
+              _input(ilceCtrl, 'İlçe'),
+              _input(mahalleCtrl, 'Mahalle'),
+            ),
             const SizedBox(height: 10),
-            Row(children: [Expanded(child: _input(adaCtrl, 'Ada')), const SizedBox(width: 10), Expanded(child: _input(parselCtrl, 'Parsel'))]),
+            _responsivePair(
+              context,
+              _input(adaCtrl, 'Ada'),
+              _input(parselCtrl, 'Parsel'),
+            ),
             const SizedBox(height: 20),
             _bolumBaslik('Mevcut Bina (Hak sınırları için)'),
-            Row(children: [Expanded(child: _input(eskiDaireSayisiCtrl, 'Eski Daire Sayısı', isNumber: true)), const SizedBox(width: 10), Expanded(child: _input(eskiDukkanSayisiCtrl, 'Eski Dükkan Sayısı', isNumber: true))]),
+            _responsivePair(
+              context,
+              _input(eskiDaireSayisiCtrl, 'Eski Daire Sayısı', isNumber: true),
+              _input(eskiDukkanSayisiCtrl, 'Eski Dükkan Sayısı', isNumber: true),
+            ),
             const SizedBox(height: 20),
             _bolumBaslik('Maliyetler (m2 birim)'),
-            Row(children: [Expanded(child: _input(daireMaliyetCtrl, 'Daire m2 Fiyatı', isNumber: true)), const SizedBox(width: 10), Expanded(child: _input(dukkanMaliyetCtrl, 'Dükkan m2 Fiyatı', isNumber: true))]),
+            _responsivePair(
+              context,
+              _input(daireMaliyetCtrl, 'Daire m2 Fiyatı', isNumber: true),
+              _input(dukkanMaliyetCtrl, 'Dükkan m2 Fiyatı', isNumber: true),
+            ),
             const SizedBox(height: 10),
             _input(ortakAlanMaliyetCtrl, 'Ortak Alan m2 Fiyatı', isNumber: true),
             const SizedBox(height: 20),
             _bolumBaslik('Hak Limitleri (Hibe/Kredi)'),
-            Row(children: [Expanded(child: _input(daireHibeLimitCtrl, 'Daire Hibe', isNumber: true)), const SizedBox(width: 10), Expanded(child: _input(daireKrediLimitCtrl, 'Daire Kredi', isNumber: true))]),
+            _responsivePair(
+              context,
+              _input(daireHibeLimitCtrl, 'Daire Hibe', isNumber: true),
+              _input(daireKrediLimitCtrl, 'Daire Kredi', isNumber: true),
+            ),
             const SizedBox(height: 10),
-            Row(children: [Expanded(child: _input(dukkanHibeLimitCtrl, 'Dükkan Hibe', isNumber: true)), const SizedBox(width: 10), Expanded(child: _input(dukkanKrediLimitCtrl, 'Dükkan Kredi', isNumber: true))]),
+            _responsivePair(
+              context,
+              _input(dukkanHibeLimitCtrl, 'Dükkan Hibe', isNumber: true),
+              _input(dukkanKrediLimitCtrl, 'Dükkan Kredi', isNumber: true),
+            ),
             const SizedBox(height: 20),
             _bolumBaslik('Proje Yapısı'),
-            Row(children: [Expanded(child: _input(bodrumKatSayisiCtrl, 'Bodrum Kat Sayısı', isNumber: true)), const SizedBox(width: 10), Expanded(child: _input(normalKatSayisiCtrl, 'Zemin Dahil Kat', isNumber: true))]),
+            _responsivePair(
+              context,
+              _input(bodrumKatSayisiCtrl, 'Bodrum Kat Sayısı', isNumber: true),
+              _input(normalKatSayisiCtrl, 'Zemin Dahil Kat', isNumber: true),
+            ),
             const SizedBox(height: 30),
             if (editMod) ...[
               SizedBox(
@@ -380,6 +433,27 @@ class TeklifDetaySayfasi extends StatefulWidget {
   State<TeklifDetaySayfasi> createState() => _TeklifDetaySayfasiState();
 }
 
+class _SiginakDurumu {
+  final int konutSayisi;
+  final double toplamTicariM2;
+  final double mevcutSiginakM2;
+  final bool siginakSart;
+  final double gerekenSiginakM2;
+  final double sabitEkM2;
+
+  const _SiginakDurumu({
+    required this.konutSayisi,
+    required this.toplamTicariM2,
+    required this.mevcutSiginakM2,
+    required this.siginakSart,
+    required this.gerekenSiginakM2,
+    required this.sabitEkM2,
+  });
+
+  bool get yeterliMi => !siginakSart || mevcutSiginakM2 >= gerekenSiginakM2;
+  double get farkM2 => gerekenSiginakM2 - mevcutSiginakM2;
+}
+
 class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
   double toplamInsaatAlani = 0;
   double toplamOrtakAlanM2 = 25;
@@ -393,11 +467,77 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
   double kullanilanHibeTL = 0;
   double kullanilanKrediTL = 0;
   Map<int, double> katDoluluklari = {};
+  static const double _siginakEkSabitM2 = 9.0; // 3 m² enerji odası + 3 m² yangın holü + 3 m² WC
 
   @override
   void initState() {
     super.initState();
     _hesapla();
+  }
+
+  _SiginakDurumu _siginakDurumunuHesapla() {
+    int konutSayisi = 0;
+    double toplamTicariM2 = 0;
+    double mevcutSiginakM2 = 0;
+
+    for (final k in widget.katListesi) {
+      for (final b in k.bolumler) {
+        if (b.isOrtakAlan && b.tip.contains('Sığınak')) {
+          mevcutSiginakM2 += b.girilenM2;
+        } else if (!b.isOrtakAlan) {
+          if (b.tip.contains('Daire') || b.tip.contains('Dubleks')) {
+            konutSayisi++;
+          }
+          if (b.tip.contains('Dükkan') || b.tip.contains('Ofis')) {
+            toplamTicariM2 += b.girilenM2;
+          }
+        }
+      }
+    }
+
+    final siginakSart = (toplamInsaatAlani >= 1500) || (konutSayisi >= 10);
+    double gerekenSiginakM2 = 0;
+    if (siginakSart) {
+      gerekenSiginakM2 = (konutSayisi * 4.0) + (toplamTicariM2 / 20.0) + _siginakEkSabitM2;
+    }
+
+    return _SiginakDurumu(
+      konutSayisi: konutSayisi,
+      toplamTicariM2: toplamTicariM2,
+      mevcutSiginakM2: mevcutSiginakM2,
+      siginakSart: siginakSart,
+      gerekenSiginakM2: gerekenSiginakM2,
+      sabitEkM2: _siginakEkSabitM2,
+    );
+  }
+
+  Widget _siginakDurumAppBarBanti() {
+    final d = _siginakDurumunuHesapla();
+    final renk = d.siginakSart
+        ? (d.yeterliMi ? Colors.green.shade900 : Colors.red.shade900)
+        : Colors.blueGrey.shade900;
+
+    final metin = d.siginakSart
+        ? (d.yeterliMi
+            ? 'SIGINAK UYGUN'
+            : 'SIGINAK EKSIK: ${formatNumber(d.farkM2)} m²')
+        : 'SIGINAK SARTI YOK';
+
+    return Container(
+      height: 30,
+      width: double.infinity,
+      color: Colors.amber.shade200,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Text(
+        metin,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: renk,
+        ),
+      ),
+    );
   }
 
   void _hesapla() {
@@ -694,32 +834,9 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
       }
 
       // Sığınak kontrolleri
-      int konutSayisi = 0;
-      double toplamTicariM2 = 0;
-      double mevcutSiginakM2 = 0;
+      final siginakDurumu = _siginakDurumunuHesapla();
 
-      for (final k in widget.katListesi) {
-        for (final b in k.bolumler) {
-          if (b.isOrtakAlan && b.tip.contains('Sığınak')) {
-            mevcutSiginakM2 += b.girilenM2;
-          } else if (!b.isOrtakAlan) {
-            if (b.tip.contains('Daire') || b.tip.contains('Dubleks')) {
-              konutSayisi++;
-            }
-            if (b.tip.contains('Dükkan') || b.tip.contains('Ofis')) {
-              toplamTicariM2 += b.girilenM2;
-            }
-          }
-        }
-      }
-
-      final bool siginakSart = (toplamInsaatAlani >= 1500) || (konutSayisi >= 10);
-      double gerekenSiginakM2 = 0;
-      if (siginakSart) {
-        gerekenSiginakM2 = (konutSayisi * 4.0) + (toplamTicariM2 / 20.0);
-      }
-
-      if (siginakSart && mevcutSiginakM2 < gerekenSiginakM2) {
+      if (siginakDurumu.siginakSart && !siginakDurumu.yeterliMi) {
         final devam = await showDialog<bool>(
           context: context,
           builder: (c) => AlertDialog(
@@ -731,8 +848,11 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
               children: [
                 const Text('Sığınak gereksinimi sağlanmıyor.', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                Text('• Gereken: ${formatNumber(gerekenSiginakM2)} m²'),
-                Text('• Mevcut: ${formatNumber(mevcutSiginakM2)} m²', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                Text('• Gereken: ${formatNumber(siginakDurumu.gerekenSiginakM2)} m²'),
+                Text('• Mevcut: ${formatNumber(siginakDurumu.mevcutSiginakM2)} m²', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                Text('• Eksik: ${formatNumber(siginakDurumu.farkM2)} m²', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+                const SizedBox(height: 6),
+                Text('• Sabit ek alan: ${formatNumber(siginakDurumu.sabitEkM2)} m² (enerji odası + yangın holü + wc)'),
                 const SizedBox(height: 10),
                 const Text('Devam edilsin mi?'),
               ],
@@ -1007,6 +1127,10 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
         title: const Text('Planlama ve Dağıtım'),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(30),
+          child: _siginakDurumAppBarBanti(),
+        ),
         actions: [
           IconButton(onPressed: () => _kaydet('teklif'), icon: const Icon(Icons.save, color: Colors.white), tooltip: 'Taslak Kaydet'),
           IconButton(onPressed: _pdfIslemde ? null : _pdfOlusturKontrol, icon: const Icon(Icons.picture_as_pdf, color: Colors.white)),
@@ -1019,9 +1143,10 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
               padding: const EdgeInsets.all(12),
               itemCount: widget.katListesi.length,
               itemBuilder: (_, i) {
-                final kat = widget.katListesi[i];
+                final katIndex = i;
+                final kat = widget.katListesi[katIndex];
                 final sinir = kat.girilenKatAlani;
-                final dolu = katDoluluklari[i] ?? 0;
+                final dolu = katDoluluklari[katIndex] ?? 0;
                 final bos = sinir - dolu;
                 final renk = bos < -0.5
                     ? Colors.red
@@ -1100,9 +1225,9 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
                                             Expanded(
                                               child: DropdownButtonHideUnderline(
                                                 child: DropdownButton<String>(
-                                                  value: _tiplerForKat(i).contains(b.tip) ? b.tip : 'Daire',
+                                                  value: _tiplerForKat(katIndex).contains(b.tip) ? b.tip : 'Daire',
                                                   isExpanded: true,
-                                                  items: _tiplerForKat(i)
+                                                  items: _tiplerForKat(katIndex)
                                                       .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                                                       .toList(),
                                                   onChanged: (v) {
@@ -1234,9 +1359,9 @@ class _TeklifDetaySayfasiState extends State<TeklifDetaySayfasi> {
                                         else
                                           DropdownButtonHideUnderline(
                                             child: DropdownButton<String>(
-                                              value: _tiplerForKat(i).contains(b.tip) ? b.tip : 'Daire',
+                                              value: _tiplerForKat(katIndex).contains(b.tip) ? b.tip : 'Daire',
                                               isExpanded: true,
-                                              items: _tiplerForKat(i)
+                                              items: _tiplerForKat(katIndex)
                                                   .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                                                   .toList(),
                                               onChanged: (v) {

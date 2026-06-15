@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +11,32 @@ class FcmService {
   factory FcmService() => _instance;
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+
+  Future<String?> _resolveFcmToken() async {
+    if (kIsWeb) {
+      return _messaging.getToken(
+        vapidKey: 'BIIx0YZjIcdBoXPcUpCzMSldawZYzeg9DKrLWs9820RxEXhf_uYV-fhj1YJwX5RzGJlFYsSRDRkafpDiCfHB2rk',
+      );
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      await _messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      for (var attempt = 0; attempt < 5; attempt++) {
+        final apnsToken = await _messaging.getAPNSToken();
+        if (apnsToken != null && apnsToken.isNotEmpty) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+    }
+
+    return _messaging.getToken();
+  }
 
   /// Bildirim izni iste ve FCM token'ı Firestore'a kaydet
   Future<void> initialize() async {
@@ -24,17 +52,7 @@ class FcmService {
         return;
       }
 
-      // Web için VAPID key gerekiyor
-      String? token;
-      if (kIsWeb) {
-        // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
-        // Bu key'i Firebase Console'dan alıp buraya koymanız gerekir
-        token = await _messaging.getToken(
-          vapidKey: 'BIIx0YZjIcdBoXPcUpCzMSldawZYzeg9DKrLWs9820RxEXhf_uYV-fhj1YJwX5RzGJlFYsSRDRkafpDiCfHB2rk',
-        );
-      } else {
-        token = await _messaging.getToken();
-      }
+      final token = await _resolveFcmToken();
 
       if (token != null) {
         await _saveToken(token);
@@ -67,12 +85,7 @@ class FcmService {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      String? token;
-      if (kIsWeb) {
-        token = await _messaging.getToken();
-      } else {
-        token = await _messaging.getToken();
-      }
+      final token = await _resolveFcmToken();
 
       if (token != null) {
         await FirebaseFirestore.instance

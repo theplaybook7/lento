@@ -15,6 +15,15 @@ String formatNumber(dynamic value) {
   return number.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
 }
 
+DateTime? _asDateTime(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is Timestamp) return raw.toDate();
+  if (raw is DateTime) return raw;
+  if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+  if (raw is String) return DateTime.tryParse(raw);
+  return null;
+}
+
 class BinlikInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
@@ -24,6 +33,129 @@ class BinlikInputFormatter extends TextInputFormatter {
     final double number = double.parse(clean);
     final String newText = formatNumber(number);
     return TextEditingValue(text: newText, selection: TextSelection.collapsed(offset: newText.length));
+  }
+}
+
+enum PlanTier { free, solo, enterprise }
+
+class PlanLimitleri {
+  final int? maxProjeSayisi;
+  final int? maxCariSayisi;
+  final bool personelEkleyebilir;
+  final bool projePaylasabilir;
+
+  const PlanLimitleri({
+    this.maxProjeSayisi,
+    this.maxCariSayisi,
+    required this.personelEkleyebilir,
+    required this.projePaylasabilir,
+  });
+}
+
+const String subscriptionTypeTrial = 'trial';
+const String subscriptionTypeSoloMonthly = 'solo_monthly';
+const String subscriptionTypeEnterpriseMonthly = 'enterprise_monthly';
+
+String normalizeSubscriptionType(String? raw) {
+  final normalized = (raw ?? '').trim().toLowerCase();
+  switch (normalized) {
+    case 'trial':
+      return subscriptionTypeTrial;
+    case 'monthly':
+    case 'solo':
+    case 'solo_monthly':
+      return subscriptionTypeSoloMonthly;
+    case 'yearly':
+    case 'enterprise':
+    case 'enterprise_monthly':
+    case 'buyuk':
+    case 'boss':
+      return subscriptionTypeEnterpriseMonthly;
+    default:
+      return normalized;
+  }
+}
+
+PlanTier planTierFromRaw(
+  String? raw, {
+  String? subscriptionType,
+  DateTime? subscriptionEndDate,
+}) {
+  final normalized = (raw ?? '').trim().toLowerCase();
+  if (normalized == 'enterprise' || normalized == 'buyuk' || normalized == 'boss') {
+    return PlanTier.enterprise;
+  }
+  if (normalized == 'solo' || normalized == 'tek_kisilik' || normalized == 'pro') {
+    return PlanTier.solo;
+  }
+
+  final hasActiveSubscription =
+      subscriptionEndDate != null && subscriptionEndDate.isAfter(DateTime.now());
+  if (hasActiveSubscription) {
+    switch (normalizeSubscriptionType(subscriptionType)) {
+      case subscriptionTypeTrial:
+        return PlanTier.free;
+      case subscriptionTypeEnterpriseMonthly:
+        return PlanTier.enterprise;
+      case subscriptionTypeSoloMonthly:
+        return PlanTier.solo;
+    }
+  }
+
+  if (normalized == 'free' || normalized == 'ucretsiz') {
+    return PlanTier.free;
+  }
+
+  return PlanTier.free;
+}
+
+String planTierLabel(PlanTier tier) {
+  switch (tier) {
+    case PlanTier.free:
+      return 'Ucretsiz';
+    case PlanTier.solo:
+      return 'SOLO';
+    case PlanTier.enterprise:
+      return 'Buyuk Isletme';
+  }
+}
+
+String subscriptionTypeLabel(String? raw) {
+  switch (normalizeSubscriptionType(raw)) {
+    case subscriptionTypeTrial:
+      return '1 Hafta Deneme';
+    case subscriptionTypeSoloMonthly:
+      return 'SOLO (Aylik)';
+    case subscriptionTypeEnterpriseMonthly:
+      return 'Buyuk Isletme (Aylik)';
+    default:
+      return (raw == null || raw.trim().isEmpty) ? '-' : raw;
+  }
+}
+
+PlanLimitleri planLimitleriFor(PlanTier tier) {
+  switch (tier) {
+    case PlanTier.free:
+      return const PlanLimitleri(
+        maxProjeSayisi: 1,
+        maxCariSayisi: 10,
+        personelEkleyebilir: false,
+        projePaylasabilir: false,
+      );
+    case PlanTier.solo:
+      return const PlanLimitleri(
+        maxProjeSayisi: null,
+        maxCariSayisi: null,
+        personelEkleyebilir: false,
+        projePaylasabilir: false,
+      );
+    case PlanTier.enterprise:
+      return const PlanLimitleri(
+        maxProjeSayisi: null,
+        maxCariSayisi: null,
+        personelEkleyebilir: true,
+        projePaylasabilir: true,
+      );
   }
 }
 
@@ -78,10 +210,11 @@ class Sirket {
   String? odemeTransactionId;
   
   // Subscription
-  String? subscriptionType;       // 'yearly' | 'monthly' | 'trial'
+  String? subscriptionType;       // 'solo_monthly' | 'enterprise_monthly' | 'trial'
   DateTime? subscriptionEndDate;  // Abonelik bitiş tarihi
   bool autoRenew;                 // Otomatik yenileme
   List<Map<String, dynamic>> paymentHistory; // Ödeme geçmişi
+  String planTier;                // free | solo | enterprise
 
   Sirket({
     required this.id,
@@ -100,6 +233,7 @@ class Sirket {
     this.subscriptionEndDate,
     this.autoRenew = true,
     this.paymentHistory = const [],
+    this.planTier = 'free',
   });
 
   factory Sirket.fromFirestore(DocumentSnapshot doc) {
@@ -123,14 +257,30 @@ class Sirket {
       aktif: m['aktif'] as bool? ?? true,
       personelListesi: yetkiler,
       odemePaid: m['odemePaid'] as bool? ?? false,
-      odemeDate: m['odemeDate'] != null ? (m['odemeDate'] as Timestamp).toDate() : null,
+      odemeDate: _asDateTime(m['odemeDate']),
       odemeTransactionId: m['odemeTransactionId'] as String?,
       subscriptionType: m['subscriptionType'] as String?,
-      subscriptionEndDate: m['subscriptionEndDate'] != null ? (m['subscriptionEndDate'] as Timestamp).toDate() : null,
+      subscriptionEndDate: _asDateTime(m['subscriptionEndDate']),
       autoRenew: m['autoRenew'] as bool? ?? true,
       paymentHistory: List<Map<String, dynamic>>.from(m['paymentHistory'] as List? ?? []),
+      planTier: (m['planTier'] as String?) ??
+          planTierFromRaw(
+            null,
+            subscriptionType: m['subscriptionType'] as String?,
+        subscriptionEndDate: _asDateTime(m['subscriptionEndDate']),
+          ).name,
     );
   }
+}
+
+extension SirketPlanExt on Sirket {
+  PlanTier get aktifPlan => planTierFromRaw(
+        planTier,
+        subscriptionType: subscriptionType,
+        subscriptionEndDate: subscriptionEndDate,
+      );
+
+  PlanLimitleri get planLimitleri => planLimitleriFor(aktifPlan);
 }
 
 class SistemYoneticisi {
@@ -176,6 +326,7 @@ class SistemYoneticisi {
         return aktifKullaniciYetkileri!.goruntulemeSantiye;
       case 'muhasebe':
         return aktifKullaniciYetkileri!.goruntulemeMuhasebe;
+      case 'gorev':
       case 'teklif':
       case 'cari':
         // Teklif ve cari modülleri ayrıca kısıtlanabilir,

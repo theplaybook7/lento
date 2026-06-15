@@ -12,6 +12,9 @@ class Project {
   final String id;
   final String name;
   final String? description;
+  final String? malSahibi;
+  final String? adaParsel;
+  final String? muteahhit;
   final DateTime startDate;
   final DateTime? endDate;
   final ProjectStatus status;
@@ -20,11 +23,15 @@ class Project {
   final DateTime createdAt;
   final String companyId;
   final bool isArchived;
+  final bool isSharedWithMe;
 
   Project({
     required this.id,
     required this.name,
     this.description,
+    this.malSahibi,
+    this.adaParsel,
+    this.muteahhit,
     required this.startDate,
     this.endDate,
     this.status = ProjectStatus.planning,
@@ -33,12 +40,16 @@ class Project {
     required this.createdAt,
     required this.companyId,
     this.isArchived = false,
+    this.isSharedWithMe = false,
   });
 
   Map<String, dynamic> toMap() {
     return {
       'name': name,
       'description': description,
+      'malSahibi': malSahibi,
+      'adaParsel': adaParsel,
+      'muteahhit': muteahhit,
       'startDate': startDate,
       'endDate': endDate,
       'status': status.name,
@@ -47,14 +58,24 @@ class Project {
       'createdAt': createdAt,
       'companyId': companyId,
       'isArchived': isArchived,
+      'isSharedWithMe': isSharedWithMe,
     };
   }
 
   factory Project.fromMap(Map<String, dynamic> map, String id) {
+    final rawName = (map['name'] ?? '').toString();
+    final nameParts = rawName.split(' / ').map((part) => part.trim()).toList();
+    final parsedMalSahibi = nameParts.isNotEmpty ? nameParts.first : '';
+    final parsedAdaParsel = nameParts.length > 1 ? nameParts[1] : '';
+    final parsedMuteahhit = nameParts.length > 2 ? nameParts[2] : '';
+
     return Project(
       id: id,
-      name: map['name'] ?? '',
+      name: rawName,
       description: map['description'],
+      malSahibi: (map['malSahibi'] ?? parsedMalSahibi).toString(),
+      adaParsel: (map['adaParsel'] ?? parsedAdaParsel).toString(),
+      muteahhit: (map['muteahhit'] ?? parsedMuteahhit).toString(),
       startDate: map['startDate'] is Timestamp ? (map['startDate'] as Timestamp).toDate() : DateTime.now(),
       endDate: map['endDate'] != null && map['endDate'] is Timestamp ? (map['endDate'] as Timestamp).toDate() : null,
       status: ProjectStatus.values.firstWhere(
@@ -66,6 +87,7 @@ class Project {
       createdAt: map['createdAt'] is Timestamp ? (map['createdAt'] as Timestamp).toDate() : DateTime.now(),
       companyId: map['companyId'] ?? '',
       isArchived: map['isArchived'] ?? false,
+      isSharedWithMe: map['isSharedWithMe'] == true,
     );
   }
 }

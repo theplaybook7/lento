@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:developer' as developer;
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
@@ -18,6 +17,8 @@ import '../notification_service.dart';
 import '../utils/responsive_utils.dart' as resp;
 import '../web/web_utils.dart' as web_utils;
 import 'cari_hesap_screen.dart';
+import 'paywall_screen.dart';
+import '../payment_service.dart';
 
 class ProjectDetailsScreen extends StatefulWidget {
   final String projectId;
@@ -29,30 +30,142 @@ class ProjectDetailsScreen extends StatefulWidget {
 
 String _mimeTypeFromExtension(String ext) {
   switch (ext.toLowerCase()) {
-    case 'pdf': return 'application/pdf';
-    case 'doc': return 'application/msword';
-    case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    case 'xls': return 'application/vnd.ms-excel';
-    case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    case 'png': return 'image/png';
-    case 'jpg': case 'jpeg': return 'image/jpeg';
-    case 'gif': return 'image/gif';
-    case 'webp': return 'image/webp';
-    default: return 'application/octet-stream';
+    case 'pdf':
+      return 'application/pdf';
+    case 'doc':
+      return 'application/msword';
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'xls':
+      return 'application/vnd.ms-excel';
+    case 'xlsx':
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return 'application/octet-stream';
   }
 }
 
-class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with SingleTickerProviderStateMixin {
+class _AkisStepDefinition {
+  final int sira;
+  final String id;
+  final String title;
+
+  const _AkisStepDefinition({
+    required this.sira,
+    required this.id,
+    required this.title,
+  });
+}
+
+class _AkisFlowDefinition {
+  final int version;
+  final List<_AkisStepDefinition> steps;
+
+  const _AkisFlowDefinition({required this.version, required this.steps});
+
+  Map<int, _AkisStepDefinition> get bySira => {
+    for (final step in steps) step.sira: step,
+  };
+
+  Map<String, _AkisStepDefinition> get byId => {
+    for (final step in steps) step.id: step,
+  };
+
+  _AkisStepDefinition get firstStep => steps.first;
+  _AkisStepDefinition get lastStep => steps.last;
+}
+
+const int _defaultAkisFlowVersion = 1;
+const _AkisFlowDefinition _akisFlowV1 = _AkisFlowDefinition(
+  version: 1,
+  steps: [
+    _AkisStepDefinition(sira: 1, id: 'lihkap', title: 'Lihkap'),
+    _AkisStepDefinition(sira: 2, id: 'imar_durumu', title: 'İmar Durumu'),
+    _AkisStepDefinition(
+      sira: 3,
+      id: 'harita_arazi_randevusu',
+      title: 'Harita Arazi Randevusu Alınacaklar',
+    ),
+    _AkisStepDefinition(
+      sira: 4,
+      id: 'istikamet_kot_imza',
+      title: 'İstikamet , Kot İmzalanacaklar',
+    ),
+    _AkisStepDefinition(sira: 5, id: 'folyo', title: 'Folyo'),
+    _AkisStepDefinition(
+      sira: 6,
+      id: 'folyo_dilekcesi',
+      title: 'Folyo Dilekçesi Verilenler',
+    ),
+    _AkisStepDefinition(
+      sira: 7,
+      id: 'encumene_girenler',
+      title: 'Encümene Girenler',
+    ),
+    _AkisStepDefinition(sira: 8, id: 'kadastro', title: 'Kadastro'),
+    _AkisStepDefinition(sira: 9, id: 'tapu_mudurlugu', title: 'Tapu Müdürlüğü'),
+    _AkisStepDefinition(
+      sira: 10,
+      id: 'etut_yapilacaklar',
+      title: 'Etüt Yapılacaklar',
+    ),
+    _AkisStepDefinition(
+      sira: 11,
+      id: 'mimari_proje_cizilecekler',
+      title: 'Mimari Proje Çizilecekler',
+    ),
+    _AkisStepDefinition(sira: 12, id: 'iski', title: 'İski'),
+    _AkisStepDefinition(sira: 13, id: 'statik_taslak', title: 'Statik Taslak'),
+    _AkisStepDefinition(
+      sira: 14,
+      id: 'zemin_degeri_beklenenler',
+      title: 'Zemin Değeri Beklenenler',
+    ),
+    _AkisStepDefinition(
+      sira: 15,
+      id: 'statik_proje_yapilacaklar',
+      title: 'Statik Proje Yapılacaklar',
+    ),
+    _AkisStepDefinition(
+      sira: 16,
+      id: 'muellif_taahhutnameleri',
+      title: 'Müellif Taahhütnameleri',
+    ),
+    _AkisStepDefinition(
+      sira: 17,
+      id: 'ruhsat_dilekcesi_verilenler',
+      title: 'Ruhsat Dilekçesi Verilenler',
+    ),
+  ],
+);
+
+final Map<int, _AkisFlowDefinition> _akisFlowDefinitions = {
+  _akisFlowV1.version: _akisFlowV1,
+};
+
+class _ProjectDetailsScreenState extends State<ProjectDetailsScreen>
+    with SingleTickerProviderStateMixin {
   late FirebaseService _firebase;
   late TabController _tabController;
-  
+
   // Ruhsat işlem sırası durum yönetimi
-  final Map<int, int> _ruhsatDurumlari = {}; // sıra -> durum (0: başlamadı, 1: devam ediyor, 2: tamamlandı)
+  final Map<int, int> _ruhsatDurumlari =
+      {}; // sıra -> durum (0: başlamadı, 1: devam ediyor, 2: tamamlandı)
   final Map<int, String> _ruhsatNotlari = {}; // sıra -> not metni
-  
+
   // Belgeler
-  final List<Map<String, String>> _yuklenenBelgeler = []; // {başlık, tarih, type}
-  
+  final List<Map<String, String>> _yuklenenBelgeler =
+      []; // {başlık, tarih, type}
+
   final String _belgeArama = '';
 
   // Akış Diyagramı durum yönetimi
@@ -60,17 +173,20 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   final Map<int, String> _akisNotlari = {};
   final TextEditingController _akisNotEditController = TextEditingController();
   // ignore: unused_field
-  bool _tapuSureciGerekli = false; // Karar Kontrolü Evet/Hayır - Firestore'dan yüklenir
+  bool _tapuSureciGerekli =
+      false; // Karar Kontrolü Evet/Hayır - Firestore'dan yüklenir
   // ignore: unused_field
   bool _yolaTerkMi = false; // Yola Terk Kontrolü - Firestore'dan yüklenir
   // ignore: unused_field
-  bool _yolaTerkKararVerildi = false; // Karar verildi mi? - Firestore'dan yüklenir
+  bool _yolaTerkKararVerildi =
+      false; // Karar verildi mi? - Firestore'dan yüklenir
   // Yeni sade akış diyagramı meta
   bool _akisBaslatildi = false;
   DateTime? _akisBaslatmaTarihi;
   DateTime? _akisSonGuncelleme;
   bool _akisRuhsatTamamlandi = false;
   DateTime? _akisTamamlanmaTarihi;
+  int _akisFlowVersion = _defaultAkisFlowVersion;
   int _akisSecilenSira = 1;
 
   // Proje adı
@@ -78,22 +194,556 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
   // Şantiye durum yönetimi
   int _santiyeKatSayisi = 0; // Kullanıcının girdiği kat sayısı
-  final Map<int, int> _santiyeDurumlari = {}; // sıra -> durum (0: başlamadı, 1: devam ediyor, 2: tamamlandı)
-  final Map<int, List<Map<String, String>>> _santiyeFotograflar = {}; // sıra -> [{url, tarih}]
+  final Map<int, int> _santiyeDurumlari =
+      {}; // sıra -> durum (0: başlamadı, 1: devam ediyor, 2: tamamlandı)
+  final Map<int, List<Map<String, String>>> _santiyeFotograflar =
+      {}; // sıra -> [{url, tarih}]
+
+  bool _paylasimYukleniyor = true;
+  bool _paylasimOverrideAktif = false;
+  bool _paylasimDuzenlemeYetkisi = true;
+  Map<String, bool> _paylasimModulYetkileri = {
+    'muhasebe': true,
+    'ruhsat': true,
+    'santiye': true,
+  };
+  Map<String, bool> _paylasimModulDuzenlemeYetkileri = {
+    'muhasebe': true,
+    'ruhsat': true,
+    'santiye': true,
+  };
 
   @override
   void initState() {
     super.initState();
     _firebase = FirebaseService();
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() { if (mounted) setState(() {}); });
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _projeAdiniYukle();
+    _projePaylasimYetkisiYukle();
     _ruhsatVerileriniYukle();
     _belgeleriYukle();
     _akisDiyagramiYukle();
     _santiyeVerileriniYukle();
   }
-  
+
+  String _normalizeEmail(String value) => value.trim().toLowerCase();
+
+  bool get _duzenlemeYetkisiVar =>
+      !_paylasimOverrideAktif || _paylasimDuzenlemeYetkisi;
+
+  String? _aktifModulAnahtari() {
+    if (!_paylasimOverrideAktif) return null;
+    switch (_tabController.index) {
+      case 0:
+        return 'ruhsat';
+      case 1:
+        return 'santiye';
+      case 2:
+        return 'muhasebe';
+      default:
+        return null;
+    }
+  }
+
+  bool _duzenlemeYetkisiKontrolEt([String? modul]) {
+    final hedefModul = modul ?? _aktifModulAnahtari();
+    final yetkiVar =
+        _duzenlemeYetkisiVar &&
+        (hedefModul == null ||
+            !_paylasimOverrideAktif ||
+            (_paylasimModulDuzenlemeYetkileri[hedefModul] ?? false));
+    if (yetkiVar) return true;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hedefModul == null
+                ? 'Bu proje size salt okunur olarak paylasildi. Duzenleme yapamazsiniz.'
+                : 'Bu proje paylasiminda $hedefModul duzenleme yetkiniz bulunmuyor.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+    return false;
+  }
+
+  bool _modulYetkisiVarMi(String modul) {
+    if (_paylasimOverrideAktif) {
+      return _paylasimModulYetkileri[modul] ?? false;
+    }
+    return SistemYoneticisi().yetkiVarMi(modul);
+  }
+
+  Future<void> _projePaylasimYetkisiYukle() async {
+    try {
+      final email = _normalizeEmail(SistemYoneticisi().girisYapanEmail ?? '');
+      if (email.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _paylasimYukleniyor = false;
+          });
+        }
+        return;
+      }
+
+      final projectDoc = await FirebaseFirestore.instance
+          .collection('projects')
+          .doc(widget.projectId)
+          .get();
+      final data = projectDoc.data() ?? <String, dynamic>{};
+      final raw = List<Map<String, dynamic>>.from(
+        (data['paylasimlar'] as List?)?.map(
+              (e) => Map<String, dynamic>.from(e as Map),
+            ) ??
+            const [],
+      );
+
+      Map<String, dynamic>? benimKaydim;
+      for (final kayit in raw) {
+        if (_normalizeEmail((kayit['email'] ?? '').toString()) == email) {
+          benimKaydim = kayit;
+          break;
+        }
+      }
+
+      if (!mounted) return;
+      final kayit = benimKaydim;
+      if (kayit != null) {
+        final canEdit = kayit['canEdit'] == true;
+        bool modulDuzenlemeYetkisi(String key) {
+          if (kayit.containsKey(key)) {
+            return kayit[key] == true;
+          }
+          return canEdit;
+        }
+
+        setState(() {
+          _paylasimOverrideAktif = true;
+          _paylasimDuzenlemeYetkisi = canEdit;
+          _paylasimModulYetkileri = {
+            'muhasebe': kayit['muhasebe'] == true,
+            'ruhsat': kayit['ruhsat'] == true,
+            'santiye': kayit['santiye'] == true,
+          };
+          _paylasimModulDuzenlemeYetkileri = {
+            'muhasebe': modulDuzenlemeYetkisi('editMuhasebe'),
+            'ruhsat': modulDuzenlemeYetkisi('editRuhsat'),
+            'santiye': modulDuzenlemeYetkisi('editSantiye'),
+          };
+          _paylasimYukleniyor = false;
+        });
+      } else {
+        setState(() {
+          _paylasimOverrideAktif = false;
+          _paylasimDuzenlemeYetkisi = true;
+          _paylasimModulYetkileri = {
+            'muhasebe': true,
+            'ruhsat': true,
+            'santiye': true,
+          };
+          _paylasimModulDuzenlemeYetkileri = {
+            'muhasebe': true,
+            'ruhsat': true,
+            'santiye': true,
+          };
+          _paylasimYukleniyor = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _paylasimYukleniyor = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _projePaylasimDialoguAc() async {
+    final sirket = SistemYoneticisi().aktifSirket;
+    if (sirket == null) return;
+    if (!sirket.planLimitleri.projePaylasabilir) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Proje paylasimi sadece Buyuk Isletme planinda kullanilabilir.',
+            ),
+            backgroundColor: Colors.orange,
+            action:
+                PaymentService().isPaymentSupported &&
+                    sirket.aktifPlan != PlanTier.enterprise
+                ? SnackBarAction(
+                    label: 'Aboneligi Yukselt',
+                    textColor: Colors.white,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PaywallScreen(
+                            mode: PaywallMode.subscription,
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : null,
+          ),
+        );
+      }
+      return;
+    }
+
+    final mevcutDoc = await FirebaseFirestore.instance
+        .collection('projects')
+        .doc(widget.projectId)
+        .get();
+    final mevcutData = mevcutDoc.data() ?? <String, dynamic>{};
+    final paylasimlar = List<Map<String, dynamic>>.from(
+      (mevcutData['paylasimlar'] as List?)?.map(
+            (e) => Map<String, dynamic>.from(e as Map),
+          ) ??
+          const [],
+    );
+
+    final emailCtrl = TextEditingController();
+    bool kaydediliyor = false;
+    bool canEdit = false;
+    bool ruhsat = true;
+    bool santiye = true;
+    bool muhasebe = false;
+    bool editRuhsat = false;
+    bool editSantiye = false;
+    bool editMuhasebe = false;
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Proje Paylasimi'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Paylasilacak hesap e-postasi',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  value: ruhsat,
+                  onChanged: (v) => setDialogState(() {
+                    ruhsat = v ?? false;
+                    if (!ruhsat) editRuhsat = false;
+                  }),
+                  title: const Text('Ruhsat goruntuleyebilsin'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                CheckboxListTile(
+                  value: santiye,
+                  onChanged: (v) => setDialogState(() {
+                    santiye = v ?? false;
+                    if (!santiye) editSantiye = false;
+                  }),
+                  title: const Text('Santiye goruntuleyebilsin'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                CheckboxListTile(
+                  value: muhasebe,
+                  onChanged: (v) => setDialogState(() {
+                    muhasebe = v ?? false;
+                    if (!muhasebe) editMuhasebe = false;
+                  }),
+                  title: const Text('Muhasebe goruntuleyebilsin'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const Divider(),
+                SwitchListTile(
+                  value: canEdit,
+                  onChanged: (v) => setDialogState(() {
+                    canEdit = v;
+                    if (v) {
+                      // Duzenleme acildiginda secili moduller icin duzenlemeyi varsayilan ac.
+                      editRuhsat = ruhsat;
+                      editSantiye = santiye;
+                      editMuhasebe = muhasebe;
+                    } else {
+                      editRuhsat = false;
+                      editSantiye = false;
+                      editMuhasebe = false;
+                    }
+                  }),
+                  title: const Text(
+                    'Duzenleme izni ver (modul secimi asagida)',
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                if (canEdit) ...[
+                  CheckboxListTile(
+                    value: editRuhsat,
+                    onChanged: (v) => setDialogState(() {
+                      editRuhsat = v ?? false;
+                      if (editRuhsat) ruhsat = true;
+                    }),
+                    title: const Text('Ruhsatta duzenleyebilsin'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    value: editSantiye,
+                    onChanged: (v) => setDialogState(() {
+                      editSantiye = v ?? false;
+                      if (editSantiye) santiye = true;
+                    }),
+                    title: const Text('Santiyede duzenleyebilsin'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    value: editMuhasebe,
+                    onChanged: (v) => setDialogState(() {
+                      editMuhasebe = v ?? false;
+                      if (editMuhasebe) muhasebe = true;
+                    }),
+                    title: const Text('Muhasebede duzenleyebilsin'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+                if (paylasimlar.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Mevcut paylasimlar:',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  ...paylasimlar.map((p) {
+                    final pEmail = (p['email'] ?? '').toString();
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(pEmail),
+                      subtitle: Text(
+                        'R:${p['ruhsat'] == true ? 'E' : 'H'} S:${p['santiye'] == true ? 'E' : 'H'} M:${p['muhasebe'] == true ? 'E' : 'H'} | Duzenleme:${p['canEdit'] == true ? 'Evet' : 'Hayir'} (R:${p['editRuhsat'] == true ? 'E' : 'H'} S:${p['editSantiye'] == true ? 'E' : 'H'} M:${p['editMuhasebe'] == true ? 'E' : 'H'})',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
+                        onPressed: () async {
+                          paylasimlar.removeWhere(
+                            (x) =>
+                                _normalizeEmail(
+                                  (x['email'] ?? '').toString(),
+                                ) ==
+                                _normalizeEmail(pEmail),
+                          );
+                          final paylasilanEmailler = paylasimlar
+                              .map(
+                                (x) => _normalizeEmail(
+                                  (x['email'] ?? '').toString(),
+                                ),
+                              )
+                              .where((x) => x.isNotEmpty)
+                              .toSet()
+                              .toList();
+                          await FirebaseFirestore.instance
+                              .collection('projects')
+                              .doc(widget.projectId)
+                              .set({
+                                'paylasimlar': paylasimlar,
+                                'paylasilanEmailler': paylasilanEmailler,
+                              }, SetOptions(merge: true));
+                          setDialogState(() {});
+                          await _projePaylasimYetkisiYukle();
+                        },
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: kaydediliyor ? null : () => Navigator.pop(ctx),
+              child: const Text('Kapat'),
+            ),
+            ElevatedButton(
+              onPressed: kaydediliyor
+                  ? null
+                  : () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final normalizedEmail = _normalizeEmail(emailCtrl.text);
+                      if (normalizedEmail.isEmpty) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Lutfen e-posta girin.'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (!ruhsat && !santiye && !muhasebe) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('En az bir bolum secmelisiniz.'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() {
+                        kaydediliyor = true;
+                      });
+
+                      try {
+                        if (!ruhsat) editRuhsat = false;
+                        if (!santiye) editSantiye = false;
+                        if (!muhasebe) editMuhasebe = false;
+
+                        paylasimlar.removeWhere(
+                          (x) =>
+                              _normalizeEmail((x['email'] ?? '').toString()) ==
+                              normalizedEmail,
+                        );
+                        paylasimlar.add({
+                          'email': normalizedEmail,
+                          'ruhsat': ruhsat,
+                          'santiye': santiye,
+                          'muhasebe': muhasebe,
+                          'canEdit': canEdit,
+                          'editRuhsat': canEdit && editRuhsat,
+                          'editSantiye': canEdit && editSantiye,
+                          'editMuhasebe': canEdit && editMuhasebe,
+                          'sharedBy': _normalizeEmail(
+                            SistemYoneticisi().girisYapanEmail ?? '',
+                          ),
+                          'updatedAt': Timestamp.fromDate(DateTime.now()),
+                        });
+
+                        final paylasilanEmailler = paylasimlar
+                            .map(
+                              (x) => _normalizeEmail(
+                                (x['email'] ?? '').toString(),
+                              ),
+                            )
+                            .where((x) => x.isNotEmpty)
+                            .toSet()
+                            .toList();
+
+                        await FirebaseFirestore.instance
+                            .collection('projects')
+                            .doc(widget.projectId)
+                            .set({
+                              'paylasimlar': paylasimlar,
+                              'paylasilanEmailler': paylasilanEmailler,
+                            }, SetOptions(merge: true));
+
+                        await _projePaylasimYetkisiYukle();
+                        if (!ctx.mounted) return;
+                        Navigator.pop(ctx);
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Proje paylasim yetkisi guncellendi.',
+                            ),
+                          ),
+                        );
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Kaydetme hatasi: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      } finally {
+                        if (ctx.mounted) {
+                          setDialogState(() {
+                            kaydediliyor = false;
+                          });
+                        }
+                      }
+                    },
+              child: kaydediliyor
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Kaydet'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _AkisFlowDefinition get _aktifAkisFlow =>
+      _akisFlowDefinitions[_akisFlowVersion] ??
+      _akisFlowDefinitions[_defaultAkisFlowVersion]!;
+
+  int _resolveAkisFlowVersion(int? flowVersion) {
+    if (flowVersion != null && _akisFlowDefinitions.containsKey(flowVersion)) {
+      return flowVersion;
+    }
+    return _defaultAkisFlowVersion;
+  }
+
+  _AkisStepDefinition? _aktifAkisAdimi(int sira) => _aktifAkisFlow.bySira[sira];
+
+  String _akisAdimBaslik(int sira) => _aktifAkisAdimi(sira)?.title ?? '';
+
+  String _akisAdimId(int sira) => _aktifAkisAdimi(sira)?.id ?? 'madde_$sira';
+
+  String _akisDocId(int sira) {
+    final adim = _aktifAkisAdimi(sira);
+    if (adim == null) return 'madde_$sira';
+    if (_aktifAkisFlow.version == 1) {
+      return 'madde_${adim.sira}';
+    }
+    return adim.id;
+  }
+
+  _AkisStepDefinition? _akisAdimiCoz(Map<String, dynamic> data, String docId) {
+    final stepId = data['stepId'] as String?;
+    if (stepId != null) {
+      final fromId = _aktifAkisFlow.byId[stepId];
+      if (fromId != null) return fromId;
+    }
+
+    final sira = data['sira'];
+    if (sira is int) {
+      final fromSira = _aktifAkisFlow.bySira[sira];
+      if (fromSira != null) return fromSira;
+    }
+
+    if (docId.startsWith('madde_')) {
+      final legacySira = int.tryParse(docId.substring('madde_'.length));
+      if (legacySira != null) {
+        return _aktifAkisFlow.bySira[legacySira];
+      }
+    }
+
+    return null;
+  }
+
+  void _akisSecimiDogrula() {
+    if (_aktifAkisAdimi(_akisSecilenSira) == null) {
+      _akisSecilenSira = _aktifAkisFlow.firstStep.sira;
+    }
+  }
+
+  bool _isAkisSonMadde(int sira) {
+    final adim = _aktifAkisAdimi(sira);
+    return adim != null && adim.id == _aktifAkisFlow.lastStep.id;
+  }
+
   void _projeAdiniYukle() async {
     try {
       final project = await _firebase.getProject(widget.projectId);
@@ -105,16 +755,32 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
   void _akisDiyagramiYukle() async {
     try {
+      final ruhsatRootDoc = await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .get();
+      final rootData = ruhsatRootDoc.data() ?? <String, dynamic>{};
+
       final snapshot = await FirebaseFirestore.instance
           .collection('ruhsat')
           .doc(widget.projectId)
           .collection('akis_diyagrami')
           .get();
+      int resolvedFlowVersion = _resolveAkisFlowVersion(
+        rootData['flowVersion'] as int?,
+      );
+      final stepDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+
       for (var doc in snapshot.docs) {
         final data = doc.data();
         if (doc.id == '_meta') {
+          resolvedFlowVersion = _resolveAkisFlowVersion(
+            data['flowVersion'] as int? ?? resolvedFlowVersion,
+          );
           if (mounted) {
             setState(() {
+              _akisFlowVersion = resolvedFlowVersion;
+              _akisSecimiDogrula();
               _akisBaslatildi = data['baslatildi'] == true;
               final bt = data['baslatmaTarihi'];
               if (bt is Timestamp) _akisBaslatmaTarihi = bt.toDate();
@@ -128,27 +794,43 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           continue;
         }
         if (doc.id == 'karar_kontrol') {
-          if (mounted) setState(() { _tapuSureciGerekli = data['tapuGerekli'] == true; });
+          if (mounted) {
+            setState(() {
+              _tapuSureciGerekli = data['tapuGerekli'] == true;
+            });
+          }
           continue;
         }
         if (doc.id == 'yola_terk_kontrol') {
           if (mounted) {
             setState(() {
-            _yolaTerkMi = data['yolaTerk'] == true;
-            _yolaTerkKararVerildi = data['kararVerildi'] == true;
-          });
+              _yolaTerkMi = data['yolaTerk'] == true;
+              _yolaTerkKararVerildi = data['kararVerildi'] == true;
+            });
           }
           continue;
         }
-        final sira = data['sira'] as int?;
-        final durum = data['durum'] as int?;
-        final not = data['not'] as String?;
-        if (sira != null && mounted) {
-          setState(() {
-            if (durum != null) _akisDurumlari[sira] = durum;
-            if (not != null && not.isNotEmpty) _akisNotlari[sira] = not;
-          });
-        }
+        stepDocs.add(doc);
+      }
+
+      if (mounted) {
+        setState(() {
+          _akisFlowVersion = resolvedFlowVersion;
+          _akisSecimiDogrula();
+          _akisDurumlari.clear();
+          _akisNotlari.clear();
+          for (final doc in stepDocs) {
+            final data = doc.data();
+            final step = _akisAdimiCoz(data, doc.id);
+            final sira = step?.sira;
+            final durum = data['durum'] as int?;
+            final not = data['not'] as String?;
+            if (sira != null) {
+              if (durum != null) _akisDurumlari[sira] = durum;
+              if (not != null && not.isNotEmpty) _akisNotlari[sira] = not;
+            }
+          }
+        });
       }
     } catch (e) {
       developer.log('Akış diyagramı yükleme hatası: $e');
@@ -157,19 +839,25 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
   // ── Yeni sade akış diyagramı yardımcıları ──
   Future<void> _akisBaslat() async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     final now = DateTime.now();
     try {
+      await FirebaseFirestore.instance
+          .collection('ruhsat')
+          .doc(widget.projectId)
+          .set({'flowVersion': _akisFlowVersion}, SetOptions(merge: true));
       await FirebaseFirestore.instance
           .collection('ruhsat')
           .doc(widget.projectId)
           .collection('akis_diyagrami')
           .doc('_meta')
           .set({
-        'baslatildi': true,
-        'baslatmaTarihi': Timestamp.fromDate(now),
-        'sonGuncellemeTarihi': Timestamp.fromDate(now),
-        'ruhsatTamamlandi': false,
-      }, SetOptions(merge: true));
+            'flowVersion': _akisFlowVersion,
+            'baslatildi': true,
+            'baslatmaTarihi': Timestamp.fromDate(now),
+            'sonGuncellemeTarihi': Timestamp.fromDate(now),
+            'ruhsatTamamlandi': false,
+          }, SetOptions(merge: true));
       if (mounted) {
         setState(() {
           _akisBaslatildi = true;
@@ -180,7 +868,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Başlatma hatası: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Başlatma hatası: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -195,24 +886,31 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           .doc(widget.projectId)
           .collection('akis_diyagrami')
           .doc('_meta')
-          .set({'sonGuncellemeTarihi': Timestamp.fromDate(now)}, SetOptions(merge: true));
+          .set({
+            'sonGuncellemeTarihi': Timestamp.fromDate(now),
+          }, SetOptions(merge: true));
       if (mounted) setState(() => _akisSonGuncelleme = now);
     } catch (_) {}
   }
 
   Future<void> _akisNotKaydetYeni(int sira, String not) async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     try {
+      final baslik = _akisAdimBaslik(sira);
       await FirebaseFirestore.instance
           .collection('ruhsat')
           .doc(widget.projectId)
           .collection('akis_diyagrami')
-          .doc('madde_$sira')
+          .doc(_akisDocId(sira))
           .set({
-        'sira': sira,
-        'not': not,
-        'madde': _akisNodeNames[sira] ?? '',
-        'guncellendiTarihi': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'sira': sira,
+            'stepId': _akisAdimId(sira),
+            'flowVersion': _akisFlowVersion,
+            'not': not,
+            'madde': baslik,
+            'titleSnapshot': baslik,
+            'guncellendiTarihi': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
       if (mounted) {
         setState(() {
           if (not.isEmpty) {
@@ -226,26 +924,34 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Not kaydetme hatası: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Not kaydetme hatası: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
   }
 
   Future<void> _akisDurumDegistirYeni(int sira, int yeniDurum) async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     try {
-      final isSonMadde = sira == _akisSonMadde;
+      final isSonMadde = _isAkisSonMadde(sira);
+      final baslik = _akisAdimBaslik(sira);
       await FirebaseFirestore.instance
           .collection('ruhsat')
           .doc(widget.projectId)
           .collection('akis_diyagrami')
-          .doc('madde_$sira')
+          .doc(_akisDocId(sira))
           .set({
-        'sira': sira,
-        'durum': yeniDurum,
-        'madde': _akisNodeNames[sira] ?? '',
-        'guncellendiTarihi': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'sira': sira,
+            'stepId': _akisAdimId(sira),
+            'flowVersion': _akisFlowVersion,
+            'durum': yeniDurum,
+            'madde': baslik,
+            'titleSnapshot': baslik,
+            'guncellendiTarihi': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
       if (mounted) setState(() => _akisDurumlari[sira] = yeniDurum);
 
       // Ruhsat Yazımı tamamlandıysa sayaç durur
@@ -257,9 +963,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             .collection('akis_diyagrami')
             .doc('_meta')
             .set({
-          'ruhsatTamamlandi': true,
-          'tamamlanmaTarihi': Timestamp.fromDate(now),
-        }, SetOptions(merge: true));
+              'flowVersion': _akisFlowVersion,
+              'ruhsatTamamlandi': true,
+              'tamamlanmaTarihi': Timestamp.fromDate(now),
+            }, SetOptions(merge: true));
         if (mounted) {
           setState(() {
             _akisRuhsatTamamlandi = true;
@@ -273,7 +980,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             .doc(widget.projectId)
             .collection('akis_diyagrami')
             .doc('_meta')
-            .set({'ruhsatTamamlandi': false, 'tamamlanmaTarihi': null}, SetOptions(merge: true));
+            .set({
+              'ruhsatTamamlandi': false,
+              'tamamlanmaTarihi': null,
+            }, SetOptions(merge: true));
         if (mounted) {
           setState(() {
             _akisRuhsatTamamlandi = false;
@@ -287,7 +997,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Durum güncelleme hatası: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Durum güncelleme hatası: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -300,13 +1013,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           .doc(widget.projectId)
           .collection('islemler')
           .get();
-      
+
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final sira = data['sira'] as int?;
         final durum = data['durum'] as int?;
         final not = data['not'] as String?;
-        
+
         if (sira != null && mounted) {
           setState(() {
             if (durum != null) _ruhsatDurumlari[sira] = durum;
@@ -318,7 +1031,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       developer.log('Ruhsat verileri yükleme hatası: $e');
     }
   }
-  
+
   void _belgeleriYukle() async {
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -326,17 +1039,17 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           .doc(widget.projectId)
           .collection('belgeler')
           .get();
-      
+
       final belgeler = <Map<String, String>>[];
       for (var doc in snapshot.docs) {
         final data = doc.data();
         belgeler.add({
           'başlık': data['başlık'] ?? '',
           'tarih': data['tarih'] ?? '',
-          'firebaseUrl': data['firbaseUrl'] ?? '',
+          'firebaseUrl': data['firebaseUrl'] ?? data['firbaseUrl'] ?? '',
         });
       }
-      
+
       if (mounted) {
         setState(() {
           _yuklenenBelgeler.clear();
@@ -347,7 +1060,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       developer.log('Belgeler yükleme hatası: $e');
     }
   }
-  
+
   void _santiyeVerileriniYukle() async {
     try {
       // Kat sayısını yükle
@@ -355,7 +1068,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           .collection('santiye')
           .doc(widget.projectId)
           .get();
-      
+
       if (santiyeDoc.exists) {
         final data = santiyeDoc.data();
         if (mounted && data != null) {
@@ -364,40 +1077,40 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           });
         }
       }
-      
+
       // İşlem durumlarını yükle
       final snapshot = await FirebaseFirestore.instance
           .collection('santiye')
           .doc(widget.projectId)
           .collection('islemler')
           .get();
-      
+
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final sira = data['sira'] as int?;
         final durum = data['durum'] as int?;
-        
+
         if (sira != null && durum != null && mounted) {
           setState(() {
             _santiyeDurumlari[sira] = durum;
           });
         }
       }
-      
+
       // Fotoğrafları yükle
       final fotografSnapshot = await FirebaseFirestore.instance
           .collection('santiye')
           .doc(widget.projectId)
           .collection('fotograflar')
           .get();
-      
+
       for (var doc in fotografSnapshot.docs) {
         final data = doc.data();
         final sira = data['sira'] as int?;
         final url = data['url'] as String?;
         final tarih = data['tarih'] as String?;
         final aciklama = data['aciklama'] as String?;
-        
+
         if (sira != null && url != null && mounted) {
           if (!_santiyeFotograflar.containsKey(sira)) {
             _santiyeFotograflar[sira] = [];
@@ -418,6 +1131,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Future<void> _projeIsimDuzenle() async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     // Mevcut değerleri Firestore'dan oku
     String mevcutMalSahibi = '';
     String mevcutAdaParsel = '';
@@ -568,8 +1282,16 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             children: List.generate(3, (i) {
               final isSelected = _tabController.index == i;
               final labels = ['Muhasebe', 'Ruhsat', 'Şantiye'];
-              final icons = [Icons.info_outline, Icons.description_outlined, Icons.construction_outlined];
-              final activeColors = [Colors.blue.shade700, Colors.red.shade700, Colors.orange.shade800];
+              final icons = [
+                Icons.info_outline,
+                Icons.description_outlined,
+                Icons.construction_outlined,
+              ];
+              final activeColors = [
+                Colors.blue.shade700,
+                Colors.red.shade700,
+                Colors.orange.shade800,
+              ];
               return Expanded(
                 child: GestureDetector(
                   onTap: () => _tabController.animateTo(i),
@@ -586,13 +1308,24 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(icons[i], size: resp.isMobile(context) ? 18 : 20, color: isSelected ? activeColors[i] : Colors.white70),
-                        const SizedBox(height: 2),
-                        Text(labels[i], style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        Icon(
+                          icons[i],
+                          size: resp.isMobile(context) ? 18 : 20,
                           color: isSelected ? activeColors[i] : Colors.white70,
-                        )),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          labels[i],
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? activeColors[i]
+                                : Colors.white70,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -604,121 +1337,150 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         actions: [
           if (SistemYoneticisi().isAdminKullanici)
             PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'rename') {
-                await _projeIsimDuzenle();
-              } else if (value == 'archive') {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text(
-                      'Projeyi Arşivle',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                    content: const Text('Bu projeyi arşivlemek istediğinizden emin misiniz?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('İptal'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
+              onSelected: (value) async {
+                if (value == 'share') {
+                  await _projePaylasimDialoguAc();
+                } else if (value == 'rename') {
+                  await _projeIsimDuzenle();
+                } else if (value == 'archive') {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text(
+                        'Projeyi Arşivle',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
                         ),
-                        child: const Text('Arşivle'),
                       ),
-                    ],
-                  ),
-                );
-                if (confirm == true && mounted) {
-                  try {
-                    await _firebase.archiveProject(widget.projectId);
-                    if (!mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Proje arşivlendi')),
-                    );
-                  } catch (e) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
-                    );
+                      content: const Text(
+                        'Bu projeyi arşivlemek istediğinizden emin misiniz?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('İptal'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Arşivle'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true && mounted) {
+                    try {
+                      await _firebase.archiveProject(widget.projectId);
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Proje arşivlendi')),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(hataCevir(e)),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                } else if (value == 'delete') {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Projeyi Sil'),
+                      content: const Text(
+                        'Bu projeyi kalıcı olarak silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('İptal'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                          child: const Text('Sil'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true && mounted) {
+                    try {
+                      await _firebase.deleteProject(widget.projectId);
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Proje silindi')),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(hataCevir(e)),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 }
-              } else if (value == 'delete') {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Projeyi Sil'),
-                    content: const Text('Bu projeyi kalıcı olarak silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('İptal'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
-                        child: const Text('Sil'),
-                      ),
+              },
+              itemBuilder: (context) => [
+                if ((SistemYoneticisi()
+                        .aktifSirket
+                        ?.planLimitleri
+                        .projePaylasabilir ??
+                    false))
+                  const PopupMenuItem(
+                    value: 'share',
+                    child: Row(
+                      children: [
+                        Icon(Icons.share_outlined, color: Colors.teal),
+                        SizedBox(width: 8),
+                        Text('Paylasim Yetkileri'),
+                      ],
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: 'rename',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_outlined, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('İsim Düzenle'),
                     ],
                   ),
-                );
-                if (confirm == true && mounted) {
-                  try {
-                    await _firebase.deleteProject(widget.projectId);
-                    if (!mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Proje silindi')),
-                    );
-                  } catch (e) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
-                    );
-                  }
-                }
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'rename',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit_outlined, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Text('İsim Düzenle'),
-                  ],
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'archive',
-                child: Row(
-                  children: [
-                    Icon(Icons.archive_outlined, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Text('Arşivle'),
-                  ],
+                const PopupMenuItem(
+                  value: 'archive',
+                  child: Row(
+                    children: [
+                      Icon(Icons.archive_outlined, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text('Arşivle'),
+                    ],
+                  ),
                 ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Sil', style: TextStyle(color: Colors.red)),
-                  ],
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Sil', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
       body: TabBarView(
@@ -736,8 +1498,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Widget _buildYetkiKontrolluTab(String modul, Widget content) {
-    final sistem = SistemYoneticisi();
-    final yetkiVar = sistem.yetkiVarMi(modul);
+    if (_paylasimYukleniyor) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final yetkiVar = _modulYetkisiVarMi(modul);
 
     if (!yetkiVar) {
       return Center(
@@ -775,238 +1540,288 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         }
 
         return SingleChildScrollView(
-            child: Column(
-              children: [
-                // Ön Muhasebe Özeti
-                FutureBuilder<ProjectFinance>(
-                  future: _firebase.getProjectFinanceSummary(widget.projectId),
-                  builder: (context, financeSnap) {
-                    if (financeSnap.connectionState == ConnectionState.waiting) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: CircularProgressIndicator(),
-                      );
-                    }
+          child: Column(
+            children: [
+              // Ön Muhasebe Özeti
+              FutureBuilder<ProjectFinance>(
+                future: _firebase.getProjectFinanceSummary(widget.projectId),
+                builder: (context, financeSnap) {
+                  if (financeSnap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    );
+                  }
 
-                    if (!financeSnap.hasData) {
-                      return const SizedBox();
-                    }
+                  if (!financeSnap.hasData) {
+                    return const SizedBox();
+                  }
 
-                    final finance = financeSnap.data!;
+                  final finance = financeSnap.data!;
 
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.all(resp.responsivePadding(context)),
-                          child: Column(
-                            children: [
-                              const Text(
-                                'Ön Muhasebe Özeti',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.all(
+                          resp.responsivePadding(context),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Ön Muhasebe Özeti',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _FinanceCard(
-                                      title: 'Gelir',
-                                      amount: finance.totalIncome,
-                                      color: Colors.green,
-                                    ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _FinanceCard(
+                                    title: 'Gelir',
+                                    amount: finance.totalIncome,
+                                    color: Colors.green,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _FinanceCard(
-                                      title: 'Gider',
-                                      amount: finance.totalExpenses,
-                                      color: Colors.red,
-                                    ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _FinanceCard(
+                                    title: 'Gider',
+                                    amount: finance.totalExpenses,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            _FinanceCard(
+                              title: 'Kâr',
+                              amount: finance.profit,
+                              color: finance.profit >= 0
+                                  ? Colors.blue
+                                  : Colors.orange,
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Kâr Marjı',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${finance.profitMargin.toStringAsFixed(1)}%',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Bütçe Kullanımı',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${finance.budgetUsage.toStringAsFixed(1)}%',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              _FinanceCard(
-                                title: 'Kâr',
-                                amount: finance.profit,
-                                color: finance.profit >= 0 ? Colors.blue : Colors.orange,
-                              ),
-                              const SizedBox(height: 16),
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Kâr Marjı', style: TextStyle(color: Colors.grey.shade600)),
-                                        Text(
-                                          '${finance.profitMargin.toStringAsFixed(1)}%',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                        ),
-                                      ],
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('Bütçe Kullanımı', style: TextStyle(color: Colors.grey.shade600)),
-                                        Text(
-                                          '${finance.budgetUsage.toStringAsFixed(1)}%',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-
-                // Cariler Başlığı ve Ekle Butonu
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Cariler',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _yeniCariDialog(context),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Cari Ekle'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
+                  );
+                },
+              ),
+
+              // Cariler Başlığı ve Ekle Butonu
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Cariler',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _yeniCariDialog(context),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Cari Ekle'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
+              ),
+              const SizedBox(height: 12),
 
-                // Cariler Listesi
-                StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('cari_hesaplar')
-                      .where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '')
-                      .snapshots(),
-                  builder: (context, cariSnap) {
-                    if (!cariSnap.hasData) {
-                      return const SizedBox();
-                    }
+              // Cariler Listesi
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('cari_hesaplar')
+                    .where(
+                      'sirketId',
+                      isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '',
+                    )
+                    .snapshots(),
+                builder: (context, cariSnap) {
+                  if (!cariSnap.hasData) {
+                    return const SizedBox();
+                  }
 
-                    // Hem eski projectId hem yeni projectIds formatını destekle
-                    final cariler = cariSnap.data!.docs.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      final pids = List<String>.from(data['projectIds'] ?? []);
-                      final pid = data['projectId'] ?? '';
-                      return pids.contains(widget.projectId) || pid == widget.projectId;
-                    }).toList();
+                  // Hem eski projectId hem yeni projectIds formatını destekle
+                  final cariler = cariSnap.data!.docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final pids = List<String>.from(data['projectIds'] ?? []);
+                    final pid = data['projectId'] ?? '';
+                    return pids.contains(widget.projectId) ||
+                        pid == widget.projectId;
+                  }).toList();
 
-                    if (cariler.isEmpty) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Center(
-                          child: Text(
-                            'Henüz cari hesap eklenmedi',
-                            style: TextStyle(color: Colors.grey.shade600),
-                          ),
-                        ),
-                      );
-                    }
-
+                  if (cariler.isEmpty) {
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 0),
-                        itemCount: cariler.length,
-                        itemBuilder: (context, index) {
-                          final cariDoc = cariler[index];
-                          final cariData = cariDoc.data() as Map<String, dynamic>;
-                          final ad = cariData['ad'] ?? 'İsimsiz';
-                          final tip = cariData['tip'] ?? 'musteri';
-                          final ikon = tip == 'musteri' ? Icons.person : Icons.business;
-
-                          return FutureBuilder<QuerySnapshot>(
-                            future: FirebaseFirestore.instance
-                                .collection('cari_hesaplar')
-                                .doc(cariDoc.id)
-                                .collection('hareketler')
-                                .where('projeId', isEqualTo: widget.projectId)
-                                .get(),
-                            builder: (context, hareketSnap) {
-                              double bakiye = 0;
-                              if (hareketSnap.hasData) {
-                                for (var h in hareketSnap.data!.docs) {
-                                  final hData = h.data() as Map<String, dynamic>;
-                                  final tutarTL = ((hData['tutarTL'] ?? hData['tutar'] ?? 0.0) as num).toDouble();
-                                  final hTip = hData['tip'] ?? 'borc';
-                                  bakiye += hTip == 'alacak' ? tutarTL : -tutarTL;
-                                }
-                              }
-                              final renk = bakiye > 0 ? Colors.green : (bakiye < 0 ? Colors.red : Colors.grey);
-
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: InkWell(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (c) => CariDetayScreen(
-                                    cariId: cariDoc.id,
-                                    cariAd: ad,
-                                    projectId: widget.projectId,
-                                  ),
-                                ),
-                              ),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: renk.withValues(
-                                    alpha: (renk.a * 255.0 * 0.1).clamp(0, 255),
-                                  ),
-                                  child: Icon(ikon, color: renk),
-                                ),
-                                title: Text(ad, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text(
-                                  bakiye == 0 ? 'Dengede' : (bakiye > 0 ? 'Alınan' : 'Ödenen'),
-                                  style: TextStyle(color: renk, fontSize: 12),
-                                ),
-                                trailing: Text(
-                                  format_utils.formatTL(bakiye.abs()),
-                                  style: TextStyle(
-                                    color: renk,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                            },
-                          );
-                        },
+                      child: Center(
+                        child: Text(
+                          'Henüz cari hesap eklenmedi',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
                       ),
                     );
-                  },
-                ),
-              ],
-            ),
-          );
-        },
-      );
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      itemCount: cariler.length,
+                      itemBuilder: (context, index) {
+                        final cariDoc = cariler[index];
+                        final cariData = cariDoc.data() as Map<String, dynamic>;
+                        final ad = cariData['ad'] ?? 'İsimsiz';
+                        final tip = cariData['tip'] ?? 'musteri';
+                        final ikon = tip == 'musteri'
+                            ? Icons.person
+                            : Icons.business;
+
+                        return FutureBuilder<QuerySnapshot>(
+                          future: FirebaseFirestore.instance
+                              .collection('cari_hesaplar')
+                              .doc(cariDoc.id)
+                              .collection('hareketler')
+                              .where('projeId', isEqualTo: widget.projectId)
+                              .get(),
+                          builder: (context, hareketSnap) {
+                            double bakiye = 0;
+                            if (hareketSnap.hasData) {
+                              for (var h in hareketSnap.data!.docs) {
+                                final hData = h.data() as Map<String, dynamic>;
+                                final tutarTL =
+                                    ((hData['tutarTL'] ?? hData['tutar'] ?? 0.0)
+                                            as num)
+                                        .toDouble();
+                                final hTip = hData['tip'] ?? 'borc';
+                                bakiye += hTip == 'alacak' ? tutarTL : -tutarTL;
+                              }
+                            }
+                            final renk = bakiye > 0
+                                ? Colors.green
+                                : (bakiye < 0 ? Colors.red : Colors.grey);
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: InkWell(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (c) => CariDetayScreen(
+                                      cariId: cariDoc.id,
+                                      cariAd: ad,
+                                      projectId: widget.projectId,
+                                    ),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: renk.withValues(
+                                      alpha: (renk.a * 255.0 * 0.1).clamp(
+                                        0,
+                                        255,
+                                      ),
+                                    ),
+                                    child: Icon(ikon, color: renk),
+                                  ),
+                                  title: Text(
+                                    ad,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    bakiye == 0
+                                        ? 'Dengede'
+                                        : (bakiye > 0 ? 'Alınan' : 'Ödenen'),
+                                    style: TextStyle(color: renk, fontSize: 12),
+                                  ),
+                                  trailing: Text(
+                                    format_utils.formatTL(bakiye.abs()),
+                                    style: TextStyle(
+                                      color: renk,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildRuhsatTab() {
@@ -1021,16 +1836,16 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             ],
             indicatorColor: AppTheme.primaryColor,
             labelColor: AppTheme.primaryColor,
-            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            labelStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
             unselectedLabelStyle: const TextStyle(fontSize: 12),
           ),
           // Tab Content
           Expanded(
             child: TabBarView(
-              children: [
-                _buildAkisDiyagramiTab(),
-                _buildBelgeYuklemeTab(),
-              ],
+              children: [_buildAkisDiyagramiTab(), _buildBelgeYuklemeTab()],
             ),
           ),
         ],
@@ -1039,21 +1854,6 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   // ==================== AKIŞ DİYAGRAMI (AĞAÇ GÖRÜNÜMÜ) ====================
-
-  static const Map<int, String> _akisNodeNames = {
-    1: 'LİHKAP', 2: 'İmar Durumu', 3: 'İstikamet Memuru',
-    4: 'İstikamet Çizimi', 5: 'Folyo Hazırlanması', 6: 'Etüt Çalışması',
-    7: 'Karot Alımı', 8: 'RBT', 9: 'Kesim Yazıları', 10: 'Muafiyet',
-    11: 'Boş Yazısı', 12: 'Yıkım', 13: 'Zemin Etütü',
-    14: 'Mimari Proje', 15: 'Statik Taslak', 16: 'Statik Proje',
-    17: 'YİBF Girişi', 18: 'Elektrik Proje', 19: 'Mekanik Proje',
-    20: 'Akustik Proje', 21: 'EKB', 22: 'Müellif Evrakları', 23: 'İSKİ',
-    24: 'Ruhsat Dilekçesi', 25: 'YD Proje Onayı', 26: 'Belediye Proje Onayı',
-    27: 'Fen İşleri', 28: 'Müellif Taahhütnameleri', 29: 'Müteahhit Belgeleri',
-    30: 'Harçlar', 31: 'Otopark', 32: 'Teminat Mektubu', 33: 'Numarataj',
-    34: 'Ruhsat Yazımı',
-  };
-  static const int _akisSonMadde = 34; // Ruhsat Yazımı (sayaç burada durur, liste burada biter)
 
   Widget _buildAkisDiyagramiTab() {
     // Başlatılmamışsa: merkezi Başlat butonu
@@ -1081,7 +1881,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     ),
                   ],
                 ),
-                child: const Icon(Icons.rocket_launch_rounded, size: 72, color: Colors.white),
+                child: const Icon(
+                  Icons.rocket_launch_rounded,
+                  size: 72,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -1092,24 +1896,44 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               const SizedBox(height: 8),
               Text(
                 'Başlat\'a basarak akış diyagramını aktifleştirin.\nGün sayacı bu andan itibaren başlar.',
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                  height: 1.4,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              SizedBox(
-                width: 220,
-                child: ElevatedButton.icon(
-                  onPressed: _akisBaslat,
-                  icon: const Icon(Icons.play_arrow_rounded, size: 26),
-                  label: const Text('BAŞLAT', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 4,
-                  ),
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final buttonWidth = constraints.maxWidth < 320
+                      ? double.infinity
+                      : 220.0;
+                  return SizedBox(
+                    width: buttonWidth,
+                    child: ElevatedButton.icon(
+                      onPressed: _akisBaslat,
+                      icon: const Icon(Icons.play_arrow_rounded, size: 26),
+                      label: const Text(
+                        'BAŞLAT',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 4,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1128,12 +1952,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     final sayacDurdu = _akisRuhsatTamamlandi;
     final sayacGun = sayacDurdu
         ? (_akisTamamlanmaTarihi != null && _akisBaslatmaTarihi != null
-            ? _akisTamamlanmaTarihi!.difference(_akisBaslatmaTarihi!).inDays
-            : baslatmaGun)
+              ? _akisTamamlanmaTarihi!.difference(_akisBaslatmaTarihi!).inDays
+              : baslatmaGun)
         : sonGuncellemeGun;
 
     final tamamlanan = _akisDurumlari.values.where((d) => d == 2).length;
-    final toplam = _akisNodeNames.length;
+    final toplam = _aktifAkisFlow.steps.length;
     final yuzde = toplam > 0 ? tamamlanan / toplam : 0.0;
 
     Color sayacRenk;
@@ -1184,7 +2008,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      sayacDurdu ? Icons.verified_rounded : Icons.timer_outlined,
+                      sayacDurdu
+                          ? Icons.verified_rounded
+                          : Icons.timer_outlined,
                       color: sayacRenk,
                       size: 22,
                     ),
@@ -1197,7 +2023,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                         Text(
                           sayacDurdu
                               ? 'Ruhsat Tamamlandı'
-                              : (sayacGun == 0 ? 'Bugün işlem yapıldı' : '$sayacGun gün önce işlem yapıldı'),
+                              : (sayacGun == 0
+                                    ? 'Bugün işlem yapıldı'
+                                    : '$sayacGun gün önce işlem yapıldı'),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -1209,13 +2037,19 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                           sayacDurdu
                               ? 'Sayaç durduruldu — süreç $sayacGun günde tamamlandı'
                               : 'Başlangıç: ${_tarihBicim(_akisBaslatmaTarihi)} • Toplam $baslatmaGun gün',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade700,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -1304,7 +2138,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   return Container(
                     decoration: const BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -1338,11 +2174,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
   Widget _buildAkisNotPanel() {
     final sira = _akisSecilenSira;
-    final baslik = _akisNodeNames[sira] ?? '';
+    final baslik = _akisAdimBaslik(sira);
     final mevcutNot = _akisNotlari[sira] ?? '';
     final durum = _akisDurumlari[sira] ?? 0;
     // Her seçimde controller'ı güncelle (tek seferlik uyum için setState'den ayrı tutuyoruz)
-    if (_akisNotEditController.text != mevcutNot && !_akisNotEditController.selection.isValid) {
+    if (_akisNotEditController.text != mevcutNot &&
+        !_akisNotEditController.selection.isValid) {
       _akisNotEditController.text = mevcutNot;
     }
     Color durumRenk = durum == 2
@@ -1381,14 +2218,21 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 alignment: Alignment.center,
                 child: Text(
                   '$sira',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: durumRenk),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: durumRenk,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   baslik,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               Container(
@@ -1399,7 +2243,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 ),
                 child: Text(
                   durumText,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: durumRenk),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: durumRenk,
+                  ),
                 ),
               ),
             ],
@@ -1408,15 +2256,40 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           // Durum seçimi
           Row(
             children: [
-              _akisDurumButton(0, 'Başlamadı', Colors.blueGrey.shade400, sira, durum),
+              _akisDurumButton(
+                0,
+                'Başlamadı',
+                Colors.blueGrey.shade400,
+                sira,
+                durum,
+              ),
               const SizedBox(width: 6),
-              _akisDurumButton(1, 'Devam Ediyor', Colors.orange.shade600, sira, durum),
+              _akisDurumButton(
+                1,
+                'Devam Ediyor',
+                Colors.orange.shade600,
+                sira,
+                durum,
+              ),
               const SizedBox(width: 6),
-              _akisDurumButton(2, 'Tamamlandı', Colors.green.shade600, sira, durum),
+              _akisDurumButton(
+                2,
+                'Tamamlandı',
+                Colors.green.shade600,
+                sira,
+                durum,
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          const Text('Notlar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
+          const Text(
+            'Notlar',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
           const SizedBox(height: 6),
           Expanded(
             child: TextField(
@@ -1426,7 +2299,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               textAlignVertical: TextAlignVertical.top,
               decoration: InputDecoration(
                 hintText: 'Bu adıma ait notları yazın...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 contentPadding: const EdgeInsets.all(10),
                 filled: true,
                 fillColor: Colors.grey.shade50,
@@ -1450,7 +2325,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 onPressed: () {
                   _akisNotKaydetYeni(sira, _akisNotEditController.text.trim());
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Not kaydedildi, sayaç sıfırlandı'), backgroundColor: Colors.green, duration: Duration(seconds: 2)),
+                    const SnackBar(
+                      content: Text('Not kaydedildi, sayaç sıfırlandı'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
                   );
                   if (Navigator.of(context).canPop() &&
                       ModalRoute.of(context)?.isCurrent != true) {
@@ -1462,7 +2341,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                 ),
               ),
             ],
@@ -1472,7 +2354,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     );
   }
 
-  Widget _akisDurumButton(int durumDegeri, String label, Color color, int sira, int aktifDurum) {
+  Widget _akisDurumButton(
+    int durumDegeri,
+    String label,
+    Color color,
+    int sira,
+    int aktifDurum,
+  ) {
     final secili = aktifDurum == durumDegeri;
     return Expanded(
       child: InkWell(
@@ -1485,7 +2373,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           decoration: BoxDecoration(
             color: secili ? color : color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withValues(alpha: secili ? 1 : 0.3)),
+            border: Border.all(
+              color: color.withValues(alpha: secili ? 1 : 0.3),
+            ),
           ),
           child: Center(
             child: Text(
@@ -1524,9 +2414,16 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
             child: Row(
               children: [
-                Icon(Icons.list_alt_rounded, size: 18, color: Colors.grey.shade700),
+                Icon(
+                  Icons.list_alt_rounded,
+                  size: 18,
+                  color: Colors.grey.shade700,
+                ),
                 const SizedBox(width: 6),
-                const Text('Adımlar', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                const Text(
+                  'Adımlar',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                ),
               ],
             ),
           ),
@@ -1534,15 +2431,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 4),
-              itemCount: _akisNodeNames.length,
-              separatorBuilder: (_, __) => Divider(
-                height: 1,
-                indent: 54,
-                color: Colors.grey.shade100,
-              ),
+              itemCount: _aktifAkisFlow.steps.length,
+              separatorBuilder: (context, _) =>
+                  Divider(height: 1, indent: 54, color: Colors.grey.shade100),
               itemBuilder: (c, i) {
-                final sira = i + 1;
-                final ad = _akisNodeNames[sira] ?? '';
+                final step = _aktifAkisFlow.steps[i];
+                final sira = step.sira;
+                final ad = step.title;
                 final durum = _akisDurumlari[sira] ?? 0;
                 final not = _akisNotlari[sira] ?? '';
                 final secili = _akisSecilenSira == sira;
@@ -1558,7 +2453,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   circleColor = Colors.blueGrey.shade300;
                   circleIcon = null;
                 }
-                final isSonMadde = sira == _akisSonMadde;
+                final isSonMadde = step.id == _aktifAkisFlow.lastStep.id;
                 return Material(
                   color: secili ? Colors.blue.shade50 : Colors.transparent,
                   child: InkWell(
@@ -1566,16 +2461,20 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                       setState(() {
                         _akisSecilenSira = sira;
                         _akisNotEditController.text = _akisNotlari[sira] ?? '';
-                        _akisNotEditController.selection = TextSelection.collapsed(
-                          offset: _akisNotEditController.text.length,
-                        );
+                        _akisNotEditController.selection =
+                            TextSelection.collapsed(
+                              offset: _akisNotEditController.text.length,
+                            );
                       });
                       if (isMobile) {
                         _akisNotBottomSheetAc();
                       }
                     },
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       child: Row(
                         children: [
                           Container(
@@ -1587,7 +2486,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                               boxShadow: secili
                                   ? [
                                       BoxShadow(
-                                        color: circleColor.withValues(alpha: 0.45),
+                                        color: circleColor.withValues(
+                                          alpha: 0.45,
+                                        ),
                                         blurRadius: 8,
                                         spreadRadius: 1,
                                       ),
@@ -1596,7 +2497,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                             ),
                             alignment: Alignment.center,
                             child: circleIcon != null
-                                ? Icon(circleIcon, size: 16, color: Colors.white)
+                                ? Icon(
+                                    circleIcon,
+                                    size: 16,
+                                    color: Colors.white,
+                                  )
                                 : Text(
                                     '$sira',
                                     style: const TextStyle(
@@ -1618,19 +2523,30 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                         ad,
                                         style: TextStyle(
                                           fontSize: 13.5,
-                                          fontWeight: secili ? FontWeight.w700 : FontWeight.w500,
-                                          color: durum == 2 ? Colors.grey.shade600 : Colors.black87,
-                                          decoration: durum == 2 ? TextDecoration.lineThrough : null,
+                                          fontWeight: secili
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          color: durum == 2
+                                              ? Colors.grey.shade600
+                                              : Colors.black87,
+                                          decoration: durum == 2
+                                              ? TextDecoration.lineThrough
+                                              : null,
                                         ),
                                       ),
                                     ),
                                     if (isSonMadde)
                                       Container(
                                         margin: const EdgeInsets.only(left: 6),
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: Colors.purple.shade50,
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
                                         child: Text(
                                           'SON',
@@ -1649,16 +2565,28 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                     not,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                      fontStyle: FontStyle.italic,
+                                    ),
                                   ),
                                 ],
                               ],
                             ),
                           ),
                           if (not.isNotEmpty)
-                            Icon(Icons.sticky_note_2_outlined, size: 14, color: Colors.amber.shade700),
+                            Icon(
+                              Icons.sticky_note_2_outlined,
+                              size: 14,
+                              color: Colors.amber.shade700,
+                            ),
                           const SizedBox(width: 4),
-                          Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade400),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 18,
+                            color: Colors.grey.shade400,
+                          ),
                         ],
                       ),
                     ),
@@ -1704,11 +2632,19 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.file_upload_outlined, size: 64, color: Colors.grey.shade300),
+                  Icon(
+                    Icons.file_upload_outlined,
+                    size: 64,
+                    color: Colors.grey.shade300,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Henüz belge yüklenmedi',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.grey.shade600),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade600,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -1728,8 +2664,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 for (int i = 0; i < _yuklenenBelgeler.length; i++) {
                   final belge = _yuklenenBelgeler[i];
                   if (_belgeArama.isEmpty ||
-                      (belge['başlık']?.toLowerCase().contains(_belgeArama) ?? false) ||
-                      (belge['tarih']?.toLowerCase().contains(_belgeArama) ?? false)) {
+                      (belge['başlık']?.toLowerCase().contains(_belgeArama) ??
+                          false) ||
+                      (belge['tarih']?.toLowerCase().contains(_belgeArama) ??
+                          false)) {
                     filtrelenmis.add(MapEntry(i, belge));
                   }
                 }
@@ -1738,9 +2676,16 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.grey.shade300),
+                        Icon(
+                          Icons.search_off,
+                          size: 48,
+                          color: Colors.grey.shade300,
+                        ),
                         const SizedBox(height: 12),
-                        Text('"$_belgeArama" için belge bulunamadı', style: TextStyle(color: Colors.grey.shade500)),
+                        Text(
+                          '"$_belgeArama" için belge bulunamadı',
+                          style: TextStyle(color: Colors.grey.shade500),
+                        ),
                       ],
                     ),
                   );
@@ -1783,12 +2728,18 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     children: [
                       Text(
                         belge['başlık'] ?? 'Belge',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         belge['tarih'] ?? '',
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
                     ],
                   ),
@@ -1799,15 +2750,30 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildBelgeIslemButonu(Icons.preview, 'Önizle', AppTheme.primaryColor, () {
-                  _belgeOnizle(belge);
-                }),
-                _buildBelgeIslemButonu(Icons.download, 'İndir', Colors.green.shade700, () {
-                  _belgeIndir(belge);
-                }),
-                _buildBelgeIslemButonu(Icons.delete, 'Sil', Colors.red.shade700, () {
-                  _belgeySil(index);
-                }),
+                _buildBelgeIslemButonu(
+                  Icons.preview,
+                  'Önizle',
+                  AppTheme.primaryColor,
+                  () {
+                    _belgeOnizle(belge);
+                  },
+                ),
+                _buildBelgeIslemButonu(
+                  Icons.download,
+                  'İndir',
+                  Colors.green.shade700,
+                  () {
+                    _belgeIndir(belge);
+                  },
+                ),
+                _buildBelgeIslemButonu(
+                  Icons.delete,
+                  'Sil',
+                  Colors.red.shade700,
+                  () {
+                    _belgeySil(index);
+                  },
+                ),
               ],
             ),
           ],
@@ -1816,14 +2782,26 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     );
   }
 
-  Widget _buildBelgeIslemButonu(IconData icon, String label, Color color, VoidCallback onPressed) {
+  Widget _buildBelgeIslemButonu(
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onPressed,
+  ) {
     return InkWell(
       onTap: onPressed,
       child: Column(
         children: [
           Icon(icon, size: 20, color: color),
           const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );
@@ -1849,7 +2827,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
 
       if (file.bytes == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Dosya okunamadı. Lütfen tekrar deneyin.')),
+          const SnackBar(
+            content: Text('Dosya okunamadı. Lütfen tekrar deneyin.'),
+          ),
         );
         return;
       }
@@ -1865,8 +2845,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       // Firebase Storage'a yükle
       final fileName = file.name;
       final fileExtension = fileName.split('.').last;
-      final uniqueFileName = '${DateTime.now().millisecondsSinceEpoch}_$fileName';
-      
+      final uniqueFileName =
+          '${DateTime.now().millisecondsSinceEpoch}_$fileName';
+
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('ruhsat_belgeler')
@@ -1886,6 +2867,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         'başlık': fileName,
         'tarih': DateTime.now().toString().split(' ')[0],
         'type': fileExtension,
+        'firebaseUrl': downloadUrl,
+        // Geriye uyumluluk için bir süre daha eski alanı da yazıyoruz.
         'firbaseUrl': downloadUrl,
         'boyut': file.size,
         'yuklenmeTarihi': DateTime.now(),
@@ -1896,7 +2879,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         _yuklenenBelgeler.add({
           'başlık': yeniBelge['başlık'] as String,
           'tarih': yeniBelge['tarih'] as String,
-          'firebaseUrl': yeniBelge['firbaseUrl'] as String,
+          'firebaseUrl': yeniBelge['firebaseUrl'] as String,
         });
       });
 
@@ -1930,7 +2913,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   void _belgeySil(int index) async {
     try {
       final belge = _yuklenenBelgeler[index];
-      
+
       // Local state'ten sil
       setState(() {
         _yuklenenBelgeler.removeAt(index);
@@ -1948,7 +2931,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       if (ruhsatDoc.docs.isNotEmpty) {
         await ruhsatDoc.docs.first.reference.delete();
       }
-      
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1971,7 +2954,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     try {
       final url = belge['firebaseUrl'];
       final dosyaAdi = belge['başlık'] ?? '';
-      
+
       if (url == null || url.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1985,7 +2968,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       // Dosya türünü belirle
       final dosyaTipi = dosyaAdi.toLowerCase();
       final isPdf = dosyaTipi.endsWith('.pdf');
-      final isImage = dosyaTipi.endsWith('.jpg') ||
+      final isImage =
+          dosyaTipi.endsWith('.jpg') ||
           dosyaTipi.endsWith('.jpeg') ||
           dosyaTipi.endsWith('.png') ||
           dosyaTipi.endsWith('.gif');
@@ -2033,7 +3017,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade700,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 12,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -2049,24 +3036,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   child: Container(
                     color: Colors.grey.shade100,
                     child: (isPdf || isImage)
-                        ? FutureBuilder<Uint8List>(
-                            future: _fetchFileBytes(url),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
-                              if (snapshot.hasError || !snapshot.hasData) {
-                                return _buildPreviewError(message: snapshot.error?.toString());
-                              }
-                              
-                              final bytes = snapshot.data!;
-                              
-                              if (bytes.isEmpty) {
-                                return _buildPreviewError(message: 'Dosya boş (0 bytes)');
-                              }
-                              
-                              return _buildWebPreview(bytes, isPdf, dosyaAdi);
-                            },
+                        ? _buildPreviewFromUrl(
+                            url: url,
+                            isPdf: isPdf,
+                            isImage: isImage,
                           )
                         : _buildPreviewUnsupported(),
                   ),
@@ -2086,20 +3059,43 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     }
   }
 
-  Future<Uint8List> _fetchFileBytes(String url) async {
+  Widget _buildPreviewFromUrl({
+    required String url,
+    required bool isPdf,
+    required bool isImage,
+  }) {
     try {
-      final ref = FirebaseStorage.instance.refFromURL(url);
-      final metadata = await ref.getMetadata();
-      final maxSize = metadata.size ?? (50 * 1024 * 1024);
-      final bytes = await ref.getData(maxSize);
-      
-      if (bytes == null) {
-        throw Exception('Dosya indirilemedi');
+      if (isPdf) {
+        if (kIsWeb) {
+          // Web'de tarayıcının kendi PDF görüntüleyicisi en stabil davranışı veriyor.
+          return web_utils.buildWebPreviewFromUrl(
+            url: url,
+            isPdf: true,
+            fileName: 'preview.pdf',
+          );
+        }
+        return SfPdfViewer.network(url);
       }
-      
-      return bytes;
+
+      if (isImage) {
+        return InteractiveViewer(
+          child: Image.network(
+            url,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) =>
+                _buildPreviewError(message: 'Gorsel onizlenemedi'),
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const Center(child: CircularProgressIndicator());
+            },
+          ),
+        );
+      }
+
+      return _buildPreviewUnsupported();
     } catch (e) {
-      rethrow;
+      developer.log('_buildPreviewFromUrl hatasi: $e');
+      return _buildPreviewError(message: e.toString());
     }
   }
 
@@ -2114,7 +3110,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             const SizedBox(height: 12),
             Text(
               'Önizleme yüklenemedi',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red.shade400),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.red.shade400,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
@@ -2147,7 +3147,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             const SizedBox(height: 16),
             Text(
               'Bu dosya türü için önizleme yok',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryColor),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryColor,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -2160,44 +3164,6 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         ),
       ),
     );
-  }
-
-  Widget _buildWebPreview(Uint8List bytes, bool isPdf, String fileName) {
-    try {
-      if (kIsWeb) {
-        // Mobil tarayıcılarda iframe PDF/görsel gösteremiyor,
-        // SfPdfViewer ve Image.memory kullan
-        final isMobile = resp.isMobile(context);
-        if (isMobile) {
-          if (isPdf) {
-            return SfPdfViewer.memory(bytes);
-          }
-          return InteractiveViewer(
-            child: Image.memory(bytes, fit: BoxFit.contain),
-          );
-        }
-        // Masaüstü tarayıcılarda iframe ile önizleme
-        return web_utils.buildWebPreview(
-          bytes: bytes,
-          isPdf: isPdf,
-          fileName: fileName,
-        );
-      }
-
-      if (isPdf) {
-        return SfPdfViewer.memory(bytes);
-      }
-
-      return InteractiveViewer(
-        child: Image.memory(
-          bytes,
-          fit: BoxFit.contain,
-        ),
-      );
-    } catch (e) {
-      developer.log('_buildWebPreview hatasi: $e');
-      return _buildPreviewError(message: e.toString());
-    }
   }
 
   void _belgeIndir(Map<String, String> belge) async {
@@ -2235,13 +3201,25 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       if (kIsWeb) {
         await web_utils.downloadFile(url, fileName);
       } else {
-        // iOS/Android: Tarayıcıda aç
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        // iOS/Android: önce harici uygulamada açmayı dene, olmazsa varsayılan moda düş.
+        final uri = Uri.parse(url);
+        final launchedExternal = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (!launchedExternal) {
+          final launchedDefault = await launchUrl(uri);
+          if (!launchedDefault) {
+            throw Exception('Dosya acilamadi');
+          }
+        }
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$fileName indiriliyor...'),
+          content: Text(
+            kIsWeb ? '$fileName indiriliyor...' : '$fileName aciliyor...',
+          ),
           backgroundColor: Colors.green.shade700,
         ),
       );
@@ -2275,7 +3253,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                         children: [
                           const Text(
                             'Zemin Üstü Kat Sayısı',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -2294,8 +3275,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                     ),
                     ElevatedButton.icon(
                       onPressed: _katSayisiDialog,
-                      icon: Icon(_santiyeKatSayisi > 0 ? Icons.edit : Icons.add),
-                      label: Text(_santiyeKatSayisi > 0 ? 'Değiştir' : 'Belirle'),
+                      icon: Icon(
+                        _santiyeKatSayisi > 0 ? Icons.edit : Icons.add,
+                      ),
+                      label: Text(
+                        _santiyeKatSayisi > 0 ? 'Değiştir' : 'Belirle',
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue.shade700,
                         foregroundColor: Colors.white,
@@ -2306,7 +3291,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // İşlemler listesi
             if (_santiyeKatSayisi > 0) ...[
               const Text(
@@ -2325,11 +3310,18 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   padding: const EdgeInsets.all(32),
                   child: Column(
                     children: [
-                      Icon(Icons.construction, size: 64, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.construction,
+                        size: 64,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'Başlamak için kat sayısını belirleyin',
-                        style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
                     ],
                   ),
@@ -2340,7 +3332,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       ),
     );
   }
-  
+
   List<String> _getSantiyeIslemleri() {
     final islemler = <String>[
       'Hafriyat yapılacak alanın işaretlenmesi',
@@ -2353,13 +3345,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       'Zemin kat kalıp, demir işlemleri',
       'Hazır betonla Zemin kat betonu',
     ];
-    
+
     // Kat sayısına göre dinamik maddeler ekle
     for (int i = 1; i <= _santiyeKatSayisi; i++) {
       islemler.add('$i. kat kalıp ve demir işleri');
       islemler.add('$i. kat beton dökülmesi');
     }
-    
+
     // Kalan maddeler
     islemler.addAll([
       'Bodrum katın toprakla örtülecek kısmının su izolasyonunun yapılması',
@@ -2396,18 +3388,18 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       'Çevre düzenlemesi',
       'İnşaat temizliği',
     ]);
-    
+
     return islemler;
   }
-  
+
   Widget _buildSantiyeKanbanCard(int sira, String islem) {
     final durum = _santiyeDurumlari[sira] ?? 0;
     final fotograflar = _santiyeFotograflar[sira] ?? [];
-    
+
     Color bgColor;
     String durumText;
     IconData icon;
-    
+
     switch (durum) {
       case 0:
         bgColor = Colors.grey.shade300;
@@ -2429,13 +3421,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         durumText = 'Başlamadı';
         icon = Icons.radio_button_unchecked;
     }
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
           InkWell(
@@ -2487,9 +3477,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                       children: [
                         Text(
                           islem,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 6),
                         Row(
@@ -2498,17 +3487,21 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                             const SizedBox(width: 6),
                             Text(
                               durumText,
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.8)),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
                 ],
               ),
             ),
@@ -2528,7 +3521,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.photo_library, size: 18, color: Colors.grey),
+                    const Icon(
+                      Icons.photo_library,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'Fotoğraflar (${fotograflar.length})',
@@ -2546,7 +3543,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue.shade600,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -2566,7 +3566,8 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: GestureDetector(
-                            onTap: () => _santiyeFotografOnizle(fotograflar, index),
+                            onTap: () =>
+                                _santiyeFotografOnizle(fotograflar, index),
                             child: Stack(
                               children: [
                                 Column(
@@ -2604,7 +3605,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                   top: 2,
                                   right: 2,
                                   child: GestureDetector(
-                                    onTap: () => _santiyeFotografSil(sira, foto['id']!, foto['url']!),
+                                    onTap: () => _santiyeFotografSil(
+                                      sira,
+                                      foto['id']!,
+                                      foto['url']!,
+                                    ),
                                     child: Container(
                                       padding: const EdgeInsets.all(4),
                                       decoration: BoxDecoration(
@@ -2634,10 +3639,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       ),
     );
   }
-  
+
   Future<void> _katSayisiDialog() async {
-    final ctrl = TextEditingController(text: _santiyeKatSayisi > 0 ? '$_santiyeKatSayisi' : '');
-    
+    if (!_duzenlemeYetkisiKontrolEt()) return;
+    final ctrl = TextEditingController(
+      text: _santiyeKatSayisi > 0 ? '$_santiyeKatSayisi' : '',
+    );
+
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2661,21 +3669,23 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               final katSayisi = int.tryParse(ctrl.text) ?? 0;
               if (katSayisi <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Lütfen geçerli bir sayı girin')),
+                  const SnackBar(
+                    content: Text('Lütfen geçerli bir sayı girin'),
+                  ),
                 );
                 return;
               }
-              
+
               // Firestore'a kaydet
               await FirebaseFirestore.instance
                   .collection('santiye')
                   .doc(widget.projectId)
                   .set({'katSayisi': katSayisi}, SetOptions(merge: true));
-              
+
               setState(() {
                 _santiyeKatSayisi = katSayisi;
               });
-              
+
               Navigator.pop(ctx);
             },
             child: const Text('Kaydet'),
@@ -2684,8 +3694,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       ),
     );
   }
-  
+
   Future<void> _santiyeDurumSecDialog(int sira, String islem) async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2693,20 +3704,48 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildSantiyeStatusOption(ctx, sira, 0, 'Başlamadı', Colors.grey.shade300, Icons.radio_button_unchecked),
+            _buildSantiyeStatusOption(
+              ctx,
+              sira,
+              0,
+              'Başlamadı',
+              Colors.grey.shade300,
+              Icons.radio_button_unchecked,
+            ),
             const SizedBox(height: 8),
-            _buildSantiyeStatusOption(ctx, sira, 1, 'Devam Ediyor', Colors.yellow.shade300, Icons.access_time),
+            _buildSantiyeStatusOption(
+              ctx,
+              sira,
+              1,
+              'Devam Ediyor',
+              Colors.yellow.shade300,
+              Icons.access_time,
+            ),
             const SizedBox(height: 8),
-            _buildSantiyeStatusOption(ctx, sira, 2, 'Tamamlandı', Colors.green.shade300, Icons.check_circle),
+            _buildSantiyeStatusOption(
+              ctx,
+              sira,
+              2,
+              'Tamamlandı',
+              Colors.green.shade300,
+              Icons.check_circle,
+            ),
           ],
         ),
       ),
     );
   }
-  
-  Widget _buildSantiyeStatusOption(BuildContext ctx, int sira, int durum, String label, Color color, IconData icon) {
+
+  Widget _buildSantiyeStatusOption(
+    BuildContext ctx,
+    int sira,
+    int durum,
+    String label,
+    Color color,
+    IconData icon,
+  ) {
     final isSelected = (_santiyeDurumlari[sira] ?? 0) == durum;
-    
+
     return InkWell(
       onTap: () async {
         // Firestore'a kaydet
@@ -2715,35 +3754,34 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             .doc(widget.projectId)
             .collection('islemler')
             .doc('madde_$sira')
-            .set({
-          'sira': sira,
-          'durum': durum,
-        }, SetOptions(merge: true));
-        
+            .set({'sira': sira, 'durum': durum}, SetOptions(merge: true));
+
         setState(() {
           _santiyeDurumlari[sira] = durum;
         });
-        
+
         // Proje adını al ve bildirim gönder
         final projeDoc = await FirebaseFirestore.instance
             .collection('projects')
             .doc(widget.projectId)
             .get();
         final projeAdi = projeDoc.data()?['name'] ?? 'Proje';
-        
+
         // İşlem adını al
         final islemler = _getSantiyeIslemleri();
-        final islemAdi = sira <= islemler.length ? islemler[sira - 1] : 'İşlem $sira';
-        
+        final islemAdi = sira <= islemler.length
+            ? islemler[sira - 1]
+            : 'İşlem $sira';
+
         await BildirimServisi.bildirimGonder(
           baslik: 'Şantiye Durumu Güncellendi',
           mesaj: '$projeAdi - $islemAdi: $label',
           projeId: widget.projectId,
           modul: 'santiye',
         );
-        
+
         developer.log('✅ Bildirim gönderildi: $projeAdi - $islemAdi: $label');
-        
+
         Navigator.pop(ctx);
       },
       child: Container(
@@ -2766,26 +3804,27 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       ),
     );
   }
-  
+
   Future<void> _santiyeFotografYukle(int sira) async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowMultiple: true,
         withData: true,
       );
-      
+
       if (result == null || result.files.isEmpty) return;
-      
+
       // Her fotoğraf için açıklama girme dialogu
       final fotografBilgileri = <Map<String, dynamic>>[];
-      
+
       for (final file in result.files) {
         if (file.bytes == null) {
           developer.log('Fotograf okunamadi: ${file.name}');
           continue;
         }
-        
+
         final aciklamaCtrl = TextEditingController();
         final confirmed = await showDialog<bool>(
           context: context,
@@ -2802,10 +3841,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(
-                      file.bytes!,
-                      fit: BoxFit.cover,
-                    ),
+                    child: Image.memory(file.bytes!, fit: BoxFit.cover),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -2832,17 +3868,14 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             ],
           ),
         );
-        
+
         if (confirmed == false) continue;
-        
-        fotografBilgileri.add({
-          'file': file,
-          'aciklama': aciklamaCtrl.text,
-        });
+
+        fotografBilgileri.add({'file': file, 'aciklama': aciklamaCtrl.text});
       }
-      
+
       if (fotografBilgileri.isEmpty) return;
-      
+
       // Yükleniyor göstergesi
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2852,7 +3885,10 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                 const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Text('${fotografBilgileri.length} fotoğraf yükleniyor...'),
@@ -2863,18 +3899,19 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           ),
         );
       }
-      
+
       // Fotoğrafları yükle
       for (final fotoBilgi in fotografBilgileri) {
         final file = fotoBilgi['file'] as PlatformFile;
         final aciklama = fotoBilgi['aciklama'] as String;
-        
+
         // Firebase Storage'a yükle
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('santiye_fotograflar/${widget.projectId}/$fileName');
-        
+        final fileName =
+            '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+        final storageRef = FirebaseStorage.instance.ref().child(
+          'santiye_fotograflar/${widget.projectId}/$fileName',
+        );
+
         final ext = file.name.split('.').last.toLowerCase();
         final contentType = (ext == 'png') ? 'image/png' : 'image/jpeg';
         final downloadUrl = await uploadToStorage(
@@ -2882,24 +3919,24 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           file.bytes!,
           SettableMetadata(contentType: contentType),
         );
-        
+
         // Firestore'a kaydet
         final docRef = await FirebaseFirestore.instance
             .collection('santiye')
             .doc(widget.projectId)
             .collection('fotograflar')
             .add({
-          'sira': sira,
-          'url': downloadUrl,
-          'tarih': DateTime.now().toIso8601String(),
-          'aciklama': aciklama,
-        });
-        
+              'sira': sira,
+              'url': downloadUrl,
+              'tarih': DateTime.now().toIso8601String(),
+              'aciklama': aciklama,
+            });
+
         // State'e ekle
         if (!_santiyeFotograflar.containsKey(sira)) {
           _santiyeFotograflar[sira] = [];
         }
-        
+
         setState(() {
           _santiyeFotograflar[sira]!.add({
             'url': downloadUrl,
@@ -2909,7 +3946,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           });
         });
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2931,8 +3968,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       }
     }
   }
-  
+
   Future<void> _santiyeFotografSil(int sira, String docId, String url) async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -2951,9 +3989,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
         ],
       ),
     );
-    
+
     if (confirm != true) return;
-    
+
     try {
       // Firestore'dan sil
       await FirebaseFirestore.instance
@@ -2962,7 +4000,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           .collection('fotograflar')
           .doc(docId)
           .delete();
-      
+
       // Firebase Storage'dan sil
       try {
         final ref = FirebaseStorage.instance.refFromURL(url);
@@ -2970,12 +4008,12 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
       } catch (e) {
         developer.log('Storage silme hatası: $e');
       }
-      
+
       // State'den sil
       setState(() {
         _santiyeFotograflar[sira]?.removeWhere((f) => f['id'] == docId);
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -2987,16 +4025,16 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(hataCevir(e)),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(hataCevir(e)), backgroundColor: Colors.red),
         );
       }
     }
   }
-  
-  Future<void> _santiyeFotografOnizle(List<Map<String, String>> fotograflar, int baslangicIndex) async {
+
+  Future<void> _santiyeFotografOnizle(
+    List<Map<String, String>> fotograflar,
+    int baslangicIndex,
+  ) async {
     await showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -3019,7 +4057,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) {
                             return const Center(
-                              child: Icon(Icons.error, color: Colors.white, size: 64),
+                              child: Icon(
+                                Icons.error,
+                                color: Colors.white,
+                                size: 64,
+                              ),
                             );
                           },
                         ),
@@ -3043,8 +4085,13 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                           ],
                           if (foto['tarih']!.isNotEmpty)
                             Text(
-                              DateTime.parse(foto['tarih']!).toString().substring(0, 16),
-                              style: const TextStyle(color: Colors.white70, fontSize: 14),
+                              DateTime.parse(
+                                foto['tarih']!,
+                              ).toString().substring(0, 16),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
                             ),
                         ],
                       ),
@@ -3059,9 +4106,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
               child: IconButton(
                 onPressed: () => Navigator.pop(ctx),
                 icon: const Icon(Icons.close, color: Colors.white, size: 32),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.black54,
-                ),
+                style: IconButton.styleFrom(backgroundColor: Colors.black54),
               ),
             ),
           ],
@@ -3071,6 +4116,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Future<void> _yeniCariDialog(BuildContext context) async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     if (!mounted) return;
 
     // İlk dialog: Var olan cari seç veya yeni oluştur
@@ -3089,7 +4135,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Var olan bir cari hesabı bu projeye atayabilir veya yeni bir cari hesap oluşturabilirsiniz.'),
+            const Text(
+              'Var olan bir cari hesabı bu projeye atayabilir veya yeni bir cari hesap oluşturabilirsiniz.',
+            ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () => Navigator.pop(ctx, 'mevcut'),
@@ -3117,6 +4165,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Future<void> _mevcutCariSec(BuildContext context) async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     String arama = '';
 
     if (!mounted) return;
@@ -3135,15 +4184,24 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   decoration: InputDecoration(
                     hintText: 'Cari ara...',
                     prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     isDense: true,
                   ),
-                  onChanged: (v) => setState(() => arama = v.trim().toLowerCase()),
+                  onChanged: (v) =>
+                      setState(() => arama = v.trim().toLowerCase()),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance.collection('cari_hesaplar').where('sirketId', isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '').snapshots(),
+                    stream: FirebaseFirestore.instance
+                        .collection('cari_hesaplar')
+                        .where(
+                          'sirketId',
+                          isEqualTo: SistemYoneticisi().aktifSirket?.id ?? '',
+                        )
+                        .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
                         return const Center(child: CircularProgressIndicator());
@@ -3152,11 +4210,16 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                       // Projede zaten olan carileri filtrele
                       var docs = snapshot.data!.docs.where((doc) {
                         final data = doc.data() as Map<String, dynamic>;
-                        final pids = List<String>.from(data['projectIds'] ?? []);
+                        final pids = List<String>.from(
+                          data['projectIds'] ?? [],
+                        );
                         // Eski format desteği
                         final pid = data['projectId'] ?? '';
                         // Bu projede zaten olan carileri gösterme
-                        if (pids.contains(widget.projectId) || pid == widget.projectId) return false;
+                        if (pids.contains(widget.projectId) ||
+                            pid == widget.projectId) {
+                          return false;
+                        }
                         final ad = (data['ad'] ?? '').toString().toLowerCase();
                         return arama.isEmpty || ad.contains(arama);
                       }).toList();
@@ -3164,7 +4227,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                       if (docs.isEmpty) {
                         return Center(
                           child: Text(
-                            arama.isNotEmpty ? 'Sonuç bulunamadı' : 'Mevcut cari hesap yok',
+                            arama.isNotEmpty
+                                ? 'Sonuç bulunamadı'
+                                : 'Mevcut cari hesap yok',
                             style: TextStyle(color: Colors.grey.shade600),
                           ),
                         );
@@ -3178,18 +4243,36 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                           final ad = data['ad'] ?? 'İsimsiz';
                           final tip = data['tip'] ?? 'musteri';
                           final telefon = data['telefon'] ?? '';
-                          final ikon = tip == 'musteri' ? Icons.person_outline : Icons.business_outlined;
+                          final ikon = tip == 'musteri'
+                              ? Icons.person_outline
+                              : Icons.business_outlined;
 
                           return ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                              child: Icon(ikon, color: AppTheme.primaryColor, size: 20),
+                              backgroundColor: AppTheme.primaryColor.withValues(
+                                alpha: 0.1,
+                              ),
+                              child: Icon(
+                                ikon,
+                                color: AppTheme.primaryColor,
+                                size: 20,
+                              ),
                             ),
-                            title: Text(ad, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: telefon.toString().isNotEmpty ? Text(telefon) : null,
+                            title: Text(
+                              ad,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: telefon.toString().isNotEmpty
+                                ? Text(telefon)
+                                : null,
                             trailing: Text(
                               tip == 'musteri' ? 'Müşteri' : 'Tedarikçi',
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                              ),
                             ),
                             onTap: () async {
                               // Cari'nin projectIds listesine bu projeyi ekle
@@ -3197,13 +4280,17 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                                   .collection('cari_hesaplar')
                                   .doc(doc.id)
                                   .update({
-                                    'projectIds': FieldValue.arrayUnion([widget.projectId]),
+                                    'projectIds': FieldValue.arrayUnion([
+                                      widget.projectId,
+                                    ]),
                                   });
 
                               if (ctx.mounted) {
                                 Navigator.pop(ctx);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('$ad bu projeye eklendi')),
+                                  SnackBar(
+                                    content: Text('$ad bu projeye eklendi'),
+                                  ),
                                 );
                               }
                             },
@@ -3228,6 +4315,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
   }
 
   Future<void> _yeniCariOlustur(BuildContext context) async {
+    if (!_duzenlemeYetkisiKontrolEt()) return;
     final adCtrl = TextEditingController();
     final telefonCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
@@ -3245,27 +4333,37 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: const Text('Müşteri', style: TextStyle(fontSize: 13)),
-                        value: 'musteri',
-                        groupValue: tip,
-                        onChanged: (v) => setState(() => tip = v!),
-                        contentPadding: EdgeInsets.zero,
+                RadioGroup<String>(
+                  groupValue: tip,
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => tip = v);
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: const Text(
+                            'Müşteri',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                          value: 'musteri',
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: const Text('Tedarikçi', style: TextStyle(fontSize: 13)),
-                        value: 'tedarikci',
-                        groupValue: tip,
-                        onChanged: (v) => setState(() => tip = v!),
-                        contentPadding: EdgeInsets.zero,
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: const Text(
+                            'Tedarikçi',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                          value: 'tedarikci',
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -3319,24 +4417,62 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> with Single
                   return;
                 }
 
-                await FirebaseFirestore.instance.collection('cari_hesaplar').add({
-                  'ad': adCtrl.text.trim(),
-                  'tip': tip,
-                  'telefon': telefonCtrl.text.trim(),
-                  'email': emailCtrl.text.trim(),
-                  'adres': adresCtrl.text.trim(),
-                  'bakiye': 0.0,
-                  'projectId': widget.projectId,
-                  'projectIds': [widget.projectId],
-                  'olusturmaTarihi': FieldValue.serverTimestamp(),
-                  'sirketId': SistemYoneticisi().aktifSirket?.id ?? '',
-                });
+                try {
+                  final sirket = SistemYoneticisi().aktifSirket;
+                  final sirketId = sirket?.id ?? '';
+                  if (sirketId.isEmpty) {
+                    throw Exception(
+                      'Sirket bilgisi bulunamadi. Lutfen tekrar giris yapin.',
+                    );
+                  }
 
-                if (context.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Cari hesap oluşturuldu')),
+                  final tier = planTierFromRaw(
+                    sirket?.planTier,
+                    subscriptionType: sirket?.subscriptionType,
+                    subscriptionEndDate: sirket?.subscriptionEndDate,
                   );
+                  final limitler = planLimitleriFor(tier);
+                  if (limitler.maxCariSayisi != null) {
+                    final countResult = await FirebaseFirestore.instance
+                        .collection('cari_hesaplar')
+                        .where('sirketId', isEqualTo: sirketId)
+                        .count()
+                        .get();
+                    final toplamCari = countResult.count ?? 0;
+                    if (toplamCari >= limitler.maxCariSayisi!) {
+                      throw Exception(
+                        'Ucretsiz planda en fazla ${limitler.maxCariSayisi} cari hesap olusturabilirsiniz. Daha fazla cari icin planinizi yukseltin.',
+                      );
+                    }
+                  }
+
+                  await FirebaseFirestore.instance
+                      .collection('cari_hesaplar')
+                      .add({
+                        'ad': adCtrl.text.trim(),
+                        'tip': tip,
+                        'telefon': telefonCtrl.text.trim(),
+                        'email': emailCtrl.text.trim(),
+                        'adres': adresCtrl.text.trim(),
+                        'bakiye': 0.0,
+                        'projectId': widget.projectId,
+                        'projectIds': [widget.projectId],
+                        'olusturmaTarihi': FieldValue.serverTimestamp(),
+                        'sirketId': sirketId,
+                      });
+
+                  if (context.mounted) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cari hesap oluşturuldu')),
+                    );
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(
+                      ctx,
+                    ).showSnackBar(SnackBar(content: Text(hataCevir(e))));
+                  }
                 }
               },
               child: const Text('Kaydet'),

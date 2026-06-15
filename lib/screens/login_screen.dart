@@ -9,6 +9,7 @@ import 'dart:typed_data';
 import '../theme/app_theme.dart';
 import '../utils/error_handler.dart';
 import '../payment_service.dart';
+import '../project_core.dart' show PlanTier;
 import '../main.dart' show companyCreationInProgress;
 import 'paywall_screen.dart';
 
@@ -264,10 +265,15 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                       }
                       setState(() { loading = true; hata = null; });
                       try {
-                        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
                           email: email,
                           password: pass,
                         );
+                        try {
+                          FirebaseAuth.instance.setLanguageCode('tr');
+                          await cred.user?.sendEmailVerification();
+                        } catch (_) {}
+                        await FirebaseAuth.instance.signOut();
                         if (ctx.mounted) Navigator.pop(ctx, true);
                       } on FirebaseAuthException catch (e) {
                         String msg;
@@ -312,31 +318,21 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
       ),
     );
 
-    if (hesapOlusturuldu != true) return;
-
-    // Hesap oluşturuldu, şimdi ödeme akışına yönlendir
-    final paymentService = PaymentService();
-    await paymentService.initialize();
-    final subStatus = await paymentService.getSubscriptionStatus();
-
-    if (!(subStatus['active'] as bool)) {
+    if (hesapOlusturuldu == true) {
       if (mounted) {
-        final purchased = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Hesap olusturuldu. Giris yapmadan once e-posta aktivasyonunu tamamlayin. Mail gelmezse Spam/Junk klasorunu kontrol edin.',
+            ),
+            duration: Duration(seconds: 6),
+          ),
         );
-        if (purchased != true) {
-          // Ödeme yapılmadıysa çıkış yap
-          await FirebaseAuth.instance.signOut();
-          return;
-        }
       }
+      return;
     }
 
-    // Ödeme başarılı, şirket kurma formu
-    if (mounted) {
-      await _showSirketKurForm();
-    }
+    return;
   }
 
   /// Auth'lu kullanıcı için şirket kurma formu (Apple IAP sonrası)
@@ -356,7 +352,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: Text(
-            "Yeni Şirket Kur",
+            "Yeni Kullanıcı Kaydı",
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: AppTheme.primaryColor,
@@ -486,6 +482,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                           'adminlar': {currentUser.uid: true},
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,
+                          'planTier': PlanTier.free.name,
                         });
                         // sirketId'yi kullanıcıya kaydet
                         await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set({
@@ -524,231 +521,6 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white), strokeWidth: 2))
                   : const Text('ŞİRKET KUR'),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _personelKayitDialog() {
-    final emailCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
-    bool kayitLoading = false;
-    String? hataMetni;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            "Personel Kaydı",
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryColor,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (hataMetni != null)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            hataMetni!,
-                            style: TextStyle(
-                              color: Colors.red.shade900,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: AppTheme.primaryColor),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          "Yöneticinizin size verdiği email adresiyle kayıt olun.",
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: emailCtrl,
-                  enabled: !kayitLoading,
-                  decoration: InputDecoration(
-                    labelText: "Email",
-                    hintText: "yonetici@sirket.com tarafından eklenen email",
-                    prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryColor),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: passCtrl,
-                  enabled: !kayitLoading,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: "Şifre",
-                    hintText: "Güçlü bir şifre girin",
-                    prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryColor),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: kayitLoading ? null : () => Navigator.pop(ctx),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.grey.shade600,
-              ),
-              child: const Text("İPTAL"),
-            ),
-            ElevatedButton(
-              onPressed: kayitLoading
-                  ? null
-                  : () async {
-                      if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
-                        setDialogState(() {
-                          hataMetni = "Lütfen tüm alanları doldurun";
-                        });
-                        return;
-                      }
-
-                      setDialogState(() {
-                        kayitLoading = true;
-                        hataMetni = null;
-                      });
-
-                      // Auth state değişikliğini bypass et —
-                      // createUserWithEmailAndPassword otomatik giriş yapar,
-                      // AuthGate'in VeriYuklemeEkrani'na geçmesini engelle.
-                      companyCreationInProgress.value = true;
-
-                      try {
-                        // Firebase Auth'ta kullanıcı oluştur
-                        final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-                          email: emailCtrl.text.trim(),
-                          password: passCtrl.text.trim(),
-                        );
-
-                        // Önce user doc oluştur (Firestore security rules için gerekli)
-                        if (credential.user != null) {
-                          await FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(credential.user!.uid)
-                              .set({'email': emailCtrl.text.trim().toLowerCase()}, SetOptions(merge: true));
-                        }
-
-                        // Email ile eşleşen şirketi bul ve sirketId'yi kaydet
-                        final normalizedEmail = emailCtrl.text.trim().toLowerCase();
-                        try {
-                          final emailQuery = await FirebaseFirestore.instance
-                              .collection('sirketler')
-                              .where('emailler', arrayContains: normalizedEmail)
-                              .limit(1)
-                              .get();
-                          if (emailQuery.docs.isNotEmpty && credential.user != null) {
-                            await FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(credential.user!.uid)
-                                .set({'sirketId': emailQuery.docs.first.id}, SetOptions(merge: true));
-                          }
-                        } catch (_) {
-                          // Şirket eşleşmesi opsiyonel — login'de de yapılır
-                        }
-
-                        // ÖNEMLİ: Önce dialog'u kapat (widget tree stabil iken),
-                        // sonra signOut yap, sonra flag'i sıfırla.
-                        if (ctx.mounted) Navigator.pop(ctx);
-
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Kayıt başarılı! Şimdi giriş yapabilirsiniz."),
-                              backgroundColor: Colors.green,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-
-                        // Kullanıcıyı çıkış yaptır (giriş ekranından girmesi için)
-                        await FirebaseAuth.instance.signOut();
-                        companyCreationInProgress.value = false;
-                      } catch (e) {
-                        // Hata durumunda flag'i sıfırla ve hata göster
-                        companyCreationInProgress.value = false;
-                        if (ctx.mounted) {
-                          setDialogState(() {
-                            kayitLoading = false;
-                            hataMetni = hataCevir(e);
-                          });
-                        }
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.secondaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: kayitLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Text("KAYIT OL"),
-            )
           ],
         ),
       ),
@@ -914,7 +686,7 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                   ),
                   const SizedBox(height: 8),
                   
-                  // Yeni Şirket Kur Butonu
+                  // Yeni Kullanıcı Kaydı Butonu
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -928,33 +700,9 @@ class _LoginSayfasiState extends State<LoginSayfasi> {
                         ),
                       ),
                       child: Text(
-                        "YENİ ŞİRKET KUR",
+                        "YENİ KULLANICI KAYDI",
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: AppTheme.primaryColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Personel Kaydı Butonu
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: OutlinedButton(
-                      onPressed: _loading ? null : _personelKayitDialog,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.secondaryColor,
-                        side: BorderSide(color: AppTheme.secondaryColor, width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        "PERSONEL OLARAK KAYIT OL",
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppTheme.secondaryColor,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

@@ -4,7 +4,6 @@ import '../project_core.dart';
 import '../notification_service.dart';
 import '../theme/app_theme.dart';
 import 'project_details_screen.dart';
-import 'gunluk_rapor_screen.dart';
 
 class BildirimlerScreen extends StatefulWidget {
   const BildirimlerScreen({super.key});
@@ -91,8 +90,12 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
         return false;
       }
       // Filtre kontrolü
-      final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
-      final okunmus = okuyanlar.contains(email) || _localOkunanlar.contains(doc.id);
+      final okunmus = BildirimServisi.okunduMu(
+        b,
+        email: email,
+        docId: doc.id,
+        localOkunanlar: _localOkunanlar,
+      );
       if (_filtre == 'okunmamis') return !okunmus;
       if (_filtre == 'okunmus') return okunmus;
       return true;
@@ -100,18 +103,7 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
   }
 
   Future<void> _okunduIsaretle(QueryDocumentSnapshot doc) async {
-    final email = SistemYoneticisi().girisYapanEmail;
-    final sirketId = SistemYoneticisi().aktifSirket?.id;
-    if (email == null || sirketId == null) return;
-
-    await FirebaseFirestore.instance
-        .collection('sirketler')
-        .doc(sirketId)
-        .collection('bildirimler')
-        .doc(doc.id)
-        .update({
-      'okuyanlar': FieldValue.arrayUnion([email])
-    });
+    await BildirimServisi.okunduIsaretleDoc(doc.id);
   }
 
   List<QueryDocumentSnapshot> get _okunmamisYetkiliBildirimler {
@@ -121,8 +113,12 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
       if (!BildirimServisi.yetkiliMi(b)) {
         return false;
       }
-      final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
-      final okunmus = okuyanlar.contains(email) || _localOkunanlar.contains(doc.id);
+      final okunmus = BildirimServisi.okunduMu(
+        b,
+        email: email,
+        docId: doc.id,
+        localOkunanlar: _localOkunanlar,
+      );
       return !okunmus;
     }).toList();
   }
@@ -236,30 +232,16 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                   final mesaj = b['mesaj'] ?? '';
                   final gonderen = b['gonderen'] ?? '';
                   final projeId = b['projeId'] ?? '';
-                  final modul = b['modul'] ?? '';
+                  final tip = BildirimServisi.bildirimTipi(b);
                   final tarih = b['tarih'] as Timestamp?;
-                  final okuyanlar = (b['okuyanlar'] as List?)?.cast<String>() ?? [];
-                  final okunmus = okuyanlar.contains(email) || _localOkunanlar.contains(doc.id);
-
-                  Color modulRenk;
-                  IconData modulIkon;
-                  switch (modul) {
-                    case 'ruhsat':
-                      modulRenk = Colors.red;
-                      modulIkon = Icons.description_outlined;
-                      break;
-                    case 'santiye':
-                      modulRenk = Colors.orange;
-                      modulIkon = Icons.construction;
-                      break;
-                    case 'muhasebe':
-                      modulRenk = Colors.blue;
-                      modulIkon = Icons.account_balance_wallet;
-                      break;
-                    default:
-                      modulRenk = Colors.teal;
-                      modulIkon = Icons.notifications_active;
-                  }
+                  final okunmus = BildirimServisi.okunduMu(
+                    b,
+                    email: email,
+                    docId: doc.id,
+                    localOkunanlar: _localOkunanlar,
+                  );
+                  final modulRenk = BildirimServisi.bildirimRenk(b);
+                  final modulIkon = BildirimServisi.bildirimIkon(b);
 
                   String zamanStr = '';
                   if (tarih != null) {
@@ -297,17 +279,6 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                           setState(() {});
                         }
                         if (!mounted) return;
-                        // Günlük rapor bildirimi -> rapor ekranı
-                        if (modul == 'gunluk_rapor') {
-                          final raporId = b['raporId'] as String?;
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (c) => GunlukRaporScreen(raporId: raporId),
-                            ),
-                          );
-                          return;
-                        }
                         if (projeId.toString().isNotEmpty) {
                           Navigator.push(
                             context,
@@ -357,6 +328,23 @@ class _BildirimlerScreenState extends State<BildirimlerScreen> {
                                           ),
                                         ),
                                       ),
+                                      if (!okunmus)
+                                        Container(
+                                          margin: const EdgeInsets.only(left: 6),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: modulRenk.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            tip.toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              color: modulRenk,
+                                            ),
+                                          ),
+                                        ),
                                       if (zamanStr.isNotEmpty)
                                         Text(zamanStr, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                                     ],

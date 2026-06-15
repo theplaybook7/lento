@@ -16,14 +16,14 @@ class PaywallScreen extends StatefulWidget {
   State<PaywallScreen> createState() => _PaywallScreenState();
 }
 
-enum PlanType { monthly, yearly, trial }
+enum PlanType { solo, enterprise, trial }
 
 class _PaywallScreenState extends State<PaywallScreen> {
   bool _loading = false;
   bool _productsLoading = true;
   String _statusMessage = "";
   final Map<String, ProductDetails> _products = {};
-  PlanType _selectedPlan = PlanType.yearly;
+  PlanType _selectedPlan = PlanType.enterprise;
   bool _trialUsed = false;
 
   @override
@@ -119,11 +119,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
       String productId = '';
       
       switch (planType) {
-        case PlanType.yearly:
-          productId = 'company_yearly_subscription';
+        case PlanType.enterprise:
+          productId = PaymentService.enterpriseMonthlySubscriptionId;
           break;
-        case PlanType.monthly:
-          productId = 'company_monthly_subscription';
+        case PlanType.solo:
+          productId = PaymentService.soloMonthlySubscriptionId;
           break;
         case PlanType.trial:
           break;
@@ -178,16 +178,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   String _priceTextForPlan(PlanType planType) {
-    final id = planType == PlanType.yearly
-        ? PaymentService.yearlySubscriptionId
-        : PaymentService.monthlySubscriptionId;
+    final id = planType == PlanType.enterprise
+        ? PaymentService.enterpriseMonthlySubscriptionId
+        : PaymentService.soloMonthlySubscriptionId;
     final product = _products[id];
     if (product != null && product.price.isNotEmpty) {
       return product.price;
     }
     // Fallback fiyatlar (StoreKit yüklenemezse)
     if (!_productsLoading) {
-      return planType == PlanType.yearly ? '₺29.999,99' : '₺2.999,99';
+      return planType == PlanType.enterprise ? '₺29.999,99' : '₺2.999,99';
     }
     return 'Yükleniyor...';
   }
@@ -266,20 +266,51 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       color: AppTheme.primaryColor.withValues(alpha: 0.25),
                     ),
                   ),
-                  child: Row(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.verified_outlined, size: 16, color: AppTheme.primaryColor),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          PaymentService().isApplePaymentSupported
-                              ? 'Ödeme App Store üzerinden güvenli şekilde yapılır'
-                              : 'Ödeme Google Play üzerinden güvenli şekilde yapılır',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w600,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified_outlined, size: 16, color: AppTheme.primaryColor),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              PaymentService().isApplePaymentSupported
+                                  ? 'Ödeme App Store üzerinden güvenli şekilde yapılır'
+                                  : 'Ödeme Google Play üzerinden güvenli şekilde yapılır',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.primaryColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.amber.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Plan Ayrimlari',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: Colors.brown.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text('• ÜCRETSIZ: 1 aktif proje + 10 cari hesap'),
+                            const Text('• SOLO (Aylik): Sinirsiz proje/cari, personel ekleme kapali'),
+                            const Text('• BUYUK ISLETME (Aylik): Tum ozellikler + personel + proje paylasimi'),
+                          ],
                         ),
                       ),
                     ],
@@ -296,7 +327,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     price: "₺0",
                     duration: "/7 gün",
                     features: [
-                      "Tüm özellikler açık",
+                      "1 aktif proje hakkı",
+                      "10 cari hesap hakkı",
+                      "Personel ekleme kapalı",
+                      "Proje paylaşımı kapalı",
                       "Kredi kartı gerekmez",
                       "Otomatik yenileme yok",
                     ],
@@ -310,38 +344,44 @@ class _PaywallScreenState extends State<PaywallScreen> {
               // Plans (only on platforms supporting IAP)
               if (PaymentService().isPaymentSupported) ...[
                 _buildPlanCard(
-                  title: "Aylık",
-                  subtitle: "Subscription",
-                  price: _priceTextForPlan(PlanType.monthly),
+                  title: "SOLO",
+                  subtitle: "Tek Kişilik İşletme (Aylık)",
+                  price: _priceTextForPlan(PlanType.solo),
                   duration: "/ay",
                   features: [
                     "Sınırsız proje yönetimi",
-                    "Personel ve rol yönetimi",
+                    "Sınırsız cari hesap",
+                    "Personel ekleme kapalı",
+                    "Proje paylaşımı yok",
                     "Mali raporlama ve analiz",
                     "Otomatik aylık yenileme",
                     "7 gün para iade garantisi",
                   ],
-                  planType: PlanType.monthly,
+                  planType: PlanType.solo,
                   isPopular: false,
+                  ctaLabel: 'SOLO Başlat',
                 ),
                 const SizedBox(height: 16),
 
                 _buildPlanCard(
-                  title: "Yıllık",
-                  subtitle: "En Uygun",
-                  price: _priceTextForPlan(PlanType.yearly),
-                  duration: "/yıl",
-                  discount: "2 ay tasarruf et",
+                  title: "BÜYÜK İŞLETME",
+                  subtitle: "Enterprise (Aylık)",
+                  price: _priceTextForPlan(PlanType.enterprise),
+                  duration: "/ay",
                   features: [
                     "Sınırsız proje yönetimi",
-                    "Personel ve rol yönetimi",
+                    "Sınırsız cari hesap",
+                    "Personel ekleme ve rol yönetimi",
+                    "Proje paylaşımı: Ruhsat/Şantiye/Muhasebe bazlı",
+                    "Paylaşılan hesap için düzenleme yetkisi seçimi",
                     "Mali raporlama ve analiz",
-                    "Otomatik yıllık yenileme",
-                    "30 gün para iade garantisi",
+                    "Otomatik aylık yenileme",
+                    "7 gün para iade garantisi",
                     "Öncelikli destek",
                   ],
-                  planType: PlanType.yearly,
+                  planType: PlanType.enterprise,
                   isPopular: true,
+                  ctaLabel: 'Büyük İşletme Başlat',
                 ),
               ],
               const SizedBox(height: 40),
@@ -405,7 +445,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         ? "İşleniyor..."
                         : _selectedPlan == PlanType.trial
                             ? "Ücretsiz Dene"
-                            : _selectedPlan == PlanType.yearly ? "Yıllık Başla" : "Aylık Başla",
+                            : _selectedPlan == PlanType.enterprise ? "Büyük İşletme Başla" : "SOLO Başla",
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -424,6 +464,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
               const SizedBox(height: 16),
 
               if (PaymentService().isPaymentSupported) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'App Store Ürün Eşleşmesi: company_solo_monthly_subscription = SOLO | company_enterprise_monthly_subscription = BÜYÜK İŞLETME',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
                 TextButton(
                   onPressed: _loading ? null : _restorePurchases,
                   child: const Text('Satın Alımları Geri Yükle'),
@@ -518,6 +568,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     required PlanType planType,
     required bool isPopular,
     bool isTrial = false,
+    String? ctaLabel,
   }) {
     final isSelected = _selectedPlan == planType;
     return GestureDetector(
@@ -630,7 +681,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     child: Text(
-                      isTrial ? "Ücretsiz Dene" : "Satın Al",
+                      isTrial ? "Ücretsiz Dene" : (ctaLabel ?? "Satın Al"),
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),

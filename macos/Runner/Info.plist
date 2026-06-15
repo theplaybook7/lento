@@ -28,6 +28,10 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Uygulama, santiye fotograflari cekmek ve proje gorselleri eklemek icin kameraya erisim ister.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Uygulama, projelere fotograf yuklemek ve belge eklemek icin fotograf kutuphanesine erisim ister.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

@@ -1,7 +1,7 @@
 import 'dart:typed_data';
-import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/widgets.dart';
+import 'package:web/web.dart' as web;
 
 Widget buildWebPreview({
   required Uint8List bytes,
@@ -9,22 +9,36 @@ Widget buildWebPreview({
   required String fileName,
 }) {
   final mimeType = isPdf ? 'application/pdf' : 'image/png';
-  final blob = html.Blob([bytes], mimeType);
-  final url = html.Url.createObjectUrlFromBlob(blob);
+  final url = Uri.dataFromBytes(bytes, mimeType: mimeType).toString();
   final viewId = 'preview-${DateTime.now().millisecondsSinceEpoch}';
 
-  // ignore: undefined_prefixed_name
-  ui_web.platformViewRegistry.registerViewFactory(
-    viewId,
-    (int viewIdInt) {
-      final iframe = html.IFrameElement()
-        ..src = url
-        ..style.border = 'none'
-        ..style.width = '100%'
-        ..style.height = '100%';
-      return iframe;
-    },
-  );
+  ui_web.platformViewRegistry.registerViewFactory(viewId, (int viewIdInt) {
+    final iframe = web.HTMLIFrameElement()
+      ..src = url
+      ..style.border = 'none'
+      ..style.width = '100%'
+      ..style.height = '100%';
+    return iframe;
+  });
+
+  return HtmlElementView(viewType: viewId);
+}
+
+Widget buildWebPreviewFromUrl({
+  required String url,
+  required bool isPdf,
+  required String fileName,
+}) {
+  final viewId = 'preview-url-${DateTime.now().millisecondsSinceEpoch}';
+
+  ui_web.platformViewRegistry.registerViewFactory(viewId, (int viewIdInt) {
+    final iframe = web.HTMLIFrameElement()
+      ..src = url
+      ..style.border = 'none'
+      ..style.width = '100%'
+      ..style.height = '100%';
+    return iframe;
+  });
 
   return HtmlElementView(viewType: viewId);
 }
@@ -41,30 +55,12 @@ Future<void> downloadImage(String url, {String? fileName}) async {
 /// sonra blob URL üzerinden download anchor tetikle. Doğrudan `<a download href=...>`
 /// yöntemi cross-origin'de çalışmaz; tarayıcı dosyayı yeni sekmede açar.
 Future<void> _fetchAndDownload(String url, String fileName) async {
-  try {
-    final response = await html.HttpRequest.request(
-      url,
-      responseType: 'blob',
-    );
-    final blob = response.response as html.Blob;
-    final blobUrl = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: blobUrl)
-      ..setAttribute('download', fileName)
-      ..style.display = 'none';
-    html.document.body?.children.add(anchor);
-    anchor.click();
-    await Future.delayed(const Duration(milliseconds: 100));
-    html.document.body?.children.remove(anchor);
-    html.Url.revokeObjectUrl(blobUrl);
-  } catch (_) {
-    // Fallback: doğrudan link (yeni sekmede açabilir)
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', fileName)
-      ..setAttribute('target', '_blank')
-      ..style.display = 'none';
-    html.document.body?.children.add(anchor);
-    anchor.click();
-    await Future.delayed(const Duration(milliseconds: 100));
-    html.document.body?.children.remove(anchor);
-  }
+  final anchor = web.HTMLAnchorElement()
+    ..href = url
+    ..download = fileName
+    ..target = '_blank'
+    ..style.display = 'none';
+  web.document.body?.append(anchor);
+  anchor.click();
+  web.document.body?.removeChild(anchor);
 }

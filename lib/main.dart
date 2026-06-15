@@ -30,7 +30,6 @@ Future<void> _initializeIosServices() async {
   try {
     final notificationService = PaymentNotificationService();
     await notificationService.initialize().timeout(const Duration(seconds: 10));
-    await notificationService.initializeBackgroundTasks().timeout(const Duration(seconds: 10));
   } catch (_) {
     // iOS arka plan/bildirim servisleri uygulama acilisini bloklamamali.
   }
@@ -90,7 +89,8 @@ class AuthGate extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: companyCreationInProgress,
       builder: (context, creatingCompany, _) => StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
+        // userChanges: sign-in/out + reload sonrası emailVerified güncellemelerini de yakalar
+        stream: FirebaseAuth.instance.userChanges(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -98,11 +98,169 @@ class AuthGate extends StatelessWidget {
           if (creatingCompany) {
             return const LoginSayfasi();
           }
-          if (snapshot.hasData) {
+          final user = snapshot.data;
+          if (user != null) {
+            if (!user.emailVerified) {
+              return const EmailDogrulamaEkrani();
+            }
             return const VeriYuklemeEkrani();
           }
           return const LoginSayfasi();
         },
+      ),
+    );
+  }
+}
+
+/// E-posta doğrulanmamış kullanıcılar için ekran. Her 4 sn'de currentUser.reload() yapar;
+/// userChanges stream'i bunu yakalar ve doğrulama tamamlandığında AuthGate ana akışa geçer.
+class EmailDogrulamaEkrani extends StatefulWidget {
+  const EmailDogrulamaEkrani({super.key});
+
+  @override
+  State<EmailDogrulamaEkrani> createState() => _EmailDogrulamaEkraniState();
+}
+
+class _EmailDogrulamaEkraniState extends State<EmailDogrulamaEkrani> {
+  Timer? _timer;
+  bool _yenidenGonderiyor = false;
+  DateTime? _sonGonderim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ilkGonderim();
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      try {
+        await FirebaseAuth.instance.currentUser?.reload();
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _ilkGonderim() async {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u != null && !u.emailVerified) {
+      try {
+        FirebaseAuth.instance.setLanguageCode('tr');
+        await u.sendEmailVerification();
+        _sonGonderim = DateTime.now();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _yenidenGonder() async {
+    if (_yenidenGonderiyor) return;
+    if (_sonGonderim != null &&
+        DateTime.now().difference(_sonGonderim!).inSeconds < 30) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lütfen 30 saniye bekleyip tekrar deneyin.')),
+      );
+      return;
+    }
+    setState(() => _yenidenGonderiyor = true);
+    try {
+      FirebaseAuth.instance.setLanguageCode('tr');
+      await FirebaseAuth.instance.currentUser?.sendEmailVerification();
+      _sonGonderim = DateTime.now();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Doğrulama bağlantısı tekrar gönderildi.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gönderilemedi: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _yenidenGonderiyor = false);
+    }
+  }
+
+  Future<void> _kontrolEt() async {
+    try {
+      await FirebaseAuth.instance.currentUser?.reload();
+      final u = FirebaseAuth.instance.currentUser;
+      if (u != null && !u.emailVerified && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('E-posta henüz doğrulanmamış.')),
+        );
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final email = FirebaseAuth.instance.currentUser?.email ?? '';
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('E-posta Doğrulama'),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.mark_email_unread, size: 72, color: AppTheme.primaryColor),
+              const SizedBox(height: 16),
+              const Text(
+                'Hesabınızı doğrulayın',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Dogrulama baglantisi gonderildi:\n$email\n\nMail bazen Spam/Junk klasorune dusebilir, lutfen orayi da kontrol edin.\n\nE-postadaki baglantiya tikladiktan sonra bu ekran otomatik kapanacaktir.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _kontrolEt,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Doğrulama durumunu kontrol et'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _yenidenGonderiyor ? null : _yenidenGonder,
+                icon: _yenidenGonderiyor
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send),
+                label: const Text('Bağlantıyı tekrar gönder'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text('Çıkış yap'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -163,6 +321,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   bool _sirketBulunamadi = false;
   String? _hataMetni;
   bool _yuklemeUzunSuruyor = false;
+  bool _sirketKurulumYonlendirmesiAcildi = false;
 
   @override
   void initState() {
@@ -406,82 +565,19 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
           // FCM push bildirim token kaydı
           unawaited(FcmService().initialize());
 
-          // Abonelik kontrolü - tüm platformlar (Apple Guideline 3.1.1)
-          bool subscriptionActive = false;
-
-          // 1. Şirket aboneliğini kontrol et
-          if (bulunanSirket.subscriptionEndDate != null) {
-            subscriptionActive = bulunanSirket.subscriptionEndDate!.isAfter(DateTime.now());
-          }
-
-          // 2. Kullanıcının kendi aboneliğini kontrol et (fallback)
-          if (!subscriptionActive) {
-            final subStatus = await PaymentService().getSubscriptionStatus();
-            subscriptionActive = subStatus['active'] as bool;
-            // Kullanıcıda aktif ama şirkette yoksa, şirkete kopyala
-            if (subscriptionActive && bulunanSirket.id.isNotEmpty) {
-              final type = subStatus['type'] as String?;
-              final endDate = subStatus['endDate'] as DateTime?;
-              if (type != null && endDate != null) {
-                await PaymentService().updateCompanySubscription(
-                  sirketId: bulunanSirket.id,
-                  subscriptionType: type,
-                  subscriptionEndDate: endDate,
-                );
-              }
-            }
-          }
-
-          if (!subscriptionActive) {
-            final isAdmin = kullaniciYetkisi?.adminMi == true ||
-                _normalizeEmail(bulunanSirket.yoneticiEposta) == email;
-
-            if (isAdmin && (PaymentService().isPaymentSupported || !(await PaymentService().hasUsedTrial()))) {
-              // Admin: PaywallScreen göster (IAP + deneme veya sadece deneme)
-              if (mounted) {
-                final purchased = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (ctx) => const PaywallScreen(mode: PaywallMode.subscription),
-                  ),
-                );
-                if (purchased != true) {
-                  setState(() {
-                    _hataMetni = 'Devam etmek için aktif bir abonelik gerekli.';
-                  });
-                  return;
-                }
-                // Satın alma/deneme sonrası şirkete kaydet
-                final newSub = await PaymentService().getSubscriptionStatus();
-                if (newSub['active'] == true) {
-                  final t = newSub['type'] as String?;
-                  final d = newSub['endDate'] as DateTime?;
-                  if (t != null && d != null) {
-                    await PaymentService().updateCompanySubscription(
-                      sirketId: bulunanSirket.id,
-                      subscriptionType: t,
-                      subscriptionEndDate: d,
-                    );
-                  }
-                }
-              }
-            } else if (isAdmin) {
-              // Web admin, deneme de kullanılmış: Mobil uygulama gerekli
-              if (mounted) {
-                setState(() {
-                  _hataMetni = 'Devam etmek için aktif bir abonelik gerekli. Lütfen mobil uygulama üzerinden abonelik satın alın.';
-                });
-              }
-              return;
-            } else {
-              // Personel: Yöneticiye başvur
-              if (mounted) {
-                setState(() {
-                  _hataMetni = 'Şirketinizin aboneliği sona ermiştir. Lütfen şirket yöneticinize başvurun.';
-                });
-              }
-              return;
-            }
+          final resolvedPlan = planTierFromRaw(
+            bulunanSirket.planTier,
+            subscriptionType: bulunanSirket.subscriptionType,
+            subscriptionEndDate: bulunanSirket.subscriptionEndDate,
+          );
+          if (bulunanSirket.planTier != resolvedPlan.name) {
+            bulunanSirket.planTier = resolvedPlan.name;
+            unawaited(
+              FirebaseFirestore.instance
+                  .collection('sirketler')
+                  .doc(bulunanSirket.id)
+                  .set({'planTier': resolvedPlan.name}, SetOptions(merge: true)),
+            );
           }
 
           if (mounted) {
@@ -492,6 +588,15 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
             setState(() {
               _sirketBulunamadi = true;
             });
+
+            if (!_sirketKurulumYonlendirmesiAcildi) {
+              _sirketKurulumYonlendirmesiAcildi = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && _sirketBulunamadi) {
+                  _sirketKur();
+                }
+              });
+            }
           }
         }
       } catch (e) {
@@ -510,46 +615,6 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
   }
 
   Future<void> _sirketKur() async {
-    final paymentService = PaymentService();
-    await paymentService.initialize();
-
-    // Abonelik kontrolü
-    final subStatus = await paymentService.getSubscriptionStatus();
-
-    if (!(subStatus['active'] as bool)) {
-      if (paymentService.isPaymentSupported || !(await paymentService.hasUsedTrial())) {
-        // IAP veya deneme ile satın alma
-        if (mounted) {
-          final purchased = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
-          );
-          if (purchased != true) return;
-        }
-      } else {
-        // Web/diğer platformlar, deneme de kullanılmış: Mobil uygulama gerekli
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Abonelik Gerekli'),
-              content: const Text(
-                'Şirket kurmak için aktif bir aboneliğiniz olmalıdır. '
-                'Lütfen mobil uygulama üzerinden abonelik satın alın.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('TAMAM'),
-                ),
-              ],
-            ),
-          );
-        }
-        return;
-      }
-    }
-
     if (mounted) {
       _sirketKurDialog();
     }
@@ -564,7 +629,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Yeni Şirket Kur"),
+          title: const Text("Yeni Kullanıcı Kaydı"),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -624,6 +689,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                           'adminlar': {user.uid: true},
                           'olusturmaTarihi': FieldValue.serverTimestamp(),
                           'aktif': true,
+                          'planTier': PlanTier.free.name,
                         });
                         // sirketId'yi kullanıcıya kaydet
                         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -774,7 +840,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  "Bu hesapla ilişkili bir şirket bulunamadı. Yeni bir şirket kurabilir veya çıkış yapabilirsiniz.",
+                  "Bu hesapla ilişkili bir şirket bulunamadı. Şirket ayarları/kurulum adımına yönlendirilebilirsiniz.",
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -783,7 +849,7 @@ class _VeriYuklemeEkraniState extends State<VeriYuklemeEkrani> {
                   child: ElevatedButton.icon(
                     onPressed: _sirketKur,
                     icon: const Icon(Icons.add_business),
-                    label: const Text("Şirket Kur"),
+                    label: const Text("Şirket Ayarlarına Git"),
                   ),
                 ),
                 const SizedBox(height: 12),

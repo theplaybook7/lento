@@ -131,6 +131,8 @@ class _GorevAtaDialogState extends State<GorevAtaDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dialogWidth = screenWidth < 520 ? screenWidth * 0.9 : 400.0;
     final sirket = SistemYoneticisi().aktifSirket;
     final me = SistemYoneticisi().girisYapanEmail?.trim().toLowerCase() ?? '';
     // Personel listesi + şirket sahibi (kendisi hariç)
@@ -156,7 +158,7 @@ class _GorevAtaDialogState extends State<GorevAtaDialog> {
         ],
       ),
       content: SizedBox(
-        width: 400,
+        width: dialogWidth,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -267,8 +269,10 @@ class _GorevAtaDialogState extends State<GorevAtaDialog> {
                         elevation: 4,
                         borderRadius: BorderRadius.circular(6),
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                              maxHeight: 240, maxWidth: 380),
+                          constraints: BoxConstraints(
+                            maxHeight: 240,
+                            maxWidth: dialogWidth,
+                          ),
                           child: ListView.builder(
                             padding: EdgeInsets.zero,
                             shrinkWrap: true,

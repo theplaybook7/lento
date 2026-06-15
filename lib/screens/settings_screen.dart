@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -12,6 +13,7 @@ import '../utils/error_handler.dart';
 import '../services/fcm_service.dart';
 import '../utils/responsive_utils.dart' as resp;
 import '../payment_service.dart';
+import '../firebase_options.dart';
 import '../main.dart' show AuthGate;
 import 'paywall_screen.dart';
 
@@ -34,6 +36,81 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
   }
 
   bool get _isAdmin => _isCompanyOwner || (SistemYoneticisi().aktifKullaniciYetkileri?.adminMi == true);
+
+  String _normalizeEmail(String email) => email.trim().toLowerCase();
+
+  bool _isValidEmailFormat(String email) {
+    final pattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+    return pattern.hasMatch(email);
+  }
+
+  void _showUpgradeSnackBar(String message) {
+    final activePlan = SistemYoneticisi().aktifSirket?.aktifPlan ?? PlanTier.free;
+    final showUpgrade =
+        PaymentService().isPaymentSupported && activePlan != PlanTier.enterprise;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.orange,
+        action: showUpgrade
+            ? SnackBarAction(
+                label: 'Aboneligi Yukselt',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PaywallScreen(mode: PaywallMode.subscription),
+                    ),
+                  );
+                },
+              )
+            : null,
+      ),
+    );
+  }
+
+  Future<String> _createPersonnelAuthUser({
+    required String email,
+    required String password,
+  }) async {
+    final tempAppName = 'personel_create_${DateTime.now().millisecondsSinceEpoch}';
+    FirebaseApp? tempApp;
+    try {
+      tempApp = await Firebase.initializeApp(
+        name: tempAppName,
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      final tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+      final credential = await tempAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final uid = credential.user?.uid;
+      if (uid == null || uid.isEmpty) {
+        throw Exception('Personel hesabi olusturulamadi.');
+      }
+      return uid;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        throw Exception('Bu email zaten kayitli. Farkli bir email kullanin.');
+      }
+      if (e.code == 'invalid-email') {
+        throw Exception('Email adresi gecersiz.');
+      }
+      if (e.code == 'weak-password') {
+        throw Exception('Sifre en az 6 karakter olmali.');
+      }
+      throw Exception(e.message ?? 'Personel hesabi olusturulamadi.');
+    } finally {
+      try {
+        if (tempApp != null) {
+          await FirebaseAuth.instanceFor(app: tempApp).signOut();
+          await tempApp.delete();
+        }
+      } catch (_) {}
+    }
+  }
 
   late TextEditingController _adCtrl;
   late TextEditingController _telefonCtrl;
@@ -461,7 +538,15 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
       }
       return;
     }
+    if (!_sirket.planLimitleri.personelEkleyebilir) {
+      if (mounted) {
+        _showUpgradeSnackBar('Bu planda personel ekleme kapali. Buyuk Isletme planina gecerek personel ekleyebilirsiniz.');
+      }
+      return;
+    }
     final emailCtrl = TextEditingController();
+    final sifreCtrl = TextEditingController();
+    final sifreTekrarCtrl = TextEditingController();
     bool ruhsat = true;
     bool santiye = true;
     bool muhasebe = true;
@@ -489,6 +574,48 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     labelText: "Email",
                     hintText: "personel@sirket.com",
                     prefixIcon: Icon(Icons.email_outlined, color: AppTheme.primaryColor),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: sifreCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: "Gecici Sifre",
+                    hintText: "En az 6 karakter",
+                    prefixIcon: Icon(Icons.lock_outline, color: AppTheme.primaryColor),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: sifreTekrarCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: "Sifre Tekrar",
+                    hintText: "Gecici sifreyi tekrar girin",
+                    prefixIcon: Icon(Icons.lock_reset, color: AppTheme.primaryColor),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -565,12 +692,51 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   return;
                 }
 
-                final normalizedEmail = emailCtrl.text.trim().toLowerCase();
+                if (sifreCtrl.text.isEmpty || sifreTekrarCtrl.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Sifre alanlari bos olamaz")),
+                  );
+                  return;
+                }
+
+                final normalizedEmail = _normalizeEmail(emailCtrl.text);
+                final sifre = sifreCtrl.text;
+                final sifreTekrar = sifreTekrarCtrl.text;
+
+                if (!_isValidEmailFormat(normalizedEmail)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Gecerli bir email adresi girin (or. personel@sirket.com).'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                if (sifre.length < 6) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Sifre en az 6 karakter olmali.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                if (sifre != sifreTekrar) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Sifreler birbiriyle ayni olmali.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
 
                 // Aynı email bu şirkette zaten var mı?
                 final mevcutMu = _sirket.personelListesi.any(
-                  (p) => p.email.trim().toLowerCase() == normalizedEmail,
-                ) || _sirket.yoneticiEposta.trim().toLowerCase() == normalizedEmail;
+                  (p) => _normalizeEmail(p.email) == normalizedEmail,
+                ) || _normalizeEmail(_sirket.yoneticiEposta) == normalizedEmail;
                 if (mevcutMu) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -603,8 +769,26 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                   }
                 } catch (_) {}
 
+                String yeniKullaniciUid = '';
+                try {
+                  yeniKullaniciUid = await _createPersonnelAuthUser(
+                    email: normalizedEmail,
+                    password: sifre,
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(hataCevir(e)),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                  return;
+                }
+
                 final yeniPersonel = PersonelYetki(
-                  email: emailCtrl.text.trim(),
+                  email: normalizedEmail,
                   adminMi: admin,
                   goruntulemeRuhsat: ruhsat,
                   goruntulemeSantiye: santiye,
@@ -620,6 +804,14 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     'personelListesi': updatedList.map((p) => p.toMap()).toList(),
                     'emailler': FieldValue.arrayUnion([normalizedEmail]),
                   });
+
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(yeniKullaniciUid)
+                      .set({
+                    'email': normalizedEmail,
+                    'sirketId': _sirket.id,
+                  }, SetOptions(merge: true));
 
                   _sirket.personelListesi = updatedList;
                   SistemYoneticisi().aktifSirket = _sirket;
@@ -871,12 +1063,14 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
     final sirket = SistemYoneticisi().aktifSirket;
     final subEnd = sirket?.subscriptionEndDate;
     final subType = sirket?.subscriptionType;
+    final aktifPlan = sirket?.aktifPlan ?? PlanTier.free;
+    final limitler = planLimitleriFor(aktifPlan);
     final isActive = subEnd != null && subEnd.isAfter(DateTime.now());
     final isAdmin = SistemYoneticisi().aktifKullaniciYetkileri?.adminMi == true;
 
     return [
       Text(
-        'Abonelik Durumu',
+        'Plan ve Abonelik',
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.bold,
           color: AppTheme.primaryColor,
@@ -909,8 +1103,15 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
               ),
               if (subType != null) ...[
                 const SizedBox(height: 8),
-                Text('Plan: ${subType == 'yearly' ? 'Yıllık' : subType == 'monthly' ? 'Aylık' : subType == 'trial' ? '1 Hafta Deneme' : subType}'),
+                Text('Abonelik: ${subscriptionTypeLabel(subType)}'),
               ],
+              const SizedBox(height: 8),
+              Text('Kullanim Plani: ${planTierLabel(aktifPlan)}', style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text('Proje limiti: ${limitler.maxProjeSayisi?.toString() ?? 'Sinirsiz'}'),
+              Text('Cari limiti: ${limitler.maxCariSayisi?.toString() ?? 'Sinirsiz'}'),
+              Text('Personel ekleme: ${limitler.personelEkleyebilir ? 'Acik' : 'Kapali'}'),
+              Text('Proje paylasimi: ${limitler.projePaylasabilir ? 'Acik' : 'Kapali'}'),
               if (subEnd != null) ...[
                 const SizedBox(height: 4),
                 Text('Bitiş: ${DateFormat('dd.MM.yyyy').format(subEnd)}'),
@@ -928,11 +1129,22 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                       if (purchased == true && mounted) {
                         final sub = await PaymentService().getSubscriptionStatus();
                         if (sub['active'] == true && sirket != null) {
+                          final subType = sub['type'] as String;
+                          final yeniPlan = planTierFromRaw(
+                            null,
+                            subscriptionType: subType,
+                            subscriptionEndDate: sub['endDate'] as DateTime,
+                          ).name;
                           await PaymentService().updateCompanySubscription(
                             sirketId: sirket.id,
-                            subscriptionType: sub['type'] as String,
+                            subscriptionType: subType,
                             subscriptionEndDate: sub['endDate'] as DateTime,
                           );
+                          await FirebaseFirestore.instance
+                              .collection('sirketler')
+                              .doc(sirket.id)
+                              .set({'planTier': yeniPlan}, SetOptions(merge: true));
+                          _sirket.planTier = yeniPlan;
                         }
                         setState(() {});
                       }
@@ -975,11 +1187,22 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                         if (restored) {
                           final sub = await paymentService.getSubscriptionStatus();
                           if (sub['active'] == true && sirket != null) {
+                            final subType = sub['type'] as String;
+                            final yeniPlan = planTierFromRaw(
+                              null,
+                              subscriptionType: subType,
+                              subscriptionEndDate: sub['endDate'] as DateTime,
+                            ).name;
                             await paymentService.updateCompanySubscription(
                               sirketId: sirket.id,
-                              subscriptionType: sub['type'] as String,
+                              subscriptionType: subType,
                               subscriptionEndDate: sub['endDate'] as DateTime,
                             );
+                            await FirebaseFirestore.instance
+                                .collection('sirketler')
+                                .doc(sirket.id)
+                                .set({'planTier': yeniPlan}, SetOptions(merge: true));
+                            _sirket.planTier = yeniPlan;
                           }
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Satın alımlar geri yüklendi.'), backgroundColor: Colors.green),
@@ -999,6 +1222,22 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.grey.shade700,
                     ),
+                  ),
+                ),
+              ],
+              if (isAdmin && !PaymentService().isApplePaymentSupported) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.25)),
+                  ),
+                  child: const Text(
+                    'Satın Alımları Geri Yükle sadece iOS uygulamasında (App Store) görünür. Web/desktop sürümünde desteklenmez.',
+                    style: TextStyle(fontSize: 13),
                   ),
                 ),
               ],
@@ -1205,6 +1444,17 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                               ),
                             ),
                           ),
+                        if (_isAdmin && !_sirket.planLimitleri.personelEkleyebilir)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                            child: Text(
+                              "Bu planda personel ekleme kapalı. Buyuk Isletme planina gecerek personel ekleyebilirsiniz.",
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.orange.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                         if (_sirket.personelListesi.isEmpty)
                           Padding(
                             padding: const EdgeInsets.all(24),
@@ -1257,7 +1507,9 @@ class _SettingsSayfasiState extends State<SettingsSayfasi> {
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton.icon(
-                      onPressed: _saving || !_isAdmin ? null : _personelEkle,
+                      onPressed: _saving || !_isAdmin || !_sirket.planLimitleri.personelEkleyebilir
+                          ? null
+                          : _personelEkle,
                       icon: const Icon(Icons.person_add_outlined),
                       label: const Text("Yeni Personel Ekle"),
                       style: OutlinedButton.styleFrom(

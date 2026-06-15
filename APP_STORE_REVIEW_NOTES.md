@@ -22,6 +22,20 @@ E-posta: [test hesabı e-postası]
 Uygulama bir inşaat yönetim sistemidir. Giriş yaptıktan sonra projeler, cari hesaplar, 
 ödeme planları ve ruhsat takibi ekranlarına erişilebilir.
 
+Abonelik ayrımları (inceleme için):
+- company_monthly_subscription => SOLO (Tek Kişilik İşletme)
+	* Sınırsız proje/cari
+	* Personel ekleme yok
+	* Proje paylaşımı yok
+- company_yearly_subscription => BÜYÜK İŞLETME (Enterprise)
+	* Sınırsız proje/cari/personel
+	* Proje paylaşımı var
+	* Paylaşılan hesap için düzenleme yetkisi aç/kapat var
+
+Ücretsiz plan limiti:
+- En fazla 1 aktif proje
+- En fazla 10 cari hesap
+
 Bu güncellemede yapılan değişiklikler:
 1. Giriş ekranına "Şifremi Unuttum" butonu eklendi
 2. iOS'ta fotoğraf/belge yükleme hatası düzeltildi

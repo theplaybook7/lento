@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/project_model.dart';
+import '../project_core.dart';
 import 'dart:developer' as developer;
 
 class FirebaseService {
@@ -11,6 +12,15 @@ class FirebaseService {
 
   final _db = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
+
+  DateTime? _asDateTime(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
+  }
 
   // Firebase Storage referansı al
   Reference getStorageRef(String path) {
@@ -32,6 +42,29 @@ class FirebaseService {
     required String muteahhit,
   }) async {
     try {
+      final companyDoc = await _db.collection('sirketler').doc(companyId).get();
+      final companyData = companyDoc.data() ?? <String, dynamic>{};
+      final planTier = planTierFromRaw(
+        companyData['planTier'] as String?,
+        subscriptionType: companyData['subscriptionType'] as String?,
+        subscriptionEndDate: _asDateTime(companyData['subscriptionEndDate']),
+      );
+      final limitler = planLimitleriFor(planTier);
+      if (limitler.maxProjeSayisi != null) {
+        final projectCount = await _db
+            .collection('projects')
+            .where('companyId', isEqualTo: companyId)
+            .where('isArchived', isEqualTo: false)
+            .count()
+            .get();
+        final toplam = projectCount.count ?? 0;
+        if (toplam >= limitler.maxProjeSayisi!) {
+          throw Exception(
+            'Ucretsiz planda en fazla ${limitler.maxProjeSayisi} aktif proje olusturabilirsiniz. Yukseltme yaparak limite takilmadan devam edebilirsiniz.',
+          );
+        }
+      }
+
       final docRef = await _db.collection('projects').add({
         'companyId': companyId,
         'name': name,
@@ -59,6 +92,7 @@ class FirebaseService {
         _db.collection('ruhsat').doc(docRef.id).set({
           'projectId': docRef.id,
           'createdAt': DateTime.now(),
+          'flowVersion': 1,
           'documents': [],
         }),
         _db.collection('santiye').doc(docRef.id).set({
@@ -493,6 +527,84 @@ class FirebaseService {
 
             return projects;
         });
+  }
+
+  /// Kullanıcının görebileceği projeler: kendi şirket projeleri + kendisiyle paylaşılan projeler
+  Stream<List<Project>> getVisibleProjectsStream({
+    required String companyId,
+    required String userEmail,
+  }) {
+    final normalizedEmail = userEmail.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      return getProjectsStream(companyId);
+    }
+
+    final controller = StreamController<List<Project>>();
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> ownDocs = [];
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> sharedDocs = [];
+
+    void emitMerged() {
+      final byId = <String, Project>{};
+
+      for (final doc in ownDocs) {
+        final data = doc.data();
+        if ((data['isArchived'] ?? false) == true) continue;
+        byId[doc.id] = Project.fromMap(data, doc.id);
+      }
+
+      for (final doc in sharedDocs) {
+        final data = doc.data();
+        if ((data['isArchived'] ?? false) == true) continue;
+        byId[doc.id] = Project.fromMap({
+          ...data,
+          'isSharedWithMe': true,
+        }, doc.id);
+      }
+
+      final projects = byId.values.toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      if (!controller.isClosed) {
+        controller.add(projects);
+      }
+    }
+
+    final ownSub = _db
+        .collection('projects')
+        .where('companyId', isEqualTo: companyId)
+        .snapshots()
+        .listen(
+      (snap) {
+        ownDocs = snap.docs;
+        emitMerged();
+      },
+      onError: (e, st) {
+        if (!controller.isClosed) controller.addError(e, st);
+      },
+    );
+
+    final sharedSub = _db
+        .collection('projects')
+        .where('paylasilanEmailler', arrayContains: normalizedEmail)
+        .snapshots()
+        .listen(
+      (snap) {
+        sharedDocs = snap.docs;
+        emitMerged();
+      },
+      onError: (e, st) {
+        developer.log('Paylasilan proje stream hatasi (fallback own projects): $e');
+        sharedDocs = [];
+        emitMerged();
+      },
+    );
+
+    controller.onCancel = () async {
+      await ownSub.cancel();
+      await sharedSub.cancel();
+    };
+
+    return controller.stream;
   }
 }
 

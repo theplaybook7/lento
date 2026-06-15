@@ -1,14 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'dart:async';
+
+import 'project_core.dart';
 
 class PaymentService {
   static final PaymentService _instance = PaymentService._internal();
   
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   final InAppPurchase _iap = InAppPurchase.instance;
 
   StreamSubscription<List<PurchaseDetails>>? _subscription;
@@ -17,12 +21,23 @@ class PaymentService {
   Completer<bool>? _purchaseCompleter;
   String? _pendingProductId;
   
-  // Ürün ID'leri - Subscription
-  static const String yearlySubscriptionId = 'company_yearly_subscription';
-  static const String monthlySubscriptionId = 'company_monthly_subscription';
+  // Yeni App Store ürün ID'leri
+  static const String soloMonthlySubscriptionId =
+      'company_solo_monthly_subscription';
+  static const String enterpriseMonthlySubscriptionId =
+      'company_enterprise_monthly_subscription';
+
+  // Legacy ürünler - yalnızca geri yükleme/geçiş desteği için tutulur.
+  static const String legacyMonthlySubscriptionId =
+      'company_monthly_subscription';
+  static const String legacyYearlySubscriptionId =
+      'company_yearly_subscription';
+
   static const Set<String> _subscriptionProductIds = {
-    yearlySubscriptionId,
-    monthlySubscriptionId,
+    soloMonthlySubscriptionId,
+    enterpriseMonthlySubscriptionId,
+    legacyMonthlySubscriptionId,
+    legacyYearlySubscriptionId,
   };
   
   
@@ -82,19 +97,24 @@ class PaymentService {
   }
 
   String? _subscriptionTypeFromProductId(String productId) {
-    if (productId == yearlySubscriptionId) return 'yearly';
-    if (productId == monthlySubscriptionId) return 'monthly';
+    if (productId == soloMonthlySubscriptionId ||
+        productId == legacyMonthlySubscriptionId) {
+      return subscriptionTypeSoloMonthly;
+    }
+    if (productId == enterpriseMonthlySubscriptionId ||
+        productId == legacyYearlySubscriptionId) {
+      return subscriptionTypeEnterpriseMonthly;
+    }
     return null;
   }
 
-  DateTime _subscriptionEndDateForType(String type) {
-    if (type == 'yearly') {
-      return DateTime.now().add(const Duration(days: 365));
-    }
-    if (type == 'trial') {
-      return DateTime.now().add(const Duration(days: 7));
-    }
-    return DateTime.now().add(const Duration(days: 30));
+  DateTime? _asDateTime(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
   }
 
   /// 1 haftalık ücretsiz deneme başlat
@@ -106,46 +126,33 @@ class PaymentService {
         return false;
       }
 
-      // Daha önce deneme kullanılmış mı kontrol et
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        final data = userDoc.data() as Map<String, dynamic>;
-        if (data['trialUsed'] == true) {
-          _lastError = 'Ücretsiz deneme hakkınız daha önce kullanılmıştır.';
-          return false;
-        }
-      }
-
-      final endDate = _subscriptionEndDateForType('trial');
-
-      await _firestore.collection('users').doc(user.uid).set({
-        'companyCreationPaid': true,
-        'paidAt': DateTime.now(),
-        'subscriptionType': 'trial',
-        'subscriptionEndDate': Timestamp.fromDate(endDate),
-        'autoRenew': false,
-        'trialUsed': true,
-        'trialStartDate': DateTime.now(),
-        'lastPurchaseStatus': 'trial',
-      }, SetOptions(merge: true));
-
-      // Şirkete de yaz
-      try {
-        final sirketId = userDoc.data()?['sirketId'] as String?;
-        if (sirketId != null && sirketId.isNotEmpty) {
-          await updateCompanySubscription(
-            sirketId: sirketId,
-            subscriptionType: 'trial',
-            subscriptionEndDate: endDate,
-          );
-        }
-      } catch (_) {}
+      final callable = _functions.httpsCallable('activateFreeTrial');
+      await callable.call(<String, dynamic>{});
 
       _lastError = '';
       return true;
     } catch (e) {
       _lastError = 'Deneme başlatılamadı: $e';
       return false;
+    }
+  }
+
+  Future<void> _verifyApplePurchase(PurchaseDetails purchase) async {
+    final receipt = purchase.verificationData.serverVerificationData;
+    if (receipt.isEmpty) {
+      throw Exception('Apple receipt verisi bos geldi.');
+    }
+
+    final callable = _functions.httpsCallable('verifyAppStoreReceipt');
+    final res = await callable.call(<String, dynamic>{
+      'receipt': receipt,
+      'productId': purchase.productID,
+      'purchaseId': purchase.purchaseID,
+    });
+
+    final data = res.data;
+    if (data is! Map || data['success'] != true) {
+      throw Exception('Sunucu satin alma dogrulamasi basarisiz.');
     }
   }
 
@@ -190,31 +197,16 @@ class PaymentService {
       final subscriptionType = _subscriptionTypeFromProductId(purchase.productID);
 
       if (user != null && subscriptionType != null) {
-        final subscriptionEndDate = _subscriptionEndDateForType(subscriptionType);
-
-        await _firestore.collection('users').doc(user.uid).set({
-          'companyCreationPaid': true,
-          'paidAt': DateTime.now(),
-          'productId': purchase.productID,
-          'transactionId': purchase.purchaseID,
-          'subscriptionType': subscriptionType,
-          'subscriptionEndDate': Timestamp.fromDate(subscriptionEndDate),
-          'autoRenew': true,
-          'lastPurchaseStatus': purchase.status.name,
-        }, SetOptions(merge: true));
-
-        // Şirkete de yaz
-        try {
-          final userDoc = await _firestore.collection('users').doc(user.uid).get();
-          final sirketId = userDoc.data()?['sirketId'] as String?;
-          if (sirketId != null && sirketId.isNotEmpty) {
-            await updateCompanySubscription(
-              sirketId: sirketId,
-              subscriptionType: subscriptionType,
-              subscriptionEndDate: subscriptionEndDate,
-            );
+        if (isApplePaymentSupported) {
+          await _verifyApplePurchase(purchase);
+        } else {
+          _lastError = 'Bu platformda guvenli sunucu dogrulamasi henuz aktif degil.';
+          _completePurchaseFlow(false, productId: purchase.productID);
+          if (purchase.pendingCompletePurchase) {
+            await _iap.completePurchase(purchase);
           }
-        } catch (_) {}
+          return;
+        }
 
         _lastError = '';
         _completePurchaseFlow(true, productId: purchase.productID);
@@ -266,15 +258,15 @@ class PaymentService {
 
       if (userDoc.exists) {
         final data = userDoc.data() as Map<String, dynamic>;
-        final endDate = data['subscriptionEndDate'] as Timestamp?;
-        final type = data['subscriptionType'] as String?;
+        final endDate = _asDateTime(data['subscriptionEndDate']);
+        final type = normalizeSubscriptionType(data['subscriptionType'] as String?);
         
         if (endDate != null) {
-          final isActive = endDate.toDate().isAfter(DateTime.now());
+          final isActive = endDate.isAfter(DateTime.now());
           return {
             'active': isActive,
             'type': type,
-            'endDate': endDate.toDate(),
+            'endDate': endDate,
           };
         }
       }
@@ -428,10 +420,19 @@ class PaymentService {
     required DateTime subscriptionEndDate,
   }) async {
     try {
+      final normalizedType = subscriptionType.trim().toLowerCase();
+      final normalizedSubscriptionType =
+          normalizeSubscriptionType(normalizedType);
+      final planTier = planTierFromRaw(
+        null,
+        subscriptionType: normalizedSubscriptionType,
+        subscriptionEndDate: subscriptionEndDate,
+      ).name;
       await _firestore.collection('sirketler').doc(sirketId).update({
-        'subscriptionType': subscriptionType,
+        'subscriptionType': normalizedSubscriptionType,
         'subscriptionEndDate': Timestamp.fromDate(subscriptionEndDate),
-        'autoRenew': true,
+        'autoRenew': normalizedSubscriptionType != subscriptionTypeTrial,
+        'planTier': planTier,
       });
     } catch (_) {
       // Best effort

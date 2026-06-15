@@ -73,6 +73,10 @@ String hataCevir(Object e) {
     return 'Veri okunamadı. Lütfen tekrar deneyin.';
   }
 
+  if (mesaj.startsWith('Exception: ')) {
+    return mesaj.replaceFirst('Exception: ', '').trim();
+  }
+
   // Genel hata — teknik detayı göstermeden kısa bir mesaj
   return 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.';
 }

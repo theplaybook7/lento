@@ -40,8 +40,8 @@
 				"lib/firebase_options.dart": {
 					"projectId": "insaat-yonetim-takip",
 					"configurations": {
-						"ios": "1:478876596230:ios:b9a10331363d2749dd6b87",
-						"macos": "1:478876596230:ios:b9a10331363d2749dd6b87",
+						"ios": "1:478876596230:ios:b862535e946b080bdd6b87",
+						"macos": "1:478876596230:ios:b862535e946b080bdd6b87",
 						"web": "1:478876596230:web:bf478c1b7775f737dd6b87"
 					}
 				}

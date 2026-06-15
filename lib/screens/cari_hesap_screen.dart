@@ -921,7 +921,7 @@ class _CariDetayScreenState extends State<CariDetayScreen> {
         children: [
           ListTile(
             leading: CircleAvatar(
-              backgroundColor: renk.withValues(alpha: (renk.a * 255.0 * 0.1).clamp(0, 255)),
+              backgroundColor: renk.withValues(alpha: 0.1),
               child: Icon(ikon, color: renk, size: 20),
             ),
             title: Text(

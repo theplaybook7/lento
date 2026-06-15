@@ -80,12 +80,23 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
       barrierColor: Colors.black54,
       builder: (ctx) {
         final screenWidth = MediaQuery.of(ctx).size.width;
-        final bubbleWidth = screenWidth.clamp(280.0, 390.0).toDouble();
+        final bubbleWidth = (screenWidth - 24).clamp(260.0, 390.0).toDouble();
 
         final isBelow = rect.top < MediaQuery.of(ctx).size.height * 0.5;
         final bubbleTop = isBelow ? rect.bottom + 14 : rect.top - 14;
-        final bubbleLeft = (rect.center.dx - bubbleWidth / 2)
-            .clamp(12.0, screenWidth - bubbleWidth - 12.0);
+        final minBubbleLeft = 12.0;
+        final maxBubbleLeft = (screenWidth - bubbleWidth - 12.0).toDouble();
+        final bubbleLeft = maxBubbleLeft >= minBubbleLeft
+          ? (rect.center.dx - bubbleWidth / 2)
+            .clamp(minBubbleLeft, maxBubbleLeft)
+            .toDouble()
+          : minBubbleLeft;
+
+        final minHighlightLeft = 4.0;
+        final maxHighlightLeft = (screenWidth - rect.width - 4.0).toDouble();
+        final highlightLeft = maxHighlightLeft >= minHighlightLeft
+          ? (rect.left - 8).clamp(minHighlightLeft, maxHighlightLeft).toDouble()
+          : minHighlightLeft;
 
         return Stack(
           children: [
@@ -96,7 +107,7 @@ class _DashboardSayfasiState extends State<DashboardSayfasi> {
               ),
             ),
             Positioned(
-              left: (rect.left - 8).clamp(4.0, screenWidth - rect.width - 4.0),
+              left: highlightLeft,
               top: (rect.top - 8).clamp(4.0, MediaQuery.of(ctx).size.height - rect.height - 4.0),
               child: IgnorePointer(
                 child: Container(
